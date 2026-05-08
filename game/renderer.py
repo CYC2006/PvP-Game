@@ -1,4 +1,5 @@
 import os
+import math
 import pygame
 from game.state import GameState, MAX_HP, MAP_WIDTH, MAP_HEIGHT, PLAYER_RADIUS, BULLET_RADIUS
 
@@ -114,8 +115,10 @@ def _draw_obstacles(screen, obstacles: dict, destroyed: set, cx, cy):
         if sx < -w or sx > SCREEN_W + w or sy < -h or sy > SCREEN_H + h:
             continue
 
-        sprite = _get_obstacle_sprite(obs.kind, w, h)
-        screen.blit(sprite, (sx - w // 2, sy - h // 2))
+        sprite  = _get_obstacle_sprite(obs.kind, w, h)
+        rotated = pygame.transform.rotate(sprite, -math.degrees(obs.angle))
+        screen.blit(rotated, (sx - rotated.get_width() // 2,
+                               sy - rotated.get_height() // 2))
 
 
 # ── 子彈 ──────────────────────────────────────────────────────────────────────
