@@ -1,0 +1,107 @@
+import socket
+import sys
+import time
+import pygame
+
+from game.input    import read_input
+from game.renderer import draw, SCREEN_W, SCREEN_H
+from game.state    import GameState
+from network.protocol import (
+    PKT_JOINED, PKT_STATE,
+    pack_join, pack_command,
+    unpack_joined, unpack_state,
+    packet_type,
+)
+
+PORT                = 5000
+BUF_SIZE            = 1024
+FPS                 = 60
+JOIN_RETRY_INTERVAL = 1.0
+
+
+def connect(sock: socket.socket, server_addr: tuple) -> int:
+    print(f"[Client] Connecting to {server_addr[0]}:{server_addr[1]} ...")
+    last_sent = 0.0
+    while True:
+        now = time.perf_counter()
+        if now - last_sent >= JOIN_RETRY_INTERVAL:
+            sock.sendto(pack_join(), server_addr)
+            last_sent = now
+        try:
+            data, _ = sock.recvfrom(BUF_SIZE)
+            if packet_type(data) == PKT_JOINED:
+                pid = unpack_joined(data)
+                print(f"[Client] Joined as Player {pid}")
+                return pid
+        except BlockingIOError:
+            pass
+        time.sleep(0.05)
+
+
+def run(server_ip: str) -> None:
+    server_addr = (server_ip, PORT)
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setblocking(False)
+
+    player_id = connect(sock, server_addr)
+
+    pygame.init()
+    pygame.mouse.set_visible(True)
+    screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+    pygame.display.set_caption(f"PvP Game — Player {player_id}")
+    font  = pygame.font.SysFont("monospace", 15)
+    clock = pygame.time.Clock()
+
+    state     = GameState()
+    keys_held: set = set()   # KEYDOWN/KEYUP 事件追蹤，比 key.get_pressed() 更可靠
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+                keys_held.add(event.key)
+            elif event.type == pygame.KEYUP:
+                keys_held.discard(event.key)
+
+        cmd = read_input(player_id, keys_held)
+        try:
+            sock.sendto(pack_command(cmd), server_addr)
+        except Exception:
+            pass
+
+        # 接收最新 state（drain 全部，只保留最新一筆）
+        latest = None
+        while True:
+            try:
+                data, _ = sock.recvfrom(BUF_SIZE)
+                if packet_type(data) == PKT_STATE:
+                    latest = data
+            except BlockingIOError:
+                break
+        if latest:
+            state = unpack_state(latest)
+
+        draw(screen, state, player_id, font)
+        pygame.display.flip()
+        clock.tick(FPS)
+
+    pygame.quit()
+    sock.close()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        server_ip = input("Server IP: ").strip()
+    else:
+        server_ip = sys.argv[1]
+
+    try:
+        run(server_ip)
+    except KeyboardInterrupt:
+        print("\n[Client] Disconnected.")
+        sys.exit(0)
