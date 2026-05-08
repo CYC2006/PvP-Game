@@ -2,7 +2,8 @@ import socket
 import time
 import sys
 
-from game.state import GameState
+from game.state    import GameState
+from game.obstacle import load_map
 from network.protocol import (
     PKT_JOIN, PKT_CMD,
     pack_joined, pack_state,
@@ -14,7 +15,8 @@ PORT        = 5000
 TICK_RATE   = 60
 TICK_DT     = 1.0 / TICK_RATE
 MAX_PLAYERS = 2
-BUF_SIZE    = 512
+BUF_SIZE    = 1024
+MAP_PATH    = "maps/map_01.json"
 
 
 def get_local_ip() -> str:
@@ -27,13 +29,18 @@ def get_local_ip() -> str:
 
 
 def run():
+    # 載入地圖
+    obstacles   = load_map(MAP_PATH)
+    obstacle_hp = {oid: obs.hp for oid, obs in obstacles.items()}
+    print(f"[Server] Loaded map: {len(obstacles)} obstacles")
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((HOST, PORT))
     sock.setblocking(False)
 
-    state: GameState       = GameState()
-    clients: dict[int, tuple]     = {}   # player_id → (ip, port)
-    addr_to_id: dict[tuple, int]  = {}
+    state: GameState          = GameState()
+    clients: dict[int, tuple] = {}
+    addr_to_id: dict          = {}
 
     print(f"[Server] Listening on {get_local_ip()}:{PORT}")
     print(f"[Server] Waiting for {MAX_PLAYERS} players...")
@@ -41,7 +48,7 @@ def run():
     next_tick = time.perf_counter()
 
     while True:
-        # ── receive all pending packets ───────────────────────────────────
+        # ── 收封包 ────────────────────────────────────────────────
         while True:
             try:
                 data, addr = sock.recvfrom(BUF_SIZE)
@@ -61,8 +68,6 @@ def run():
                         print(f"[Server] Player {pid} joined from {addr}")
                         if len(clients) == MAX_PLAYERS:
                             print("[Server] Game start!")
-                    else:
-                        print(f"[Server] Rejected {addr}: server full")
 
             elif ptype == PKT_CMD:
                 if addr in addr_to_id and len(clients) == MAX_PLAYERS:
@@ -73,12 +78,13 @@ def run():
                         cmd.shooting, cmd.aim_x, cmd.aim_y,
                     )
 
-        # ── tick ──────────────────────────────────────────────────────────
+        # ── Tick ──────────────────────────────────────────────────
         now = time.perf_counter()
         if now >= next_tick:
             next_tick += TICK_DT
             state.tick += 1
-            state.step_bullets()   # move bullets + resolve hits
+            state.step_bullets(obstacles, obstacle_hp)
+            state.resolve_player_collisions(obstacles)
 
             if len(clients) == MAX_PLAYERS:
                 payload = pack_state(state)

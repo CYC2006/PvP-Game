@@ -6,6 +6,7 @@ import pygame
 from game.input    import read_input
 from game.renderer import draw, LOGICAL_W, LOGICAL_H
 from game.state    import GameState
+from game.obstacle import load_map
 from network.protocol import (
     PKT_JOINED, PKT_STATE,
     pack_join, pack_command,
@@ -17,6 +18,7 @@ PORT                = 5000
 BUF_SIZE            = 1024
 FPS                 = 60
 JOIN_RETRY_INTERVAL = 1.0
+MAP_PATH            = "maps/map_01.json"
 
 
 def connect(sock: socket.socket, server_addr: tuple) -> int:
@@ -39,24 +41,17 @@ def connect(sock: socket.socket, server_addr: tuple) -> int:
 
 
 def get_viewport(screen_w: int, screen_h: int) -> tuple:
-    """
-    計算在實際螢幕上，等比例放大邏輯畫面的位置與尺寸。
-    回傳 (scaled_w, scaled_h, offset_x, offset_y, scale)
-    """
-    scale     = min(screen_w / LOGICAL_W, screen_h / LOGICAL_H)
-    scaled_w  = int(LOGICAL_W * scale)
-    scaled_h  = int(LOGICAL_H * scale)
-    offset_x  = (screen_w - scaled_w) // 2
-    offset_y  = (screen_h - scaled_h) // 2
-    return scaled_w, scaled_h, offset_x, offset_y, scale
+    scale    = min(screen_w / LOGICAL_W, screen_h / LOGICAL_H)
+    scaled_w = int(LOGICAL_W * scale)
+    scaled_h = int(LOGICAL_H * scale)
+    off_x    = (screen_w - scaled_w) // 2
+    off_y    = (screen_h - scaled_h) // 2
+    return scaled_w, scaled_h, off_x, off_y, scale
 
 
 def screen_to_logical(sx: int, sy: int,
-                      offset_x: int, offset_y: int, scale: float) -> tuple:
-    """螢幕座標 → 邏輯畫布座標"""
-    lx = int((sx - offset_x) / scale)
-    ly = int((sy - offset_y) / scale)
-    return lx, ly
+                       off_x: int, off_y: int, scale: float) -> tuple:
+    return int((sx - off_x) / scale), int((sy - off_y) / scale)
 
 
 def run(server_ip: str) -> None:
@@ -67,48 +62,41 @@ def run(server_ip: str) -> None:
 
     player_id = connect(sock, server_addr)
 
+    # 載入地圖（與 server 相同的 JSON）
+    obstacles = load_map(MAP_PATH)
+
     pygame.init()
     pygame.mouse.set_visible(True)
-
-    # 起始為視窗模式（邏輯解析度）
-    screen     = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
-    fullscreen = False
+    screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
     pygame.display.set_caption(f"PvP Game — Player {player_id}")
-    font  = pygame.font.SysFont("monospace", 15)
-    clock = pygame.time.Clock()
-
-    # 邏輯畫布：所有遊戲繪圖都在這裡
+    font       = pygame.font.SysFont("monospace", 15)
+    clock      = pygame.time.Clock()
     logical_surf = pygame.Surface((LOGICAL_W, LOGICAL_H))
 
     state     = GameState()
     keys_held: set = set()
+    fullscreen = False
 
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_F11:
-                    # F11 切換全螢幕
                     fullscreen = not fullscreen
                     if fullscreen:
                         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                     else:
                         screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
                 keys_held.add(event.key)
-
             elif event.type == pygame.KEYUP:
                 keys_held.discard(event.key)
 
-        # 計算當前縮放參數
         sw, sh = screen.get_size()
         scaled_w, scaled_h, off_x, off_y, scale = get_viewport(sw, sh)
-
-        # 滑鼠螢幕座標 → 邏輯座標
         raw_mx, raw_my = pygame.mouse.get_pos()
         logical_mouse  = screen_to_logical(raw_mx, raw_my, off_x, off_y, scale)
 
@@ -118,7 +106,6 @@ def run(server_ip: str) -> None:
         except Exception:
             pass
 
-        # 接收最新 state（drain 全部，只保留最新一筆）
         latest = None
         while True:
             try:
@@ -130,14 +117,11 @@ def run(server_ip: str) -> None:
         if latest:
             state = unpack_state(latest)
 
-        # 畫到邏輯畫布
-        draw(logical_surf, state, player_id, font)
+        draw(logical_surf, state, player_id, font, obstacles)
 
-        # 縮放到實際螢幕（黑邊填充）
         screen.fill((0, 0, 0))
         scaled = pygame.transform.scale(logical_surf, (scaled_w, scaled_h))
         screen.blit(scaled, (off_x, off_y))
-
         pygame.display.flip()
         clock.tick(FPS)
 

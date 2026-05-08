@@ -1,15 +1,15 @@
 from dataclasses import dataclass, field
 import math
 
-MAP_WIDTH  = 3840
-MAP_HEIGHT = 2160
+MAP_WIDTH  = 1920   # 縮小以方便測試（原 3840）
+MAP_HEIGHT = 1080   # 縮小以方便測試（原 2160）
 
-PLAYER_SPEED  = 3.0
-PLAYER_RADIUS = 16
-BULLET_SPEED  = 8.0
-BULLET_RADIUS = 5
-MAX_HP        = 5
-BULLET_MAX_RANGE = 900   # pixels before bullet disappears
+PLAYER_SPEED     = 3.0
+PLAYER_RADIUS    = 16
+BULLET_SPEED     = 8.0
+BULLET_RADIUS    = 5
+MAX_HP           = 5
+BULLET_MAX_RANGE = 900
 
 
 @dataclass
@@ -39,7 +39,7 @@ class Bullet:
     owner_id: int
     x: float
     y: float
-    dx: float       # normalised direction × speed
+    dx: float
     dy: float
     distance_travelled: float = 0.0
 
@@ -58,10 +58,11 @@ class Bullet:
 
 @dataclass
 class GameState:
-    players: dict = field(default_factory=dict)
-    bullets: dict = field(default_factory=dict)   # bullet_id → Bullet
-    tick: int = 0
-    _next_bullet_id: int = 0
+    players: dict            = field(default_factory=dict)
+    bullets: dict            = field(default_factory=dict)
+    destroyed_obstacles: set = field(default_factory=set)  # 已被摧毀的障礙物 ID
+    tick: int                = 0
+    _next_bullet_id: int     = 0
 
     def add_player(self, player_id: int) -> Player:
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -92,23 +93,63 @@ class GameState:
             dx=ndx, dy=ndy,
         )
 
-    def step_bullets(self) -> None:
-        """Move all bullets and resolve hits. Called once per server tick."""
+    def step_bullets(self, obstacles: dict = None,
+                     obstacle_hp: dict = None) -> None:
+        """
+        移動所有子彈，解析碰撞。
+        obstacles   : {id: Obstacle}，伺服器傳入
+        obstacle_hp : {id: int}，伺服器端 HP 追蹤
+        """
+        if obstacles is None:
+            obstacles = {}
+
         expired = []
         for bid, bullet in self.bullets.items():
             bullet.step()
             if bullet.is_expired():
                 expired.append(bid)
                 continue
-            # collision with players
+
+            hit = False
+
+            # 子彈 vs 玩家
             for pid, player in self.players.items():
                 if pid == bullet.owner_id:
                     continue
                 if math.hypot(bullet.x - player.x, bullet.y - player.y) < PLAYER_RADIUS + BULLET_RADIUS:
                     player.hp -= 1
-                    expired.append(bid)
                     if player.hp <= 0:
                         player.respawn()
+                    expired.append(bid)
+                    hit = True
                     break
+
+            if hit:
+                continue
+
+            # 子彈 vs 障礙物
+            for oid, obs in obstacles.items():
+                if oid in self.destroyed_obstacles:
+                    continue
+                if obs.collides_circle(bullet.x, bullet.y, BULLET_RADIUS):
+                    if obstacle_hp is not None:
+                        obstacle_hp[oid] -= 1
+                        if obstacle_hp[oid] <= 0:
+                            self.destroyed_obstacles.add(oid)
+                    expired.append(bid)
+                    break
+
         for bid in expired:
             self.bullets.pop(bid, None)
+
+    def resolve_player_collisions(self, obstacles: dict = None) -> None:
+        """將所有玩家從非破壞的障礙物中推出"""
+        if not obstacles:
+            return
+        for player in self.players.values():
+            for oid, obs in obstacles.items():
+                if oid in self.destroyed_obstacles:
+                    continue
+                new_x, new_y = obs.push_out_circle(player.x, player.y, PLAYER_RADIUS)
+                player.x = new_x
+                player.y = new_y
