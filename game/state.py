@@ -89,14 +89,18 @@ class GameState:
         uy  = aim_y / length
         ndx = ux * BULLET_SPEED
         ndy = uy * BULLET_SPEED
-        # 從槍口生成，避免子彈出現在角色中心
-        barrel = PLAYER_RADIUS + 10   # 槍口距角色中心的像素數
+        # 槍口位置 = 中心 + 前方偏移 + 右肩偏移
+        # 右肩方向（逆時針 90°）：(-uy, ux)
+        barrel_fwd   = PLAYER_RADIUS + 10   # 前方距離（px）
+        barrel_right = 8                    # 右肩距離（px）
+        rx = -uy   # 角色右方單位向量 x
+        ry =  ux   # 角色右方單位向量 y
         bid = self._next_bullet_id
         self._next_bullet_id = (self._next_bullet_id + 1) % 256
         self.bullets[bid] = Bullet(
             id=bid, owner_id=owner_id,
-            x=player.x + ux * barrel,
-            y=player.y + uy * barrel,
+            x=player.x + ux * barrel_fwd + rx * barrel_right,
+            y=player.y + uy * barrel_fwd + ry * barrel_right,
             dx=ndx, dy=ndy,
         )
 
