@@ -28,8 +28,7 @@ def read_input(player_id: int, keys_held: set,
     if pygame.K_a in keys_held or pygame.K_LEFT  in keys_held: dx -= 1.0
     if pygame.K_d in keys_held or pygame.K_RIGHT in keys_held: dx += 1.0
 
-    moving    = dx != 0.0 or dy != 0.0
-    crouching = shift_held and moving
+    crouching = shift_held   # 按住 Shift 即蹲下，不需移動
 
     effective_stance = "hold" if crouching else stance
 
