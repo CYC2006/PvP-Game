@@ -85,13 +85,18 @@ class GameState:
         length = math.hypot(aim_x, aim_y)
         if length == 0:
             return
-        ndx = aim_x / length * BULLET_SPEED
-        ndy = aim_y / length * BULLET_SPEED
+        ux  = aim_x / length          # 瞄準方向單位向量
+        uy  = aim_y / length
+        ndx = ux * BULLET_SPEED
+        ndy = uy * BULLET_SPEED
+        # 從槍口生成，避免子彈出現在角色中心
+        barrel = PLAYER_RADIUS + 10   # 槍口距角色中心的像素數
         bid = self._next_bullet_id
         self._next_bullet_id = (self._next_bullet_id + 1) % 256
         self.bullets[bid] = Bullet(
             id=bid, owner_id=owner_id,
-            x=player.x, y=player.y,
+            x=player.x + ux * barrel,
+            y=player.y + uy * barrel,
             dx=ndx, dy=ndy,
         )
 

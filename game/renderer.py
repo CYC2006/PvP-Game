@@ -187,7 +187,9 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             angle  = 0.0
 
         sprite  = _get_player_sprite("hitman1", stance)
-        rotated = pygame.transform.rotate(sprite, -angle)
+        # sprite 預設朝右（+x 方向），pygame rotate 逆時針為正
+        # 90 - angle 讓 angle=0（瞄準正上方）時轉 +90°（逆時針），sprite 正確朝上
+        rotated = pygame.transform.rotate(sprite, 90 - angle)
         screen.blit(rotated, (sx - rotated.get_width()  // 2,
                                sy - rotated.get_height() // 2))
 
