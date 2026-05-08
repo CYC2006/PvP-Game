@@ -20,12 +20,13 @@ class Player:
     speed: float = PLAYER_SPEED
     hp: int = MAX_HP
 
-    def move(self, dx: float, dy: float) -> None:
+    def move(self, dx: float, dy: float, crouching: bool = False) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
         if length > 0:
             dx, dy = dx / length, dy / length
-        self.x = max(PLAYER_RADIUS, min(MAP_WIDTH  - PLAYER_RADIUS, self.x + dx * self.speed))
-        self.y = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS, self.y + dy * self.speed))
+        speed = self.speed * (0.5 if crouching else 1.0)
+        self.x = max(PLAYER_RADIUS, min(MAP_WIDTH  - PLAYER_RADIUS, self.x + dx * speed))
+        self.y = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS, self.y + dy * speed))
 
     def respawn(self) -> None:
         self.hp = MAX_HP
@@ -71,10 +72,11 @@ class GameState:
         return self.players[player_id]
 
     def apply_command(self, player_id: int, dx: float, dy: float,
-                      shooting: bool, aim_x: float, aim_y: float) -> None:
+                      shooting: bool, aim_x: float, aim_y: float,
+                      crouching: bool = False) -> None:
         if player_id not in self.players:
             return
-        self.players[player_id].move(dx, dy)
+        self.players[player_id].move(dx, dy, crouching)
         if shooting:
             self._spawn_bullet(player_id, aim_x, aim_y)
 

@@ -28,9 +28,44 @@ HP_BAR_Y_FROM_BOTTOM = 50
 HP_BAR_W             = 160
 HP_BAR_H             = 18
 HP_PIP_GAP           = 4
+PLAYER_SPRITE_SCALE  = 1.5   # 原圖 33–54 × 43 px，放大後約 50–81 × 65 px
+
+# 角色定義：char_key → (資料夾名稱, 檔名前綴)
+CHAR_DIR: dict = {
+    "hitman1": ("Hitman 1", "hitman1"),
+}
 
 # 障礙物圖片快取：(kind, w, h) → Surface
 _sprite_cache: dict = {}
+# 角色圖片快取：(char_key, stance) → Surface（原尺寸 × PLAYER_SPRITE_SCALE）
+_player_cache: dict = {}
+
+# HUD stance 顯示顏色
+COL_STANCE = {
+    "stand":   (160, 160, 160),
+    "machine": (255, 200,  60),
+    "hold":    ( 80, 160, 255),
+}
+
+
+def _get_player_sprite(char_key: str, stance: str) -> pygame.Surface:
+    """載入並快取角色 sprite（按 PLAYER_SPRITE_SCALE 放大，保持原始比例）。"""
+    key = (char_key, stance)
+    if key not in _player_cache:
+        folder, prefix = CHAR_DIR.get(char_key, ("Hitman 1", "hitman1"))
+        path = os.path.join("assets", "Player", folder, f"{prefix}_{stance}.png")
+        try:
+            img = pygame.image.load(path).convert_alpha()
+            new_w = max(1, int(img.get_width()  * PLAYER_SPRITE_SCALE))
+            new_h = max(1, int(img.get_height() * PLAYER_SPRITE_SCALE))
+            _player_cache[key] = pygame.transform.scale(img, (new_w, new_h))
+        except Exception:
+            # 找不到圖片時用灰色圓形代替
+            size = int(43 * PLAYER_SPRITE_SCALE)
+            surf = pygame.Surface((size, size), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (160, 160, 160, 220), (size // 2, size // 2), size // 2)
+            _player_cache[key] = surf
+    return _player_cache[key]
 
 
 def _get_obstacle_sprite(kind: str, w: int, h: int) -> pygame.Surface:
@@ -59,7 +94,8 @@ def _ws(wx, wy, cx, cy) -> tuple:
 # ── 主繪圖入口 ────────────────────────────────────────────────────────────────
 
 def draw(screen: pygame.Surface, state: GameState, my_id: int,
-         font: pygame.font.Font, obstacles: dict = None) -> None:
+         font: pygame.font.Font, obstacles: dict = None,
+         my_stance: str = "stand", aim_angle_deg: float = 0.0) -> None:
     screen.fill(COL_BG)
 
     if my_id not in state.players:
@@ -75,8 +111,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _draw_obstacles(screen, obstacles, state.destroyed_obstacles, cx, cy)
 
     _draw_bullets(screen, state, cx, cy)
-    _draw_players(screen, state, my_id, cx, cy, font)
-    _draw_hud(screen, state, my_id, font)
+    _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg)
+    _draw_hud(screen, state, my_id, font, my_stance)
 
 
 # ── 地圖底層 ──────────────────────────────────────────────────────────────────
@@ -134,24 +170,36 @@ def _draw_bullets(screen, state, cx, cy):
 
 # ── 玩家 ──────────────────────────────────────────────────────────────────────
 
-def _draw_players(screen, state, my_id, cx, cy, font):
+def _draw_players(screen, state, my_id, cx, cy, font,
+                  my_stance="stand", aim_angle_deg=0.0):
     for pid, player in state.players.items():
         sx, sy = _ws(player.x, player.y, cx, cy)
-        if not (-PLAYER_RADIUS <= sx <= SCREEN_W + PLAYER_RADIUS
-                and -PLAYER_RADIUS <= sy <= SCREEN_H + PLAYER_RADIUS):
+        cull = PLAYER_RADIUS * 6   # 旋轉後 sprite 最大半徑
+        if not (-cull <= sx <= SCREEN_W + cull
+                and -cull <= sy <= SCREEN_H + cull):
             continue
 
-        color = COL_PLAYERS.get(pid, (180, 180, 180))
-        rim   = COL_SELF_RIM if pid == my_id else COL_OTHER_RIM
+        if pid == my_id:
+            stance = my_stance
+            angle  = aim_angle_deg
+        else:
+            stance = "stand"
+            angle  = 0.0
 
-        pygame.draw.circle(screen, color, (sx, sy), PLAYER_RADIUS)
-        pygame.draw.circle(screen, rim,   (sx, sy), PLAYER_RADIUS, 2)
+        sprite  = _get_player_sprite("hitman1", stance)
+        rotated = pygame.transform.rotate(sprite, -angle)
+        screen.blit(rotated, (sx - rotated.get_width()  // 2,
+                               sy - rotated.get_height() // 2))
 
+        # 對方頭上顯示 HP pip bar
         if pid != my_id:
-            _draw_pip_bar(screen, player.hp, sx - 20, sy - PLAYER_RADIUS - 10)
+            head_y = sy - rotated.get_height() // 2 - 8
+            _draw_pip_bar(screen, player.hp, sx - 20, head_y)
 
+        # 玩家名稱標籤
+        label_y = sy - rotated.get_height() // 2 - 20
         label = font.render(f"P{pid}", True, COL_TEXT)
-        screen.blit(label, (sx - label.get_width() // 2, sy - PLAYER_RADIUS - 20))
+        screen.blit(label, (sx - label.get_width() // 2, label_y))
 
 
 def _draw_pip_bar(screen, hp: int, x: int, y: int):
@@ -163,11 +211,13 @@ def _draw_pip_bar(screen, hp: int, x: int, y: int):
 
 # ── HUD ──────────────────────────────────────────────────────────────────────
 
-def _draw_hud(screen, state, my_id, font):
+def _draw_hud(screen, state, my_id, font, my_stance="stand"):
     if my_id in state.players:
         me = state.players[my_id]
         screen.blit(font.render(f"Tick {state.tick}", True, COL_TEXT), (8, 8))
         screen.blit(font.render(f"P{my_id}  ({int(me.x)}, {int(me.y)})", True, COL_TEXT), (8, 26))
+        stance_col = COL_STANCE.get(my_stance, COL_TEXT)
+        screen.blit(font.render(f"[E] {my_stance.upper()}", True, stance_col), (8, 44))
     _draw_hp_bar(screen, state, my_id, font)
 
 

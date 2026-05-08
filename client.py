@@ -1,3 +1,4 @@
+import math
 import socket
 import sys
 import time
@@ -73,9 +74,10 @@ def run(server_ip: str) -> None:
     clock      = pygame.time.Clock()
     logical_surf = pygame.Surface((LOGICAL_W, LOGICAL_H))
 
-    state     = GameState()
+    state      = GameState()
     keys_held: set = set()
     fullscreen = False
+    stance     = "stand"   # "stand" | "machine"（E 鍵切換）
 
     running = True
     while running:
@@ -91,6 +93,8 @@ def run(server_ip: str) -> None:
                         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                     else:
                         screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
+                elif event.key == pygame.K_e:
+                    stance = "machine" if stance == "stand" else "stand"
                 keys_held.add(event.key)
             elif event.type == pygame.KEYUP:
                 keys_held.discard(event.key)
@@ -100,7 +104,11 @@ def run(server_ip: str) -> None:
         raw_mx, raw_my = pygame.mouse.get_pos()
         logical_mouse  = screen_to_logical(raw_mx, raw_my, off_x, off_y, scale)
 
-        cmd = read_input(player_id, keys_held, logical_mouse)
+        shift_held = (pygame.K_LSHIFT in keys_held or pygame.K_RSHIFT in keys_held)
+        cmd, effective_stance = read_input(player_id, keys_held, logical_mouse,
+                                           stance, shift_held)
+        # aim_angle: 0° = 上, 90° = 右（用於旋轉 sprite）
+        aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
         try:
             sock.sendto(pack_command(cmd), server_addr)
         except Exception:
@@ -117,7 +125,8 @@ def run(server_ip: str) -> None:
         if latest:
             state = unpack_state(latest)
 
-        draw(logical_surf, state, player_id, font, obstacles)
+        draw(logical_surf, state, player_id, font, obstacles,
+             effective_stance, aim_angle_deg)
 
         screen.fill((0, 0, 0))
         scaled = pygame.transform.scale(logical_surf, (scaled_w, scaled_h))
