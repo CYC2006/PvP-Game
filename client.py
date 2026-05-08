@@ -4,7 +4,7 @@ import time
 import pygame
 
 from game.input    import read_input
-from game.renderer import draw, SCREEN_W, SCREEN_H
+from game.renderer import draw, LOGICAL_W, LOGICAL_H
 from game.state    import GameState
 from network.protocol import (
     PKT_JOINED, PKT_STATE,
@@ -38,6 +38,27 @@ def connect(sock: socket.socket, server_addr: tuple) -> int:
         time.sleep(0.05)
 
 
+def get_viewport(screen_w: int, screen_h: int) -> tuple:
+    """
+    計算在實際螢幕上，等比例放大邏輯畫面的位置與尺寸。
+    回傳 (scaled_w, scaled_h, offset_x, offset_y, scale)
+    """
+    scale     = min(screen_w / LOGICAL_W, screen_h / LOGICAL_H)
+    scaled_w  = int(LOGICAL_W * scale)
+    scaled_h  = int(LOGICAL_H * scale)
+    offset_x  = (screen_w - scaled_w) // 2
+    offset_y  = (screen_h - scaled_h) // 2
+    return scaled_w, scaled_h, offset_x, offset_y, scale
+
+
+def screen_to_logical(sx: int, sy: int,
+                      offset_x: int, offset_y: int, scale: float) -> tuple:
+    """螢幕座標 → 邏輯畫布座標"""
+    lx = int((sx - offset_x) / scale)
+    ly = int((sy - offset_y) / scale)
+    return lx, ly
+
+
 def run(server_ip: str) -> None:
     server_addr = (server_ip, PORT)
 
@@ -48,27 +69,50 @@ def run(server_ip: str) -> None:
 
     pygame.init()
     pygame.mouse.set_visible(True)
-    screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+
+    # 起始為視窗模式（邏輯解析度）
+    screen     = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
+    fullscreen = False
     pygame.display.set_caption(f"PvP Game — Player {player_id}")
     font  = pygame.font.SysFont("monospace", 15)
     clock = pygame.time.Clock()
 
+    # 邏輯畫布：所有遊戲繪圖都在這裡
+    logical_surf = pygame.Surface((LOGICAL_W, LOGICAL_H))
+
     state     = GameState()
-    keys_held: set = set()   # KEYDOWN/KEYUP 事件追蹤，比 key.get_pressed() 更可靠
+    keys_held: set = set()
 
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                elif event.key == pygame.K_F11:
+                    # F11 切換全螢幕
+                    fullscreen = not fullscreen
+                    if fullscreen:
+                        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                    else:
+                        screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
                 keys_held.add(event.key)
+
             elif event.type == pygame.KEYUP:
                 keys_held.discard(event.key)
 
-        cmd = read_input(player_id, keys_held)
+        # 計算當前縮放參數
+        sw, sh = screen.get_size()
+        scaled_w, scaled_h, off_x, off_y, scale = get_viewport(sw, sh)
+
+        # 滑鼠螢幕座標 → 邏輯座標
+        raw_mx, raw_my = pygame.mouse.get_pos()
+        logical_mouse  = screen_to_logical(raw_mx, raw_my, off_x, off_y, scale)
+
+        cmd = read_input(player_id, keys_held, logical_mouse)
         try:
             sock.sendto(pack_command(cmd), server_addr)
         except Exception:
@@ -86,7 +130,14 @@ def run(server_ip: str) -> None:
         if latest:
             state = unpack_state(latest)
 
-        draw(screen, state, player_id, font)
+        # 畫到邏輯畫布
+        draw(logical_surf, state, player_id, font)
+
+        # 縮放到實際螢幕（黑邊填充）
+        screen.fill((0, 0, 0))
+        scaled = pygame.transform.scale(logical_surf, (scaled_w, scaled_h))
+        screen.blit(scaled, (off_x, off_y))
+
         pygame.display.flip()
         clock.tick(FPS)
 

@@ -1,8 +1,10 @@
 import pygame
 from game.state import GameState, MAX_HP, MAP_WIDTH, MAP_HEIGHT, PLAYER_RADIUS, BULLET_RADIUS
 
-SCREEN_W = 1280
-SCREEN_H = 720
+LOGICAL_W = 1280   # 固定邏輯解析度（16:9）
+LOGICAL_H = 720
+SCREEN_W  = LOGICAL_W   # 向下相容舊呼叫
+SCREEN_H  = LOGICAL_H
 
 # colours
 COL_BG          = (30,  30,  30)
