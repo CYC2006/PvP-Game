@@ -92,7 +92,7 @@ class GameState:
         # 槍口位置 = 中心 + 前方偏移 + 右肩偏移
         # 右肩方向（逆時針 90°）：(-uy, ux)
         barrel_fwd   = PLAYER_RADIUS + 10   # 前方距離（px）
-        barrel_right = 8                    # 右肩距離（px）
+        barrel_right = 14                   # 右肩距離（px）
         rx = -uy   # 角色右方單位向量 x
         ry =  ux   # 角色右方單位向量 y
         bid = self._next_bullet_id
