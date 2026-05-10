@@ -1,5 +1,6 @@
 import os
 import math
+import time
 import pygame
 from game.state import GameState, MAX_HP, MAP_WIDTH, MAP_HEIGHT, PLAYER_RADIUS, BULLET_RADIUS
 
@@ -40,12 +41,63 @@ _sprite_cache: dict = {}
 # 角色圖片快取：(char_key, stance) → Surface（原尺寸 × PLAYER_SPRITE_SCALE）
 _player_cache: dict = {}
 
+# ── 障礙物被擊中震動 ──────────────────────────────────────────────
+# {oid: expiry_time}  ← perf_counter 時間戳
+_shake_timers: dict = {}
+# 上一幀子彈位置 {bid: (x, y)}，用來偵測消失的子彈
+_prev_bullet_pos: dict = {}
+
+SHAKE_DURATION = 0.35   # 震動持續秒數
+SHAKE_AMP      = 5      # 最大位移像素
+SHAKE_FREQ     = 40     # 振盪頻率 Hz
+
 # HUD stance 顯示顏色
 COL_STANCE = {
     "stand":   (160, 160, 160),
     "machine": (255, 200,  60),
     "hold":    ( 80, 160, 255),
 }
+
+
+def _process_hits(state: GameState, obstacles: dict) -> None:
+    """
+    比較本幀與上幀子彈集合：
+    消失的子彈若最後位置靠近某障礙物，對該障礙物啟動震動計時器。
+    """
+    now     = time.perf_counter()
+    cur_ids = set(state.bullets)
+
+    for bid, (bx, by) in _prev_bullet_pos.items():
+        if bid not in cur_ids and obstacles:
+            for oid, obs in obstacles.items():
+                if oid in state.destroyed_obstacles:
+                    continue
+                # 用略寬鬆的半徑補償一幀延遲
+                check_r = BULLET_RADIUS + max(obs.width, obs.height) * 0.55
+                if obs.collides_circle(bx, by, check_r):
+                    _shake_timers[oid] = now + SHAKE_DURATION
+                    break   # 一顆子彈只觸發一個障礙物
+
+    _prev_bullet_pos.clear()
+    for bid, b in state.bullets.items():
+        _prev_bullet_pos[bid] = (b.x, b.y)
+
+
+def _shake_offset(oid: int) -> tuple:
+    """
+    回傳 (dx, dy) 震動偏移像素。
+    振幅隨剩餘時間線性衰減，頻率固定。
+    """
+    now = time.perf_counter()
+    if oid not in _shake_timers:
+        return 0, 0
+    remaining = _shake_timers[oid] - now
+    if remaining <= 0:
+        del _shake_timers[oid]
+        return 0, 0
+    amp = SHAKE_AMP * (remaining / SHAKE_DURATION)
+    t   = (SHAKE_DURATION - remaining) * SHAKE_FREQ * math.tau
+    return int(amp * math.sin(t)), int(amp * math.sin(t * 1.3 + 1.0))
 
 
 def _get_player_sprite(char_key: str, stance: str) -> pygame.Surface:
@@ -108,6 +160,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     _draw_map(screen, cx, cy)
 
     if obstacles:
+        _process_hits(state, obstacles)
         _draw_obstacles(screen, obstacles, state.destroyed_obstacles, cx, cy)
 
     _draw_bullets(screen, state, cx, cy)
@@ -153,8 +206,9 @@ def _draw_obstacles(screen, obstacles: dict, destroyed: set, cx, cy):
 
         sprite  = _get_obstacle_sprite(obs.kind, w, h)
         rotated = pygame.transform.rotate(sprite, -math.degrees(obs.angle))
-        screen.blit(rotated, (sx - rotated.get_width() // 2,
-                               sy - rotated.get_height() // 2))
+        ox, oy  = _shake_offset(oid)
+        screen.blit(rotated, (sx - rotated.get_width()  // 2 + ox,
+                               sy - rotated.get_height() // 2 + oy))
 
 
 # ── 子彈 ──────────────────────────────────────────────────────────────────────
