@@ -3,9 +3,9 @@ import json
 from dataclasses import dataclass
 
 OBSTACLE_CONFIG: dict = {
-    "box_1":  {"width": 64, "height": 64, "hp": 3, "shape": "obb"},
-    "rock_1": {"width": 80, "height": 80, "hp": 5, "shape": "circle"},
-    "rock_2": {"width": 80, "height": 80, "hp": 4, "shape": "circle"},
+    "box_1":  {"width": 64, "height": 64, "hp": 3, "shape": "obb",    "destructible": True},
+    "rock_1": {"width": 80, "height": 80, "hp": 0, "shape": "circle", "destructible": False},
+    "rock_2": {"width": 80, "height": 80, "hp": 0, "shape": "circle", "destructible": False},
 }
 
 # hitbox 比視覺小一圈，讓「擦邊而過」體驗更舒適
@@ -21,8 +21,9 @@ class Obstacle:
     width: float
     height: float
     hp: int
-    angle: float = 0.0    # 旋轉角度（弧度）
-    shape: str   = "obb"  # "obb" | "circle"
+    angle:        float = 0.0    # 旋轉角度（弧度）
+    shape:        str   = "obb"  # "obb" | "circle"
+    destructible: bool  = True   # False → 子彈會彈開但不扣血、不摧毀
 
     # ── circle shape 用的碰撞半徑 ────────────────────────────────
     @property
@@ -127,6 +128,7 @@ def load_map(path: str) -> dict:
             hp=cfg["hp"],
             angle=math.radians(entry.get("angle_deg", 0)),
             shape=cfg.get("shape", "obb"),
+            destructible=cfg.get("destructible", True),
         )
         obstacles[obs.id] = obs
     return obstacles

@@ -1,6 +1,7 @@
 import os
 import math
 import time
+import random
 import pygame
 from game.state import GameState, MAX_HP, MAP_WIDTH, MAP_HEIGHT, PLAYER_RADIUS, BULLET_RADIUS
 
@@ -42,14 +43,30 @@ _sprite_cache: dict = {}
 _player_cache: dict = {}
 
 # ── 障礙物被擊中震動 ──────────────────────────────────────────────
-# {oid: expiry_time}  ← perf_counter 時間戳
+# {oid: (expiry, duration)}  ← perf_counter 時間戳 + 本次持續秒數
 _shake_timers: dict = {}
 # 上一幀子彈位置 {bid: (x, y)}，用來偵測消失的子彈
 _prev_bullet_pos: dict = {}
 
-SHAKE_DURATION = 0.35   # 震動持續秒數
-SHAKE_AMP      = 5      # 最大位移像素
-SHAKE_FREQ     = 40     # 振盪頻率 Hz
+SHAKE_AMP  = 5    # 最大位移像素
+SHAKE_FREQ = 40   # 振盪頻率 Hz
+
+# ── 粒子效果 ──────────────────────────────────────────────────────────────────
+# 每顆粒子：[spawn_x, spawn_y, vx, vy, spawn_t, max_life, (r,g,b), max_size]
+_particles: list = []
+
+# 上一幀已摧毀的障礙物 ID，用來偵測「本幀新摧毀」以補觸發粒子
+_prev_destroyed: set = set()
+
+# 各障礙物種類的粒子顏色（同色系深淺變化）
+PARTICLE_COLORS: dict = {
+    "box_1":  [(165, 108, 52), (195, 142, 68), (145, 88, 38),
+               (220, 168, 92), (130,  75, 30)],
+    "rock_1": [(138, 132, 122), (112, 108, 100), (158, 152, 142),
+               ( 88,  84,  78), (175, 170, 160)],
+    "rock_2": [(118, 113, 105), (143, 138, 128), ( 93,  90,  84),
+               (168, 162, 153), (105, 100,  93)],
+}
 
 # HUD stance 顯示顏色
 COL_STANCE = {
@@ -61,22 +78,34 @@ COL_STANCE = {
 
 def _process_hits(state: GameState, obstacles: dict) -> None:
     """
-    比較本幀與上幀子彈集合：
-    消失的子彈若最後位置靠近某障礙物，對該障礙物啟動震動計時器。
+    每幀做兩件事：
+    1. 比較 destroyed_obstacles：本幀新摧毀的障礙物補觸發粒子（彌補最後一擊）
+    2. 比較子彈集合：消失子彈靠近哪個障礙物 → 震動 + 粒子
     """
     now     = time.perf_counter()
     cur_ids = set(state.bullets)
 
+    # ── 1. 新摧毀障礙物 ───────────────────────────────────────────
+    newly_destroyed = state.destroyed_obstacles - _prev_destroyed
+    for oid in newly_destroyed:
+        if oid in obstacles:
+            obs = obstacles[oid]
+            _spawn_particles(obs.x, obs.y, obs.kind, count=18)  # 多一點粒子
+    _prev_destroyed.clear()
+    _prev_destroyed.update(state.destroyed_obstacles)
+
+    # ── 2. 消失子彈偵測 ───────────────────────────────────────────
     for bid, (bx, by) in _prev_bullet_pos.items():
         if bid not in cur_ids and obstacles:
             for oid, obs in obstacles.items():
                 if oid in state.destroyed_obstacles:
                     continue
-                # 用略寬鬆的半徑補償一幀延遲
                 check_r = BULLET_RADIUS + max(obs.width, obs.height) * 0.55
                 if obs.collides_circle(bx, by, check_r):
-                    _shake_timers[oid] = now + SHAKE_DURATION
-                    break   # 一顆子彈只觸發一個障礙物
+                    dur = random.uniform(0.2, 0.3)
+                    _shake_timers[oid] = (now + dur, dur)
+                    _spawn_particles(bx, by, obs.kind)
+                    break
 
     _prev_bullet_pos.clear()
     for bid, b in state.bullets.items():
@@ -84,20 +113,58 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
 
 
 def _shake_offset(oid: int) -> tuple:
-    """
-    回傳 (dx, dy) 震動偏移像素。
-    振幅隨剩餘時間線性衰減，頻率固定。
-    """
+    """回傳 (dx, dy) 震動偏移像素；振幅隨剩餘時間線性衰減。"""
     now = time.perf_counter()
     if oid not in _shake_timers:
         return 0, 0
-    remaining = _shake_timers[oid] - now
+    expiry, duration = _shake_timers[oid]
+    remaining = expiry - now
     if remaining <= 0:
         del _shake_timers[oid]
         return 0, 0
-    amp = SHAKE_AMP * (remaining / SHAKE_DURATION)
-    t   = (SHAKE_DURATION - remaining) * SHAKE_FREQ * math.tau
+    amp = SHAKE_AMP * (remaining / duration)
+    t   = (duration - remaining) * SHAKE_FREQ * math.tau
     return int(amp * math.sin(t)), int(amp * math.sin(t * 1.3 + 1.0))
+
+
+def _spawn_particles(bx: float, by: float, kind: str, count: int = 12) -> None:
+    """在被擊中位置朝四周噴出同色系粒子。"""
+    now    = time.perf_counter()
+    colors = PARTICLE_COLORS.get(kind, [(128, 128, 128)])
+    for _ in range(count):
+        angle    = random.uniform(0, math.tau)
+        speed    = random.uniform(40, 140)
+        max_life = random.uniform(0.20, 0.45)
+        color    = random.choice(colors)
+        max_size = random.uniform(2.0, 5.5)
+        _particles.append([
+            bx, by,
+            math.cos(angle) * speed,
+            math.sin(angle) * speed,
+            now, max_life, color, max_size,
+        ])
+
+
+def _draw_particles(screen, cx: float, cy: float) -> None:
+    """更新並繪製所有粒子，清除已過期的。"""
+    now   = time.perf_counter()
+    alive = []
+    for p in _particles:
+        bx, by, vx, vy, spawn_t, max_life, color, max_size = p
+        elapsed   = now - spawn_t
+        remaining = max_life - elapsed
+        if remaining <= 0:
+            continue
+        alive.append(p)
+        alpha    = remaining / max_life          # 1.0 → 0.0
+        cur_size = max(1, int(max_size * alpha))
+        sx, sy   = _ws(bx + vx * elapsed, by + vy * elapsed, cx, cy)
+        if -10 <= sx <= SCREEN_W + 10 and -10 <= sy <= SCREEN_H + 10:
+            r, g, b = color
+            pygame.draw.circle(screen,
+                               (int(r * alpha), int(g * alpha), int(b * alpha)),
+                               (sx, sy), cur_size)
+    _particles[:] = alive
 
 
 def _get_player_sprite(char_key: str, stance: str) -> pygame.Surface:
@@ -163,6 +230,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _process_hits(state, obstacles)
         _draw_obstacles(screen, obstacles, state.destroyed_obstacles, cx, cy)
 
+    _draw_particles(screen, cx, cy)
     _draw_bullets(screen, state, cx, cy)
     _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg)
     _draw_hud(screen, state, my_id, font, my_stance)

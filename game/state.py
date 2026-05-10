@@ -143,11 +143,11 @@ class GameState:
                 if oid in self.destroyed_obstacles:
                     continue
                 if obs.collides_circle(bullet.x, bullet.y, BULLET_RADIUS):
-                    if obstacle_hp is not None:
+                    if obstacle_hp is not None and obs.destructible:
                         obstacle_hp[oid] -= 1
                         if obstacle_hp[oid] <= 0:
                             self.destroyed_obstacles.add(oid)
-                    expired.append(bid)
+                    expired.append(bid)   # 不可破壞的障礙物也會讓子彈消失
                     break
 
         for bid in expired:
