@@ -4,8 +4,9 @@ from dataclasses import dataclass
 
 OBSTACLE_CONFIG: dict = {
     "box_1":  {"width": 64, "height": 64, "hp": 3, "shape": "obb",    "destructible": True},
-    "rock_1": {"width": 80, "height": 80, "hp": 0, "shape": "circle", "destructible": False},
-    "rock_2": {"width": 80, "height": 80, "hp": 0, "shape": "circle", "destructible": False},
+    # radius_ratio：石頭在 PNG 裡只佔部分面積，用量測到的視覺半徑比例取代 HITBOX_RATIO
+    "rock_1": {"width": 80, "height": 80, "hp": 0, "shape": "circle", "destructible": False, "radius_ratio": 0.70},
+    "rock_2": {"width": 80, "height": 80, "hp": 0, "shape": "circle", "destructible": False, "radius_ratio": 0.52},
 }
 
 # hitbox 比視覺小一圈，讓「擦邊而過」體驗更舒適
@@ -21,14 +22,15 @@ class Obstacle:
     width: float
     height: float
     hp: int
-    angle:        float = 0.0    # 旋轉角度（弧度）
-    shape:        str   = "obb"  # "obb" | "circle"
-    destructible: bool  = True   # False → 子彈會彈開但不扣血、不摧毀
+    angle:        float = 0.0         # 旋轉角度（弧度）
+    shape:        str   = "obb"       # "obb" | "circle"
+    destructible: bool  = True        # False → 子彈會彈開但不扣血、不摧毀
+    radius_ratio: float = HITBOX_RATIO  # circle shape 用：碰撞半徑 = (width/2)*ratio
 
     # ── circle shape 用的碰撞半徑 ────────────────────────────────
     @property
     def _collision_radius(self) -> float:
-        return (self.width / 2) * HITBOX_RATIO
+        return (self.width / 2) * self.radius_ratio
 
     # ── OBB 半邊長 ───────────────────────────────────────────────
     @property
@@ -129,6 +131,7 @@ def load_map(path: str) -> dict:
             angle=math.radians(entry.get("angle_deg", 0)),
             shape=cfg.get("shape", "obb"),
             destructible=cfg.get("destructible", True),
+            radius_ratio=cfg.get("radius_ratio", HITBOX_RATIO),
         )
         obstacles[obs.id] = obs
     return obstacles
