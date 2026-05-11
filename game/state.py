@@ -18,13 +18,15 @@ class Player:
     id: int
     x: float
     y: float
-    speed: float = PLAYER_SPEED
-    hp: int      = DEFAULT_MAX_HP
-    max_hp: int  = DEFAULT_MAX_HP   # 依角色設定，respawn 恢復到此值
-    damage_min: int = 1             # 子彈最小傷害（由 server 依角色設定）
-    damage_max: int = 1             # 子彈最大傷害
-    aim_angle: float = 0.0          # 瞄準角度（度），0=上, 90=右；同步給對手
-    stance: str = "stand"           # "stand" | "machine" | "hold" | "reload"
+    speed: float       = PLAYER_SPEED
+    hp: int            = DEFAULT_MAX_HP
+    max_hp: int        = DEFAULT_MAX_HP   # 依角色設定，respawn 恢復到此值
+    damage_min: int    = 1                # 子彈最小傷害（由 server 依角色設定）
+    damage_max: int    = 1                # 子彈最大傷害
+    bullet_speed: float = BULLET_SPEED   # 子彈速度（像素/tick），依角色設定
+    spread: float      = 5.0             # 子彈最大偏角（±度），依角色設定
+    aim_angle: float   = 0.0             # 瞄準角度（度），0=上, 90=右；同步給對手
+    stance: str        = "stand"         # "stand" | "machine" | "hold" | "reload"
 
     def move(self, dx: float, dy: float, crouching: bool = False) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -84,10 +86,12 @@ class GameState:
         if player_id not in self.players:
             return
         p = self.players[player_id]
-        p.max_hp     = get_stat(char_key, "hp")
-        p.hp         = p.max_hp
-        p.damage_min = get_stat(char_key, "damage_min")
-        p.damage_max = get_stat(char_key, "damage_max")
+        p.max_hp       = get_stat(char_key, "hp")
+        p.hp           = p.max_hp
+        p.damage_min   = get_stat(char_key, "damage_min")
+        p.damage_max   = get_stat(char_key, "damage_max")
+        p.bullet_speed = float(get_stat(char_key, "bullet_speed"))
+        p.spread       = float(get_stat(char_key, "spread"))
 
     def apply_command(self, player_id: int, dx: float, dy: float,
                       shooting: bool, aim_x: float, aim_y: float,
@@ -109,13 +113,14 @@ class GameState:
             return
         ux  = aim_x / length
         uy  = aim_y / length
-        # 後座力散佈：±5° 隨機偏角
-        spread = math.radians(random.uniform(-5.0, 5.0))
-        cos_s, sin_s = math.cos(spread), math.sin(spread)
-        ux, uy = ux * cos_s - uy * sin_s, ux * sin_s + uy * cos_s
+        # 後座力散佈：依角色 spread 屬性決定最大偏角
+        if player.spread > 0:
+            dev = math.radians(random.uniform(-player.spread, player.spread))
+            cos_s, sin_s = math.cos(dev), math.sin(dev)
+            ux, uy = ux * cos_s - uy * sin_s, ux * sin_s + uy * cos_s
 
-        ndx = ux * BULLET_SPEED
-        ndy = uy * BULLET_SPEED
+        ndx = ux * player.bullet_speed
+        ndy = uy * player.bullet_speed
         barrel_fwd   = PLAYER_RADIUS + 10
         barrel_right = 14
         rx = -uy
