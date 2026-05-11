@@ -4,6 +4,7 @@ import time
 import random
 import pygame
 from game.state import GameState, MAX_HP, MAP_WIDTH, MAP_HEIGHT, PLAYER_RADIUS, BULLET_RADIUS
+from game.input import MAGAZINE_SIZE, RELOAD_TIME_MS
 
 LOGICAL_W = 1280
 LOGICAL_H = 720
@@ -73,6 +74,7 @@ COL_STANCE = {
     "stand":   (160, 160, 160),
     "machine": (255, 200,  60),
     "hold":    ( 80, 160, 255),
+    "reload":  (255,  90,  90),
 }
 
 
@@ -214,7 +216,8 @@ def _ws(wx, wy, cx, cy) -> tuple:
 
 def draw(screen: pygame.Surface, state: GameState, my_id: int,
          font: pygame.font.Font, obstacles: dict = None,
-         my_stance: str = "stand", aim_angle_deg: float = 0.0) -> None:
+         my_stance: str = "stand", aim_angle_deg: float = 0.0,
+         ammo: int = MAGAZINE_SIZE, is_reloading: bool = False) -> None:
     screen.fill(COL_BG)
 
     if my_id not in state.players:
@@ -233,7 +236,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     _draw_particles(screen, cx, cy)
     _draw_bullets(screen, state, cx, cy)
     _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg)
-    _draw_hud(screen, state, my_id, font, my_stance)
+    _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading)
 
 
 # ── 地圖底層 ──────────────────────────────────────────────────────────────────
@@ -335,14 +338,47 @@ def _draw_pip_bar(screen, hp: int, x: int, y: int):
 
 # ── HUD ──────────────────────────────────────────────────────────────────────
 
-def _draw_hud(screen, state, my_id, font, my_stance="stand"):
+def _draw_hud(screen, state, my_id, font, my_stance="stand",
+              ammo: int = MAGAZINE_SIZE, is_reloading: bool = False):
     if my_id in state.players:
         me = state.players[my_id]
         screen.blit(font.render(f"Tick {state.tick}", True, COL_TEXT), (8, 8))
         screen.blit(font.render(f"P{my_id}  ({int(me.x)}, {int(me.y)})", True, COL_TEXT), (8, 26))
         stance_col = COL_STANCE.get(my_stance, COL_TEXT)
         screen.blit(font.render(f"[E] {my_stance.upper()}", True, stance_col), (8, 44))
+        # 彈藥 HUD
+        _draw_ammo_hud(screen, font, ammo, is_reloading)
     _draw_hp_bar(screen, state, my_id, font)
+
+
+def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
+    """右下角顯示子彈數；換彈時顯示進度條。"""
+    now      = pygame.time.get_ticks()
+    bar_w    = 160
+    bar_h    = 14
+    bar_x    = SCREEN_W - bar_w - 20
+    ammo_y   = SCREEN_H - 80
+
+    if is_reloading:
+        # 換彈進度條（從 input 模組的全域取進度）
+        import game.input as _inp
+        elapsed  = now - _inp._reload_start_ms
+        progress = min(1.0, elapsed / RELOAD_TIME_MS)
+        pygame.draw.rect(screen, (60, 20, 20),
+                         (bar_x, ammo_y, bar_w, bar_h), border_radius=4)
+        fill_w = int(bar_w * progress)
+        if fill_w > 0:
+            pygame.draw.rect(screen, (255, 90, 90),
+                             (bar_x, ammo_y, fill_w, bar_h), border_radius=4)
+        pygame.draw.rect(screen, (200, 80, 80),
+                         (bar_x, ammo_y, bar_w, bar_h), 2, border_radius=4)
+        label = font.render("RELOADING...", True, (255, 90, 90))
+    else:
+        # 子彈數字
+        col   = (255, 220, 60) if ammo > 10 else (255, 90, 90)
+        label = font.render(f"AMMO  {ammo} / {MAGAZINE_SIZE}", True, col)
+
+    screen.blit(label, (bar_x + bar_w - label.get_width(), ammo_y - 18))
 
 
 def _draw_hp_bar(screen, state, my_id, font):
