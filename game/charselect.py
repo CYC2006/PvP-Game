@@ -2,35 +2,29 @@
 Character selection screen — horizontal carousel.
 Scroll wheel / ← → to browse; centre card is the selected character.
 Click or Enter/Space to confirm.
+
+All character stats are imported from game.char_data (single source of truth).
 """
 import os
 import time
 import pygame
+from game.char_data import CHAR_STATS, CHAR_ORDER, get_stat
 
 LOGICAL_W = 1280
 LOGICAL_H = 720
 
-# ── 9 個角色（名稱 & 數值來自 Game.xlsx）────────────────────────────────────
-# damage / mag 為 "" 表示特殊種類，選角面板留空
+# ── 角色清單（從 char_data 自動建構，不在此處維護數值）─────────────────────
 CHARACTERS = [
-    {"char_key": "hitman1",    "folder": "Hitman 1",    "name": "Agent",
-     "hp": 100, "gun": "Pistol",      "damage": "25~30", "mag": "12"},
-    {"char_key": "manBlue",    "folder": "Man Blue",    "name": "Rambo",
-     "hp": 200, "gun": "Shotgun",     "damage": "",      "mag": "6"},
-    {"char_key": "manBrown",   "folder": "Man Brown",   "name": "Bear",
-     "hp": 150, "gun": "Machine Gun", "damage": "15~20", "mag": "50"},
-    {"char_key": "manOld",     "folder": "Man Old",     "name": "Sniper",
-     "hp": 70,  "gun": "Sniper",      "damage": "75~80", "mag": "5"},
-    {"char_key": "robot1",     "folder": "Robot 1",     "name": "Robot",
-     "hp": 120, "gun": "Laser Gun",   "damage": "",      "mag": ""},
-    {"char_key": "soldier1",   "folder": "Soldier 1",   "name": "Soldier",
-     "hp": 180, "gun": "Rifle",       "damage": "10~15", "mag": "40"},
-    {"char_key": "survivor1",  "folder": "Survivor 1",  "name": "Assassin",
-     "hp": 100, "gun": "Shuriken",    "damage": "35~40", "mag": ""},
-    {"char_key": "womanGreen", "folder": "Woman Green", "name": "Dancer",
-     "hp": 140, "gun": "Poison Gas",  "damage": "",      "mag": ""},
-    {"char_key": "zoimbie1",   "folder": "Zombie 1",    "name": "Zombie",
-     "hp": 300, "gun": "Hand",        "damage": "",      "mag": ""},
+    {
+        "char_key": key,
+        "folder":   CHAR_STATS[key]["folder"],
+        "name":     get_stat(key, "name"),
+        "hp":       get_stat(key, "hp"),
+        "gun":      get_stat(key, "gun"),
+        "damage":   get_stat(key, "damage"),
+        "mag":      get_stat(key, "mag"),
+    }
+    for key in CHAR_ORDER
 ]
 N = len(CHARACTERS)
 
