@@ -83,7 +83,6 @@ def char_select_loop(sock, server_addr, screen, logical_surf,
                 confirmed = charselect.handle_event(event)
                 if confirmed:
                     my_ready = True
-                    charselect.set_waiting(True)
                     idx = charselect.selected_idx()
                     sock.sendto(pack_char_select(idx), server_addr)
                     print(f"[Client] Selected char {idx} ({charselect.selected_char()['name']})")

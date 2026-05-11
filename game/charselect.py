@@ -201,44 +201,19 @@ def draw_char_select(screen: pygame.Surface,
     if _target_idx < N - 1:
         pygame.draw.polygon(screen, _arrow_col(right_pts), right_pts)
 
-    # ── 合併狀態列（一行）─────────────────────────────────────────
-    status_y = CARD_Y + CARD_H // 2 + 22
-
-    char_name = CHARACTERS[_target_idx]["name"]
-    if my_ready:
-        you_part = f"YOU: {char_name} ✓"
-        you_col  = COL_READY
-    else:
-        you_part = f"YOU: {char_name}"
-        you_col  = COL_STATUS
-
-    if opponent_ready:
-        op_part = "OPPONENT: READY ✓"
-        op_col  = COL_READY
-    else:
-        op_part = "OPPONENT: waiting..."
-        op_col  = COL_STATUS
-
-    hint_part = "" if my_ready else "  •  ← → scroll / Click or Enter to confirm"
-
-    # 分段渲染，讓各段有自己的顏色
-    you_surf  = font_sm.render(you_part, True, you_col)
-    sep_surf  = font_sm.render("   |   ", True, COL_HINT)
-    op_surf   = font_sm.render(op_part,  True, op_col)
-    hint_surf = font_sm.render(hint_part, True, COL_HINT)
-
-    total_w = (you_surf.get_width() + sep_surf.get_width() +
-               op_surf.get_width() + hint_surf.get_width())
-    x = CENTER_X - total_w // 2
-    for surf in (you_surf, sep_surf, op_surf, hint_surf):
-        screen.blit(surf, (x, status_y))
-        x += surf.get_width()
+    # ── 提示文字（未確認時顯示）──────────────────────────────────
+    hint_y = CARD_Y + CARD_H // 2 + 22
+    if not my_ready:
+        hint_surf = font_sm.render("← → scroll  /  Click or Enter to confirm",
+                                   True, COL_HINT)
+        screen.blit(hint_surf, (CENTER_X - hint_surf.get_width() // 2, hint_y))
 
     # ── 數值面板 ──────────────────────────────────────────────────
-    _draw_stats_panel(screen, font_lg, font_sm, status_y + 34)
+    _draw_stats_panel(screen, font_lg, font_sm, hint_y + 34, my_ready)
 
 
-def _draw_stats_panel(screen, font_lg, font_sm, top_y: int) -> None:
+def _draw_stats_panel(screen, font_lg, font_sm, top_y: int,
+                      my_ready: bool = False) -> None:
     """顯示中央角色的數值：HP | GUN | DAMAGE | AMMO | RELOAD | RATE。"""
     char = CHARACTERS[_target_idx]
 
@@ -292,21 +267,10 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int) -> None:
             val_surf = font_sm.render("—", True, COL_STAT_EMPTY)
         screen.blit(val_surf, (cx - val_surf.get_width() // 2, panel_y + 32))
 
-    # "Waiting for opponent" 文字（已確認後顯示）
-    if _is_waiting():
+    # "Waiting for opponent" 文字（已確認後顯示在 panel 下方）
+    if my_ready:
         dots   = "." * (int(time.perf_counter() * 2) % 4)
         w_surf = font_lg.render(f"Waiting for opponent{dots}", True, COL_WAIT)
         screen.blit(w_surf,
                     (CENTER_X - w_surf.get_width() // 2,
                      panel_y + panel_h + 16))
-
-
-# 模組內部用來判斷是否正在等待對手的旗標
-_waiting: bool = False
-
-def _is_waiting() -> bool:
-    return _waiting
-
-def set_waiting(v: bool) -> None:
-    global _waiting
-    _waiting = v
