@@ -260,7 +260,7 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int) -> None:
         ("RATE",   rate_str),
     ]
 
-    panel_w  = 660
+    panel_w  = 780
     panel_h  = 72
     panel_x  = CENTER_X - panel_w // 2
     panel_y  = top_y
