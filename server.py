@@ -10,6 +10,7 @@ from network.protocol import (
     unpack_command, packet_type,
 )
 
+
 HOST        = "0.0.0.0"
 PORT        = 5000
 TICK_RATE   = 60
@@ -81,7 +82,7 @@ def run():
                     # 雙方都選完 → 開始遊戲
                     if len(player_chars) == MAX_PLAYERS:
                         game_started = True
-                        payload = pack_game_start()
+                        payload = pack_game_start(player_chars)
                         for a in clients.values():
                             try:
                                 sock.sendto(payload, a)

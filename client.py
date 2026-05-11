@@ -8,11 +8,11 @@ from game.input      import read_input
 from game.renderer   import draw, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
-from game.charselect import draw_char_select, handle_click
+import game.charselect as charselect
 from network.protocol import (
     PKT_JOINED, PKT_STATE, PKT_GAME_START,
     pack_join, pack_command, pack_char_select,
-    unpack_joined, unpack_state,
+    unpack_joined, unpack_state, unpack_game_start,
     packet_type,
 )
 
@@ -57,31 +57,38 @@ def screen_to_logical(sx: int, sy: int,
 
 
 def char_select_loop(sock, server_addr, screen, logical_surf,
-                     font_lg, font_sm, clock) -> bool:
+                     font_lg, font_sm, clock) -> tuple:
     """
-    選角畫面主迴圈。
-    回傳 True 表示雙方都選完，進入遊戲；False 表示玩家關閉視窗。
+    選角畫面主迴圈（carousel 版）。
+    回傳 (player_chars_dict, my_char_key)，或 (None, None) 表示玩家關閉視窗。
+    player_chars_dict: {pid: char_key}  由 PKT_GAME_START 解析
     """
-    selected_idx   = -1   # -1 = 尚未選擇
+    charselect.reset()
     my_ready       = False
     opponent_ready = False
+    last_time      = pygame.time.get_ticks()
 
     while True:
+        now = pygame.time.get_ticks()
+        dt  = (now - last_time) / 1000.0
+        last_time = now
+
         # ── 事件 ──────────────────────────────────────────────────
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return False
+                return None, None
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                return False
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                # 取得 logical 座標（選角畫面 1:1，不需 viewport 換算）
-                new_idx = handle_click(event.pos, selected_idx, my_ready)
-                if new_idx != selected_idx or not my_ready:
-                    selected_idx = new_idx
-                    if selected_idx >= 0:
-                        my_ready = True
-                        sock.sendto(pack_char_select(selected_idx), server_addr)
-                        print(f"[Client] Selected char {selected_idx}")
+                return None, None
+            if not my_ready:
+                confirmed = charselect.handle_event(event)
+                if confirmed:
+                    my_ready = True
+                    idx = charselect.selected_idx()
+                    sock.sendto(pack_char_select(idx), server_addr)
+                    print(f"[Client] Selected char {idx} ({charselect.selected_char()['name']})")
+            else:
+                # 已確認後仍可接收 QUIT / ESCAPE（上面已處理）
+                pass
 
         # ── 收封包 ────────────────────────────────────────────────
         while True:
@@ -89,17 +96,25 @@ def char_select_loop(sock, server_addr, screen, logical_surf,
                 data, _ = sock.recvfrom(BUF_SIZE)
                 ptype = packet_type(data)
                 if ptype == PKT_GAME_START:
-                    opponent_ready = True
-                    return True           # 雙方都選完，開始遊戲
+                    # 解析雙方角色 id → char_key
+                    raw_chars = unpack_game_start(data)   # {pid: char_id}
+                    from game.charselect import CHARACTERS
+                    player_chars = {pid: CHARACTERS[cid]["char_key"]
+                                    for pid, cid in raw_chars.items()
+                                    if 0 <= cid < len(CHARACTERS)}
+                    my_char_key = charselect.selected_char()["char_key"]
+                    return player_chars, my_char_key
             except (BlockingIOError, ConnectionResetError, OSError):
                 break
 
-        # ── 繪製 ──────────────────────────────────────────────────
+        # ── 更新 & 繪製 ───────────────────────────────────────────
+        charselect.update(dt)
+
         sw, sh = screen.get_size()
         scaled_w, scaled_h, off_x, off_y, _ = get_viewport(sw, sh)
 
-        draw_char_select(logical_surf, font_lg, font_sm,
-                         selected_idx, my_ready, opponent_ready)
+        charselect.draw_char_select(logical_surf, font_lg, font_sm,
+                                    my_ready, opponent_ready)
         screen.fill((0, 0, 0))
         scaled = pygame.transform.scale(logical_surf, (scaled_w, scaled_h))
         screen.blit(scaled, (off_x, off_y))
@@ -128,12 +143,14 @@ def run(server_ip: str) -> None:
     logical_surf = pygame.Surface((LOGICAL_W, LOGICAL_H))
 
     # ── 選角畫面 ──────────────────────────────────────────────────
-    game_ok = char_select_loop(sock, server_addr, screen, logical_surf,
-                               font_lg, font_sm, clock)
-    if not game_ok:
+    player_chars, my_char_key = char_select_loop(
+        sock, server_addr, screen, logical_surf, font_lg, font_sm, clock)
+    if player_chars is None:
         pygame.quit()
         sock.close()
         return
+
+    print(f"[Client] Game start! My char: {my_char_key}  All chars: {player_chars}")
 
     # ── 遊戲主迴圈 ────────────────────────────────────────────────
     state      = GameState()
@@ -187,7 +204,8 @@ def run(server_ip: str) -> None:
             state = unpack_state(latest)
 
         draw(logical_surf, state, player_id, font_sm, obstacles,
-             effective_stance, aim_angle_deg, ammo, is_reloading)
+             effective_stance, aim_angle_deg, ammo, is_reloading,
+             player_chars)
 
         screen.fill((0, 0, 0))
         scaled = pygame.transform.scale(logical_surf, (scaled_w, scaled_h))

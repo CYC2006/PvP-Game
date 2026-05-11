@@ -35,7 +35,15 @@ PLAYER_SPRITE_SCALE  = 1.5   # 原圖 33–54 × 43 px，放大後約 50–81 ×
 
 # 角色定義：char_key → (資料夾名稱, 檔名前綴)
 CHAR_DIR: dict = {
-    "hitman1": ("Hitman 1", "hitman1"),
+    "hitman1":    ("Hitman 1",    "hitman1"),
+    "manBlue":    ("Man Blue",    "manBlue"),
+    "manBrown":   ("Man Brown",   "manBrown"),
+    "manOld":     ("Man Old",     "manOld"),
+    "robot1":     ("Robot 1",     "robot1"),
+    "soldier1":   ("Soldier 1",   "soldier1"),
+    "survivor1":  ("Survivor 1",  "survivor1"),
+    "womanGreen": ("Woman Green", "womanGreen"),
+    "zoimbie1":   ("Zombie 1",    "zoimbie1"),
 }
 
 # 障礙物圖片快取：(kind, w, h) → Surface
@@ -217,7 +225,9 @@ def _ws(wx, wy, cx, cy) -> tuple:
 def draw(screen: pygame.Surface, state: GameState, my_id: int,
          font: pygame.font.Font, obstacles: dict = None,
          my_stance: str = "stand", aim_angle_deg: float = 0.0,
-         ammo: int = MAGAZINE_SIZE, is_reloading: bool = False) -> None:
+         ammo: int = MAGAZINE_SIZE, is_reloading: bool = False,
+         player_chars: dict = None) -> None:
+    # player_chars: {pid: char_key}，None 時全部用 hitman1
     screen.fill(COL_BG)
 
     if my_id not in state.players:
@@ -235,7 +245,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
 
     _draw_particles(screen, cx, cy)
     _draw_bullets(screen, state, cx, cy)
-    _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg)
+    _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg,
+                  player_chars or {})
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading)
 
 
@@ -296,7 +307,9 @@ def _draw_bullets(screen, state, cx, cy):
 # ── 玩家 ──────────────────────────────────────────────────────────────────────
 
 def _draw_players(screen, state, my_id, cx, cy, font,
-                  my_stance="stand", aim_angle_deg=0.0):
+                  my_stance="stand", aim_angle_deg=0.0, player_chars=None):
+    if player_chars is None:
+        player_chars = {}
     for pid, player in state.players.items():
         sx, sy = _ws(player.x, player.y, cx, cy)
         cull = PLAYER_RADIUS * 6   # 旋轉後 sprite 最大半徑
@@ -311,7 +324,8 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             stance = player.stance       # 從 server 同步的 stance
             angle  = player.aim_angle    # 從 server 同步的瞄準角度
 
-        sprite  = _get_player_sprite("hitman1", stance)
+        char_key = player_chars.get(pid, "hitman1")
+        sprite   = _get_player_sprite(char_key, stance)
         # sprite 預設朝右（+x 方向），pygame rotate 逆時針為正
         # 90 - angle 讓 angle=0（瞄準正上方）時轉 +90°（逆時針），sprite 正確朝上
         rotated = pygame.transform.rotate(sprite, 90 - angle)

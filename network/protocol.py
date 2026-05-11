@@ -115,8 +115,26 @@ def pack_char_select(char_id: int) -> bytes:
     return bytes([PKT_CHAR_SELECT, char_id & 0xFF])
 
 
-def pack_game_start() -> bytes:
-    return bytes([PKT_GAME_START])
+def pack_game_start(chars: dict = None) -> bytes:
+    """
+    chars: {pid: char_id}（最多 2 對）
+    格式: PKT_GAME_START [pid char_id] ...
+    """
+    data = [PKT_GAME_START]
+    if chars:
+        for pid, char_id in sorted(chars.items()):
+            data += [int(pid) & 0xFF, int(char_id) & 0xFF]
+    return bytes(data)
+
+
+def unpack_game_start(data: bytes) -> dict:
+    """回傳 {pid: char_id}。"""
+    chars = {}
+    i = 1
+    while i + 1 < len(data):
+        chars[data[i]] = data[i + 1]
+        i += 2
+    return chars
 
 
 def packet_type(data: bytes) -> int:
