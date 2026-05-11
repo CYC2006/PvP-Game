@@ -24,6 +24,7 @@ CHARACTERS = [
         "damage":      get_stat(key, "damage"),
         "ammo":        get_stat(key, "mag"),
         "reload_time": get_stat(key, "reload_time"),
+        "fire_rate":   get_stat(key, "fire_rate"),
     }
     for key in CHAR_ORDER
 ]
@@ -238,19 +239,28 @@ def draw_char_select(screen: pygame.Surface,
 
 
 def _draw_stats_panel(screen, font_lg, font_sm, top_y: int) -> None:
-    """顯示中央角色的數值：HP | GUN | DAMAGE | AMMO | RELOAD。"""
-    char    = CHARACTERS[_target_idx]
-    reload  = char["reload_time"]
+    """顯示中央角色的數值：HP | GUN | DAMAGE | AMMO | RELOAD | RATE。"""
+    char = CHARACTERS[_target_idx]
+
+    reload = char["reload_time"]
     reload_str = f"{reload}s" if reload else ""
+
+    rate = char["fire_rate"]
+    if rate and rate > 0:
+        rate_str = f"{int(rate) if rate == int(rate) else rate}/s"
+    else:
+        rate_str = ""
+
     fields = [
         ("HP",     str(char["hp"])),
         ("GUN",    char["gun"]),
         ("DAMAGE", char["damage"]),
         ("AMMO",   char["ammo"]),
         ("RELOAD", reload_str),
+        ("RATE",   rate_str),
     ]
 
-    panel_w  = 620
+    panel_w  = 660
     panel_h  = 72
     panel_x  = CENTER_X - panel_w // 2
     panel_y  = top_y
@@ -261,7 +271,7 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int) -> None:
     pygame.draw.rect(screen, COL_PANEL_BD,
                      (panel_x, panel_y, panel_w, panel_h), 2, border_radius=10)
 
-    col_w = panel_w // 4
+    col_w = panel_w // len(fields)   # 欄寬隨欄數自動計算
     for i, (label, value) in enumerate(fields):
         cx = panel_x + col_w * i + col_w // 2
 
