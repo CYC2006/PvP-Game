@@ -20,6 +20,8 @@ class Player:
     y: float
     speed: float = PLAYER_SPEED
     hp: int = MAX_HP
+    aim_angle: float = 0.0   # 瞄準角度（度），0=上, 90=右；同步給對手
+    stance: str = "stand"    # "stand" | "machine" | "hold"；同步給對手
 
     def move(self, dx: float, dy: float, crouching: bool = False) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -74,10 +76,14 @@ class GameState:
 
     def apply_command(self, player_id: int, dx: float, dy: float,
                       shooting: bool, aim_x: float, aim_y: float,
-                      crouching: bool = False) -> None:
+                      crouching: bool = False, stance: str = "stand") -> None:
         if player_id not in self.players:
             return
-        self.players[player_id].move(dx, dy, crouching)
+        player = self.players[player_id]
+        player.move(dx, dy, crouching)
+        player.stance = stance
+        if math.hypot(aim_x, aim_y) > 0:
+            player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
         if shooting:
             self._spawn_bullet(player_id, aim_x, aim_y)
 

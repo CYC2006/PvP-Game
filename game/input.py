@@ -51,5 +51,6 @@ def read_input(player_id: int, keys_held: set,
         shooting=shooting,
         aim_x=aim_x, aim_y=aim_y,
         crouching=crouching,
+        stance=effective_stance,
     )
     return cmd, effective_stance

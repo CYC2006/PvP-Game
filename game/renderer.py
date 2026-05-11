@@ -305,8 +305,8 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             stance = my_stance
             angle  = aim_angle_deg
         else:
-            stance = "stand"
-            angle  = 0.0
+            stance = player.stance       # 從 server 同步的 stance
+            angle  = player.aim_angle    # 從 server 同步的瞄準角度
 
         sprite  = _get_player_sprite("hitman1", stance)
         # sprite 預設朝右（+x 方向），pygame rotate 逆時針為正

@@ -10,3 +10,4 @@ class PlayerCommand:
     aim_x: float        # world-space direction vector (not normalised)
     aim_y: float
     crouching: bool = False  # shift + movement → hold stance, 0.5× speed
+    stance: str = "stand"   # "stand" | "machine" | "hold"（同步給對手）

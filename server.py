@@ -76,7 +76,7 @@ def run():
                         cmd.player_id,
                         cmd.move_x, cmd.move_y,
                         cmd.shooting, cmd.aim_x, cmd.aim_y,
-                        cmd.crouching,
+                        cmd.crouching, cmd.stance,
                     )
 
         # ── Tick ──────────────────────────────────────────────────
