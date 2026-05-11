@@ -332,10 +332,10 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         screen.blit(rotated, (sx - rotated.get_width()  // 2,
                                sy - rotated.get_height() // 2))
 
-        # 對方頭上顯示 HP pip bar
+        # 對方頭上顯示 HP bar（依真實血量百分比）
         if pid != my_id:
-            head_y = sy - rotated.get_height() // 2 - 8
-            _draw_pip_bar(screen, player.hp, sx - 20, head_y)
+            head_y = sy - rotated.get_height() // 2 - 10
+            _draw_opponent_hp_bar(screen, player.hp, player.max_hp, sx, head_y)
 
         # 玩家名稱標籤
         label_y = sy - rotated.get_height() // 2 - 20
@@ -343,11 +343,17 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         screen.blit(label, (sx - label.get_width() // 2, label_y))
 
 
-def _draw_pip_bar(screen, hp: int, x: int, y: int):
-    pip_w = 7
-    for i in range(MAX_HP):
-        col = COL_HP_FILL if i < hp else COL_HP_BG
-        pygame.draw.rect(screen, col, (x + i * (pip_w + 2), y, pip_w, 5))
+def _draw_opponent_hp_bar(screen, hp: int, max_hp: int, cx: int, y: int):
+    """對手頭上的血條，依真實 HP 百分比填充。"""
+    bar_w = 44
+    bar_h = 5
+    x = cx - bar_w // 2
+    ratio = max(0.0, hp / max_hp) if max_hp > 0 else 0.0
+    pygame.draw.rect(screen, COL_HP_BG,   (x, y, bar_w, bar_h), border_radius=2)
+    if ratio > 0:
+        fill_col = (COL_HP_FILL if ratio > 0.3 else (255, 160, 40))
+        pygame.draw.rect(screen, fill_col, (x, y, int(bar_w * ratio), bar_h), border_radius=2)
+    pygame.draw.rect(screen, COL_HP_BORDER, (x, y, bar_w, bar_h), 1, border_radius=2)
 
 
 # ── HUD ──────────────────────────────────────────────────────────────────────
@@ -377,7 +383,7 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
         # 換彈進度條（從 input 模組的全域取進度）
         import game.input as _inp
         elapsed  = now - _inp._reload_start_ms
-        progress = min(1.0, elapsed / RELOAD_TIME_MS)
+        progress = min(1.0, elapsed / _inp.RELOAD_TIME_MS)
         pygame.draw.rect(screen, (60, 20, 20),
                          (bar_x, ammo_y, bar_w, bar_h), border_radius=4)
         fill_w = int(bar_w * progress)
@@ -389,35 +395,37 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
         label = font.render("RELOADING...", True, (255, 90, 90))
     else:
         # 子彈數字
-        col   = (255, 220, 60) if ammo > 10 else (255, 90, 90)
-        label = font.render(f"AMMO  {ammo} / {MAGAZINE_SIZE}", True, col)
+        import game.input as _inp
+        mag   = _inp.MAGAZINE_SIZE
+        ammo_display = ammo if mag < 9999 else "∞"
+        mag_display  = mag  if mag < 9999 else "∞"
+        col   = (255, 220, 60) if (mag >= 9999 or ammo > 10) else (255, 90, 90)
+        label = font.render(f"AMMO  {ammo_display} / {mag_display}", True, col)
 
     screen.blit(label, (bar_x + bar_w - label.get_width(), ammo_y - 18))
 
 
 def _draw_hp_bar(screen, state, my_id, font):
-    bar_y = SCREEN_H - HP_BAR_Y_FROM_BOTTOM
-    hp    = state.players[my_id].hp if my_id in state.players else 0
+    bar_y  = SCREEN_H - HP_BAR_Y_FROM_BOTTOM
+    player = state.players.get(my_id)
+    hp     = player.hp     if player else 0
+    max_hp = player.max_hp if player else 1
+
+    ratio = max(0.0, hp / max_hp) if max_hp > 0 else 0.0
 
     pygame.draw.rect(screen, COL_HP_BG,
                      (HP_BAR_X, bar_y, HP_BAR_W, HP_BAR_H), border_radius=4)
 
-    fill_w = int(HP_BAR_W * max(0, hp) / MAX_HP)
+    fill_w = int(HP_BAR_W * ratio)
     if fill_w > 0:
-        pygame.draw.rect(screen, COL_HP_FILL,
+        fill_col = COL_HP_FILL if ratio > 0.3 else (255, 140, 30)
+        pygame.draw.rect(screen, fill_col,
                          (HP_BAR_X, bar_y, fill_w, HP_BAR_H), border_radius=4)
 
     pygame.draw.rect(screen, COL_HP_BORDER,
                      (HP_BAR_X, bar_y, HP_BAR_W, HP_BAR_H), 2, border_radius=4)
 
-    pip_w = (HP_BAR_W - HP_PIP_GAP * (MAX_HP + 1)) // MAX_HP
-    for i in range(MAX_HP):
-        pip_x = HP_BAR_X + HP_PIP_GAP + i * (pip_w + HP_PIP_GAP)
-        col = (255, 90, 90) if i < hp else (80, 30, 30)
-        pygame.draw.rect(screen, col,
-                         (pip_x, bar_y + 3, pip_w, HP_BAR_H - 6), border_radius=2)
-
-    label = font.render(f"HP  {hp} / {MAX_HP}", True, COL_TEXT)
+    label = font.render(f"HP  {hp} / {max_hp}", True, COL_TEXT)
     screen.blit(label, (HP_BAR_X, bar_y - 18))
 
 

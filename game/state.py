@@ -2,14 +2,14 @@ from dataclasses import dataclass, field
 import math
 import random
 
-MAP_WIDTH  = 1920   # 縮小以方便測試（原 3840）
-MAP_HEIGHT = 1080   # 縮小以方便測試（原 2160）
+MAP_WIDTH  = 1920
+MAP_HEIGHT = 1080
 
 PLAYER_SPEED     = 3.0
 PLAYER_RADIUS    = 16
 BULLET_SPEED     = 8.0
 BULLET_RADIUS    = 5
-MAX_HP           = 5
+DEFAULT_MAX_HP   = 100      # 預設血量（未設定角色時使用）
 BULLET_MAX_RANGE = 900
 
 
@@ -19,9 +19,12 @@ class Player:
     x: float
     y: float
     speed: float = PLAYER_SPEED
-    hp: int = MAX_HP
-    aim_angle: float = 0.0   # 瞄準角度（度），0=上, 90=右；同步給對手
-    stance: str = "stand"    # "stand" | "machine" | "hold"；同步給對手
+    hp: int      = DEFAULT_MAX_HP
+    max_hp: int  = DEFAULT_MAX_HP   # 依角色設定，respawn 恢復到此值
+    damage_min: int = 1             # 子彈最小傷害（由 server 依角色設定）
+    damage_max: int = 1             # 子彈最大傷害
+    aim_angle: float = 0.0          # 瞄準角度（度），0=上, 90=右；同步給對手
+    stance: str = "stand"           # "stand" | "machine" | "hold" | "reload"
 
     def move(self, dx: float, dy: float, crouching: bool = False) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -32,7 +35,7 @@ class Player:
         self.y = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS, self.y + dy * speed))
 
     def respawn(self) -> None:
-        self.hp = MAX_HP
+        self.hp = self.max_hp
         self.x  = float(MAP_WIDTH  // 4 if self.id == 1 else MAP_WIDTH  * 3 // 4)
         self.y  = float(MAP_HEIGHT // 2)
 
@@ -64,15 +67,27 @@ class Bullet:
 class GameState:
     players: dict            = field(default_factory=dict)
     bullets: dict            = field(default_factory=dict)
-    destroyed_obstacles: set = field(default_factory=set)  # 已被摧毀的障礙物 ID
+    destroyed_obstacles: set = field(default_factory=set)
     tick: int                = 0
     _next_bullet_id: int     = 0
 
-    def add_player(self, player_id: int) -> Player:
+    def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
         spawn_y = MAP_HEIGHT // 2
-        self.players[player_id] = Player(id=player_id, x=float(spawn_x), y=float(spawn_y))
+        self.players[player_id] = Player(id=player_id,
+                                         x=float(spawn_x), y=float(spawn_y))
         return self.players[player_id]
+
+    def apply_char_stats(self, player_id: int, char_key: str) -> None:
+        """遊戲開始後由 server 呼叫，將角色數值套用到 Player。"""
+        from game.char_data import get_stat
+        if player_id not in self.players:
+            return
+        p = self.players[player_id]
+        p.max_hp     = get_stat(char_key, "hp")
+        p.hp         = p.max_hp
+        p.damage_min = get_stat(char_key, "damage_min")
+        p.damage_max = get_stat(char_key, "damage_max")
 
     def apply_command(self, player_id: int, dx: float, dy: float,
                       shooting: bool, aim_x: float, aim_y: float,
@@ -92,7 +107,7 @@ class GameState:
         length = math.hypot(aim_x, aim_y)
         if length == 0:
             return
-        ux  = aim_x / length          # 瞄準方向單位向量
+        ux  = aim_x / length
         uy  = aim_y / length
         # 後座力散佈：±5° 隨機偏角
         spread = math.radians(random.uniform(-5.0, 5.0))
@@ -101,12 +116,10 @@ class GameState:
 
         ndx = ux * BULLET_SPEED
         ndy = uy * BULLET_SPEED
-        # 槍口位置 = 中心 + 前方偏移 + 右肩偏移
-        # 右肩方向（逆時針 90°）：(-uy, ux)
-        barrel_fwd   = PLAYER_RADIUS + 10   # 前方距離（px）
-        barrel_right = 14                   # 右肩距離（px）
-        rx = -uy   # 角色右方單位向量 x
-        ry =  ux   # 角色右方單位向量 y
+        barrel_fwd   = PLAYER_RADIUS + 10
+        barrel_right = 14
+        rx = -uy
+        ry =  ux
         bid = self._next_bullet_id
         self._next_bullet_id = (self._next_bullet_id + 1) % 256
         self.bullets[bid] = Bullet(
@@ -118,11 +131,6 @@ class GameState:
 
     def step_bullets(self, obstacles: dict = None,
                      obstacle_hp: dict = None) -> None:
-        """
-        移動所有子彈，解析碰撞。
-        obstacles   : {id: Obstacle}，伺服器傳入
-        obstacle_hp : {id: int}，伺服器端 HP 追蹤
-        """
         if obstacles is None:
             obstacles = {}
 
@@ -140,7 +148,15 @@ class GameState:
                 if pid == bullet.owner_id:
                     continue
                 if math.hypot(bullet.x - player.x, bullet.y - player.y) < PLAYER_RADIUS + BULLET_RADIUS:
-                    player.hp -= 1
+                    # 依射手角色計算傷害
+                    shooter = self.players.get(bullet.owner_id)
+                    if shooter and shooter.damage_min < shooter.damage_max:
+                        damage = random.randint(shooter.damage_min, shooter.damage_max)
+                    elif shooter:
+                        damage = shooter.damage_min
+                    else:
+                        damage = 1
+                    player.hp -= damage
                     if player.hp <= 0:
                         player.respawn()
                     expired.append(bid)
@@ -159,14 +175,13 @@ class GameState:
                         obstacle_hp[oid] -= 1
                         if obstacle_hp[oid] <= 0:
                             self.destroyed_obstacles.add(oid)
-                    expired.append(bid)   # 不可破壞的障礙物也會讓子彈消失
+                    expired.append(bid)
                     break
 
         for bid in expired:
             self.bullets.pop(bid, None)
 
     def resolve_player_collisions(self, obstacles: dict = None) -> None:
-        """將所有玩家從非破壞的障礙物中推出"""
         if not obstacles:
             return
         for player in self.players.values():

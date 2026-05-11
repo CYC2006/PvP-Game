@@ -19,7 +19,7 @@ PKT_GAME_START  = 0x06   # server → clients: 雙方都選完，遊戲開始
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBff")
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffBhB")   # id x y hp aim_angle_i16 stance_u8
+_PLAYER_ENTRY  = struct.Struct("!BffHhB")   # id x y hp(u16) aim_angle_i16 stance_u8
 _BULLET_ENTRY  = struct.Struct("!BBff")
 
 # stance 編碼表
@@ -95,7 +95,8 @@ def unpack_state(data: bytes) -> GameState:
         pid, x, y, hp, aim_i16, stance_u8 = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
-        state.players[pid] = Player(id=pid, x=x, y=y, hp=hp,
+        state.players[pid] = Player(id=pid, x=x, y=y,
+                                    hp=hp, max_hp=hp,   # max_hp 從 state 同步
                                     aim_angle=float(aim_i16), stance=stance)
         offset += _PLAYER_ENTRY.size
 

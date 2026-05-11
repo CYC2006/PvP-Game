@@ -10,37 +10,32 @@ Use get_stat(char_key, stat, level=0) everywhere so callers never need
 to know whether a value is scalar or a list.
 """
 
-# ── 角色靜態資料 ───────────────────────────────────────────────────────────
-# 欄位說明：
+# ── 欄位說明 ────────────────────────────────────────────────────────────────
 #   name         顯示名稱
 #   folder       assets/Player/ 下的資料夾名稱
 #   hp           最大血量
 #   gun          槍種名稱（顯示用）
-#   damage       傷害描述字串；純特殊效果填 "" （面板顯示 —）
-#   mag          彈夾容量字串；無彈夾概念填 ""（面板顯示 —）
+#   damage       傷害描述字串（顯示用）；特殊效果填 ""
+#   damage_min   最小傷害（server 計算用）
+#   damage_max   最大傷害（server 計算用）
+#   mag          彈夾容量字串（顯示用）；無彈夾概念填 ""
 #   fire_rate    射速（發/秒）；0 表示特殊/不適用
 #   reload_time  換彈時間（秒）；0 表示無需換彈
 
 CHAR_STATS: dict = {
+
+    # ── 已實作角色 ─────────────────────────────────────────────────────────
     "hitman1": {
         "name":        "Agent",
         "folder":      "Hitman 1",
         "hp":          100,
         "gun":         "Pistol",
         "damage":      "25~30",
+        "damage_min":  25,
+        "damage_max":  30,
         "mag":         "12",
         "fire_rate":   3,
         "reload_time": 2,
-    },
-    "manBlue": {
-        "name":        "Rambo",
-        "folder":      "Man Blue",
-        "hp":          200,
-        "gun":         "Shotgun",
-        "damage":      "",          # 越靠近越痛（特殊）
-        "mag":         "6",
-        "fire_rate":   2,
-        "reload_time": 4,
     },
     "manBrown": {
         "name":        "Bear",
@@ -48,6 +43,8 @@ CHAR_STATS: dict = {
         "hp":          150,
         "gun":         "Machine",
         "damage":      "15~20",
+        "damage_min":  15,
+        "damage_max":  20,
         "mag":         "50",
         "fire_rate":   5,
         "reload_time": 4,
@@ -58,19 +55,11 @@ CHAR_STATS: dict = {
         "hp":          70,
         "gun":         "Sniper",
         "damage":      "75~80",
+        "damage_min":  75,
+        "damage_max":  80,
         "mag":         "5",
         "fire_rate":   0.5,
         "reload_time": 5,
-    },
-    "robot1": {
-        "name":        "Robot",
-        "folder":      "Robot 1",
-        "hp":          120,
-        "gun":         "Laser",
-        "damage":      "",          # 特殊
-        "mag":         "",          # 無彈夾
-        "fire_rate":   0,
-        "reload_time": 0,
     },
     "soldier1": {
         "name":        "Soldier",
@@ -78,6 +67,8 @@ CHAR_STATS: dict = {
         "hp":          180,
         "gun":         "Rifle",
         "damage":      "10~15",
+        "damage_min":  10,
+        "damage_max":  15,
         "mag":         "40",
         "fire_rate":   8,
         "reload_time": 3,
@@ -88,8 +79,36 @@ CHAR_STATS: dict = {
         "hp":          100,
         "gun":         "Shuriken",
         "damage":      "35~40",
-        "mag":         "",          # 無彈夾
+        "damage_min":  35,
+        "damage_max":  40,
+        "mag":         "",          # 無彈夾（無限）
         "fire_rate":   4,
+        "reload_time": 0,
+    },
+
+    # ── 未實作角色（damage_min/max 為預留值）──────────────────────────────
+    "manBlue": {
+        "name":        "Rambo",
+        "folder":      "Man Blue",
+        "hp":          200,
+        "gun":         "Shotgun",
+        "damage":      "",          # 越靠近越痛（待實作）
+        "damage_min":  20,
+        "damage_max":  40,
+        "mag":         "6",
+        "fire_rate":   2,
+        "reload_time": 4,
+    },
+    "robot1": {
+        "name":        "Robot",
+        "folder":      "Robot 1",
+        "hp":          120,
+        "gun":         "Laser",
+        "damage":      "",          # 特殊（待實作）
+        "damage_min":  15,
+        "damage_max":  25,
+        "mag":         "",
+        "fire_rate":   0,
         "reload_time": 0,
     },
     "womanGreen": {
@@ -97,8 +116,10 @@ CHAR_STATS: dict = {
         "folder":      "Woman Green",
         "hp":          140,
         "gun":         "Poison",
-        "damage":      "",          # 持續傷害（特殊）
-        "mag":         "",          # 無彈夾
+        "damage":      "",          # 持續傷害（待實作）
+        "damage_min":  5,
+        "damage_max":  10,
+        "mag":         "",
         "fire_rate":   0,
         "reload_time": 0,
     },
@@ -107,8 +128,10 @@ CHAR_STATS: dict = {
         "folder":      "Zombie 1",
         "hp":          300,
         "gun":         "Hand",
-        "damage":      "",          # 特殊
-        "mag":         "",          # 無彈夾
+        "damage":      "",          # 特殊（待實作）
+        "damage_min":  20,
+        "damage_max":  30,
+        "mag":         "",
         "fire_rate":   2,
         "reload_time": 0,
     },

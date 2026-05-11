@@ -150,6 +150,10 @@ def run(server_ip: str) -> None:
 
     print(f"[Client] Game start! My char: {my_char_key}  All chars: {player_chars}")
 
+    # 依選擇角色設定射速 / 彈夾 / 換彈
+    from game.input import init_char
+    init_char(my_char_key)
+
     # ── 遊戲主迴圈 ────────────────────────────────────────────────
     state      = GameState()
     keys_held: set = set()

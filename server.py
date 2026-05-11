@@ -79,9 +79,14 @@ def run():
                     player_chars[pid] = char_id
                     print(f"[Server] Player {pid} selected char {char_id}")
 
-                    # 雙方都選完 → 開始遊戲
+                    # 雙方都選完 → 套用角色數值 → 開始遊戲
                     if len(player_chars) == MAX_PLAYERS:
                         game_started = True
+                        from game.char_data import CHAR_ORDER
+                        for p_id, c_id in player_chars.items():
+                            char_key = CHAR_ORDER[c_id]
+                            state.apply_char_stats(p_id, char_key)
+                            print(f"[Server] Player {p_id} → {char_key}")
                         payload = pack_game_start(player_chars)
                         for a in clients.values():
                             try:

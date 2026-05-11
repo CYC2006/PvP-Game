@@ -1,14 +1,41 @@
 import pygame
 from game.command import PlayerCommand
 
-SHOOT_COOLDOWN_MS = 60
-MAGAZINE_SIZE     = 45
+# 預設值（連線前 / 未選角時的 fallback）
+SHOOT_COOLDOWN_MS = 333
+MAGAZINE_SIZE     = 12
 RELOAD_TIME_MS    = 2000
 
 _last_shot_time:  int  = 0
 _ammo:            int  = MAGAZINE_SIZE
 _reloading:       bool = False
 _reload_start_ms: int  = 0
+
+
+def init_char(char_key: str) -> None:
+    """
+    遊戲開始後呼叫，依選擇角色設定射速 / 彈夾 / 換彈時間，並重置射擊狀態。
+    此後 read_input 會使用這些數值。
+    """
+    global SHOOT_COOLDOWN_MS, MAGAZINE_SIZE, RELOAD_TIME_MS
+    global _ammo, _reloading, _reload_start_ms, _last_shot_time
+
+    from game.char_data import get_stat
+
+    rate = get_stat(char_key, "fire_rate")
+    SHOOT_COOLDOWN_MS = int(1000 / rate) if rate and rate > 0 else 9999
+
+    mag_str = get_stat(char_key, "mag")
+    MAGAZINE_SIZE = int(mag_str) if mag_str and str(mag_str).strip().isdigit() else 9999
+
+    reload_s = get_stat(char_key, "reload_time")
+    RELOAD_TIME_MS = int(reload_s * 1000) if reload_s and reload_s > 0 else 99999
+
+    # 重置射擊狀態
+    _ammo            = MAGAZINE_SIZE
+    _reloading       = False
+    _reload_start_ms = 0
+    _last_shot_time  = 0
 
 
 def read_input(player_id: int, keys_held: set,
@@ -21,10 +48,6 @@ def read_input(player_id: int, keys_held: set,
 
     回傳 (PlayerCommand, effective_stance, ammo, is_reloading)
     effective_stance : "stand" | "machine" | "hold" | "reload"
-      - reload  = 換彈中，無法射擊，蹲下也不切換造型
-      - hold    = shift，0.5× 速度，無法射擊
-      - stand   = 無武器模式，無法射擊
-      - machine = 持機槍模式，可射擊
     """
     global _last_shot_time, _ammo, _reloading, _reload_start_ms
 
@@ -64,11 +87,12 @@ def read_input(player_id: int, keys_held: set,
             and (now - _last_shot_time) >= SHOOT_COOLDOWN_MS):
         shooting        = True
         _last_shot_time = now
-        _ammo          -= 1
-        if _ammo <= 0:
-            _ammo            = 0
-            _reloading       = True
-            _reload_start_ms = now
+        if MAGAZINE_SIZE < 9999:   # 有彈夾限制
+            _ammo -= 1
+            if _ammo <= 0:
+                _ammo            = 0
+                _reloading       = True
+                _reload_start_ms = now
 
     cmd = PlayerCommand(
         player_id=player_id,
