@@ -1,52 +1,69 @@
 """
 Character selection screen — horizontal carousel.
-Scroll wheel (or ←/→ arrows) to move; centre card is the selected character.
-Click or press Enter/Space to confirm.
+Scroll wheel / ← → to browse; centre card is the selected character.
+Click or Enter/Space to confirm.
 """
 import os
-import math
 import time
 import pygame
 
 LOGICAL_W = 1280
 LOGICAL_H = 720
 
-# ── 9 個角色（依資料夾名稱 / 前綴自動命名）────────────────────────────────
+# ── 9 個角色（名稱 & 數值來自 Game.xlsx）────────────────────────────────────
+# damage / mag 為 "" 表示特殊種類，選角面板留空
 CHARACTERS = [
-    {"char_key": "hitman1",    "folder": "Hitman 1",    "name": "Hitman 1"},
-    {"char_key": "manBlue",    "folder": "Man Blue",    "name": "Man Blue"},
-    {"char_key": "manBrown",   "folder": "Man Brown",   "name": "Man Brown"},
-    {"char_key": "manOld",     "folder": "Man Old",     "name": "Man Old"},
-    {"char_key": "robot1",     "folder": "Robot 1",     "name": "Robot 1"},
-    {"char_key": "soldier1",   "folder": "Soldier 1",   "name": "Soldier 1"},
-    {"char_key": "survivor1",  "folder": "Survivor 1",  "name": "Survivor 1"},
-    {"char_key": "womanGreen", "folder": "Woman Green", "name": "Woman Green"},
-    {"char_key": "zoimbie1",   "folder": "Zombie 1",    "name": "Zombie 1"},
+    {"char_key": "hitman1",    "folder": "Hitman 1",    "name": "Agent",
+     "hp": 100, "gun": "Pistol",      "damage": "25~30", "mag": "12"},
+    {"char_key": "manBlue",    "folder": "Man Blue",    "name": "Rambo",
+     "hp": 200, "gun": "Shotgun",     "damage": "",      "mag": "6"},
+    {"char_key": "manBrown",   "folder": "Man Brown",   "name": "Bear",
+     "hp": 150, "gun": "Machine Gun", "damage": "15~20", "mag": "50"},
+    {"char_key": "manOld",     "folder": "Man Old",     "name": "Sniper",
+     "hp": 70,  "gun": "Sniper",      "damage": "75~80", "mag": "5"},
+    {"char_key": "robot1",     "folder": "Robot 1",     "name": "Robot",
+     "hp": 120, "gun": "Laser Gun",   "damage": "",      "mag": ""},
+    {"char_key": "soldier1",   "folder": "Soldier 1",   "name": "Soldier",
+     "hp": 180, "gun": "Rifle",       "damage": "10~15", "mag": "40"},
+    {"char_key": "survivor1",  "folder": "Survivor 1",  "name": "Assassin",
+     "hp": 100, "gun": "Shuriken",    "damage": "35~40", "mag": ""},
+    {"char_key": "womanGreen", "folder": "Woman Green", "name": "Dancer",
+     "hp": 140, "gun": "Poison Gas",  "damage": "",      "mag": ""},
+    {"char_key": "zoimbie1",   "folder": "Zombie 1",    "name": "Zombie",
+     "hp": 300, "gun": "Hand",        "damage": "",      "mag": ""},
 ]
 N = len(CHARACTERS)
 
 # ── 版面 ──────────────────────────────────────────────────────────────────
 CARD_W       = 190
-CARD_H       = 280
-CARD_SPACING = 230        # 卡片中心間距
+CARD_H       = 265
+CARD_SPACING = 225
 CENTER_X     = LOGICAL_W // 2
-CARD_Y       = LOGICAL_H // 2 - 40
+CARD_Y       = 300          # 卡片中心 y（稍微往上移以騰出下方空間）
 
 # ── 顏色 ──────────────────────────────────────────────────────────────────
 COL_BG          = (20,  24,  32)
 COL_CARD        = (38,  46,  62)
-COL_CARD_CENTER = (30,  70,  50)
+COL_CARD_CENTER = (28,  68,  48)
 COL_BORDER      = (60,  75, 100)
 COL_BORDER_CTR  = (80, 220, 130)
 COL_TEXT        = (220, 220, 220)
 COL_TITLE       = (255, 230, 100)
 COL_NAME_CTR    = (255, 255, 255)
-COL_NAME        = (160, 160, 170)
-COL_HINT        = (140, 200, 255)
+COL_NAME        = (150, 155, 168)
+COL_ARROW       = (170, 180, 200)
+COL_ARROW_HOV   = (255, 230, 100)
 COL_READY       = ( 80, 220, 130)
 COL_WAIT        = (140, 200, 255)
-COL_ARROW       = (180, 190, 210)
-COL_ARROW_HOV   = (255, 230, 100)
+COL_STATUS      = (190, 195, 210)
+COL_HINT        = (110, 130, 160)
+
+# Stats panel
+COL_PANEL_BG    = (30,  36,  50)
+COL_PANEL_BD    = (55,  68,  95)
+COL_STAT_LABEL  = (110, 130, 160)
+COL_STAT_VAL    = (230, 235, 245)
+COL_STAT_EMPTY  = (70,  78, 100)
 
 # ── Carousel 狀態（模組全域）────────────────────────────────────────────
 _target_idx:  int   = 0
@@ -54,7 +71,7 @@ _anim_offset: float = 0.0
 
 # ── Sprite 快取 ───────────────────────────────────────────────────────────
 _sprite_cache: dict = {}
-_SPRITE_H = 160
+_SPRITE_H = 148
 
 
 def _load_sprite(char: dict) -> pygame.Surface:
@@ -63,11 +80,10 @@ def _load_sprite(char: dict) -> pygame.Surface:
         path = os.path.join("assets", "Player", char["folder"],
                             f"{char['char_key']}_stand.png")
         try:
-            img = pygame.image.load(path).convert_alpha()
+            img   = pygame.image.load(path).convert_alpha()
             ratio = _SPRITE_H / img.get_height()
             new_w = max(1, int(img.get_width() * ratio))
             raw   = pygame.transform.scale(img, (new_w, _SPRITE_H))
-            # hitman1 等角色預設朝右；旋轉 90° 讓他朝上
             _sprite_cache[key] = pygame.transform.rotate(raw, 90)
         except Exception:
             surf = pygame.Surface((80, _SPRITE_H), pygame.SRCALPHA)
@@ -80,22 +96,18 @@ def _load_sprite(char: dict) -> pygame.Surface:
 # ── 公開 API ──────────────────────────────────────────────────────────────
 
 def reset() -> None:
-    """重設 carousel 狀態（每次進入選角畫面時呼叫）。"""
     global _target_idx, _anim_offset
     _target_idx  = 0
     _anim_offset = 0.0
 
 
 def handle_event(event: pygame.event.Event) -> bool:
-    """
-    處理輸入事件。
-    回傳 True 表示玩家按下確認（Enter / Space / 點擊畫面）。
-    """
+    """回傳 True 表示玩家確認選擇。"""
     global _target_idx
     if event.type == pygame.MOUSEWHEEL:
-        _target_idx = max(0, min(N - 1, _target_idx + event.y * -1))
+        _target_idx = max(0, min(N - 1, _target_idx - event.y))
     elif event.type == pygame.KEYDOWN:
-        if event.key in (pygame.K_LEFT, pygame.K_a):
+        if event.key in (pygame.K_LEFT,  pygame.K_a):
             _target_idx = max(0, _target_idx - 1)
         elif event.key in (pygame.K_RIGHT, pygame.K_d):
             _target_idx = min(N - 1, _target_idx + 1)
@@ -107,7 +119,6 @@ def handle_event(event: pygame.event.Event) -> bool:
 
 
 def selected_char() -> dict:
-    """回傳目前中央角色的資訊 dict。"""
     return CHARACTERS[_target_idx]
 
 
@@ -116,41 +127,37 @@ def selected_idx() -> int:
 
 
 def update(dt: float) -> None:
-    """每幀呼叫，平滑插值 carousel 位置。"""
     global _anim_offset
     _anim_offset += (_target_idx - _anim_offset) * min(1.0, 14.0 * dt)
 
+
+# ── 繪圖 ──────────────────────────────────────────────────────────────────
 
 def draw_char_select(screen: pygame.Surface,
                      font_lg: pygame.font.Font,
                      font_sm: pygame.font.Font,
                      my_ready: bool,
                      opponent_ready: bool) -> None:
-    """繪製整個選角畫面（不含事件處理）。"""
     screen.fill(COL_BG)
 
     # ── 標題 ──────────────────────────────────────────────────────
     title = font_lg.render("SELECT YOUR CHARACTER", True, COL_TITLE)
-    screen.blit(title, (CENTER_X - title.get_width() // 2, 40))
+    screen.blit(title, (CENTER_X - title.get_width() // 2, 28))
 
     # ── Carousel 卡片 ──────────────────────────────────────────────
     for i, char in enumerate(CHARACTERS):
-        d   = i - _anim_offset          # 距中央的偏移（帶正負號）
+        d     = i - _anim_offset
         abs_d = abs(d)
         if abs_d > 3.2:
-            continue                    # 太遠，不渲染
+            continue
 
-        # 位置 & 縮放
-        scale   = max(0.45, 1.0 - abs_d * 0.22)
+        scale   = max(0.44, 1.0 - abs_d * 0.22)
         cx      = int(CENTER_X + d * CARD_SPACING)
         w, h    = int(CARD_W * scale), int(CARD_H * scale)
         rect    = pygame.Rect(cx - w // 2, CARD_Y - h // 2, w, h)
-
-        # Alpha（距離越遠越透明）
-        alpha = max(60, int(255 - abs_d * 90))
+        alpha   = max(55, int(255 - abs_d * 95))
 
         card_surf = pygame.Surface((w, h), pygame.SRCALPHA)
-
         is_center = abs_d < 0.4
         bg_col    = COL_CARD_CENTER if is_center else COL_CARD
         bd_col    = COL_BORDER_CTR  if is_center else COL_BORDER
@@ -161,64 +168,137 @@ def draw_char_select(screen: pygame.Surface,
 
         # Sprite
         raw_sprite = _load_sprite(char)
-        sp_scale   = scale * 0.95
+        sp_scale   = scale * 0.92
         sp_w = max(1, int(raw_sprite.get_width()  * sp_scale))
         sp_h = max(1, int(raw_sprite.get_height() * sp_scale))
         sprite = pygame.transform.scale(raw_sprite, (sp_w, sp_h))
         sprite.set_alpha(alpha)
-        sp_x = w // 2 - sp_w // 2
-        sp_y = int(h * 0.10)
-        card_surf.blit(sprite, (sp_x, sp_y))
+        card_surf.blit(sprite, (w // 2 - sp_w // 2, int(h * 0.08)))
 
-        # 角色名稱
+        # 名稱
         name_col  = COL_NAME_CTR if is_center else COL_NAME
         name_surf = font_sm.render(char["name"], True, (*name_col, alpha))
-        card_surf.blit(name_surf, (w // 2 - name_surf.get_width() // 2,
-                                   h - int(h * 0.18)))
+        card_surf.blit(name_surf,
+                       (w // 2 - name_surf.get_width() // 2, h - int(h * 0.16)))
 
         screen.blit(card_surf, rect.topleft)
 
     # ── 導航箭頭 ──────────────────────────────────────────────────
-    mx, my = pygame.mouse.get_pos()
-    arrow_y = CARD_Y
+    mx, my_pos = pygame.mouse.get_pos()
+    arrow_y    = CARD_Y
 
-    left_pts = [(CENTER_X - CARD_SPACING * 1.7,       arrow_y),
-                (CENTER_X - CARD_SPACING * 1.7 + 28,  arrow_y - 18),
-                (CENTER_X - CARD_SPACING * 1.7 + 28,  arrow_y + 18)]
-    right_pts= [(CENTER_X + CARD_SPACING * 1.7,       arrow_y),
-                (CENTER_X + CARD_SPACING * 1.7 - 28,  arrow_y - 18),
-                (CENTER_X + CARD_SPACING * 1.7 - 28,  arrow_y + 18)]
+    left_pts  = [(CENTER_X - CARD_SPACING * 1.7,      arrow_y),
+                 (CENTER_X - CARD_SPACING * 1.7 + 26, arrow_y - 16),
+                 (CENTER_X - CARD_SPACING * 1.7 + 26, arrow_y + 16)]
+    right_pts = [(CENTER_X + CARD_SPACING * 1.7,      arrow_y),
+                 (CENTER_X + CARD_SPACING * 1.7 - 26, arrow_y - 16),
+                 (CENTER_X + CARD_SPACING * 1.7 - 26, arrow_y + 16)]
 
-    def arrow_col(pts):
+    def _arrow_col(pts):
         xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
-        r = pygame.Rect(min(xs)-4, min(ys)-4, max(xs)-min(xs)+8, max(ys)-min(ys)+8)
-        return COL_ARROW_HOV if r.collidepoint(mx, my) else COL_ARROW
+        r = pygame.Rect(min(xs)-6, min(ys)-6,
+                        max(xs)-min(xs)+12, max(ys)-min(ys)+12)
+        return COL_ARROW_HOV if r.collidepoint(mx, my_pos) else COL_ARROW
 
     if _target_idx > 0:
-        pygame.draw.polygon(screen, arrow_col(left_pts),  left_pts)
+        pygame.draw.polygon(screen, _arrow_col(left_pts),  left_pts)
     if _target_idx < N - 1:
-        pygame.draw.polygon(screen, arrow_col(right_pts), right_pts)
+        pygame.draw.polygon(screen, _arrow_col(right_pts), right_pts)
 
-    # ── 提示文字 ──────────────────────────────────────────────────
-    hint_y = CARD_Y + CARD_H // 2 + 30
-    if not my_ready:
-        hint = font_sm.render("Scroll / ← → to browse   •   Click or Enter to confirm",
-                              True, COL_HINT)
-        screen.blit(hint, (CENTER_X - hint.get_width() // 2, hint_y))
+    # ── 合併狀態列（一行）─────────────────────────────────────────
+    status_y = CARD_Y + CARD_H // 2 + 22
 
-    # ── 狀態列 ────────────────────────────────────────────────────
-    status_y = hint_y + 36
-    me_text  = "YOU:       READY ✓" if my_ready else f"YOU:       {CHARACTERS[_target_idx]['name']}"
-    me_col   = COL_READY if my_ready else COL_TEXT
-    screen.blit(font_sm.render(me_text, True, me_col),
-                (CENTER_X - 180, status_y))
+    char_name = CHARACTERS[_target_idx]["name"]
+    if my_ready:
+        you_part = f"YOU: {char_name} ✓"
+        you_col  = COL_READY
+    else:
+        you_part = f"YOU: {char_name}"
+        you_col  = COL_STATUS
 
-    op_text  = "OPPONENT:  READY ✓" if opponent_ready else "OPPONENT:  waiting..."
-    op_col   = COL_READY if opponent_ready else COL_TEXT
-    screen.blit(font_sm.render(op_text, True, op_col),
-                (CENTER_X - 180, status_y + 26))
+    if opponent_ready:
+        op_part = "OPPONENT: READY ✓"
+        op_col  = COL_READY
+    else:
+        op_part = "OPPONENT: waiting..."
+        op_col  = COL_STATUS
 
-    if my_ready and not opponent_ready:
-        dots = "." * (int(time.perf_counter() * 2) % 4)
+    hint_part = "" if my_ready else "  •  ← → scroll / Click or Enter to confirm"
+
+    # 分段渲染，讓各段有自己的顏色
+    you_surf  = font_sm.render(you_part, True, you_col)
+    sep_surf  = font_sm.render("   |   ", True, COL_HINT)
+    op_surf   = font_sm.render(op_part,  True, op_col)
+    hint_surf = font_sm.render(hint_part, True, COL_HINT)
+
+    total_w = (you_surf.get_width() + sep_surf.get_width() +
+               op_surf.get_width() + hint_surf.get_width())
+    x = CENTER_X - total_w // 2
+    for surf in (you_surf, sep_surf, op_surf, hint_surf):
+        screen.blit(surf, (x, status_y))
+        x += surf.get_width()
+
+    # ── 數值面板 ──────────────────────────────────────────────────
+    _draw_stats_panel(screen, font_lg, font_sm, status_y + 34)
+
+
+def _draw_stats_panel(screen, font_lg, font_sm, top_y: int) -> None:
+    """顯示中央角色的數值：血量 | 槍種 | 傷害 | 彈夾。"""
+    char   = CHARACTERS[_target_idx]
+    fields = [
+        ("HP",     str(char["hp"])),
+        ("GUN",    char["gun"]),
+        ("DAMAGE", char["damage"]),
+        ("MAG",    char["mag"]),
+    ]
+
+    panel_w  = 560
+    panel_h  = 72
+    panel_x  = CENTER_X - panel_w // 2
+    panel_y  = top_y
+
+    # 背景
+    pygame.draw.rect(screen, COL_PANEL_BG,
+                     (panel_x, panel_y, panel_w, panel_h), border_radius=10)
+    pygame.draw.rect(screen, COL_PANEL_BD,
+                     (panel_x, panel_y, panel_w, panel_h), 2, border_radius=10)
+
+    col_w = panel_w // 4
+    for i, (label, value) in enumerate(fields):
+        cx = panel_x + col_w * i + col_w // 2
+
+        # 分隔線
+        if i > 0:
+            line_x = panel_x + col_w * i
+            pygame.draw.line(screen, COL_PANEL_BD,
+                             (line_x, panel_y + 8), (line_x, panel_y + panel_h - 8))
+
+        # Label
+        lbl = font_sm.render(label, True, COL_STAT_LABEL)
+        screen.blit(lbl, (cx - lbl.get_width() // 2, panel_y + 10))
+
+        # Value
+        if value:
+            val_surf = font_lg.render(value, True, COL_STAT_VAL)
+        else:
+            val_surf = font_sm.render("—", True, COL_STAT_EMPTY)
+        screen.blit(val_surf, (cx - val_surf.get_width() // 2, panel_y + 32))
+
+    # "Waiting for opponent" 文字（已確認後顯示）
+    if _is_waiting():
+        dots   = "." * (int(time.perf_counter() * 2) % 4)
         w_surf = font_lg.render(f"Waiting for opponent{dots}", True, COL_WAIT)
-        screen.blit(w_surf, (CENTER_X - w_surf.get_width() // 2, status_y + 62))
+        screen.blit(w_surf,
+                    (CENTER_X - w_surf.get_width() // 2,
+                     panel_y + panel_h + 16))
+
+
+# 模組內部用來判斷是否正在等待對手的旗標
+_waiting: bool = False
+
+def _is_waiting() -> bool:
+    return _waiting
+
+def set_waiting(v: bool) -> None:
+    global _waiting
+    _waiting = v

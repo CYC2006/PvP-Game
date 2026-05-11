@@ -83,12 +83,10 @@ def char_select_loop(sock, server_addr, screen, logical_surf,
                 confirmed = charselect.handle_event(event)
                 if confirmed:
                     my_ready = True
+                    charselect.set_waiting(True)
                     idx = charselect.selected_idx()
                     sock.sendto(pack_char_select(idx), server_addr)
                     print(f"[Client] Selected char {idx} ({charselect.selected_char()['name']})")
-            else:
-                # 已確認後仍可接收 QUIT / ESCAPE（上面已處理）
-                pass
 
         # ── 收封包 ────────────────────────────────────────────────
         while True:
