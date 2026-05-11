@@ -12,14 +12,14 @@ PKT_GAME_START  = 0x06   # server → clients: 雙方都選完，遊戲開始
 
 # PKT_STATE 格式:
 #   | type(1) | tick(I) |
-#   | p_count(B) | [id(B) x(f) y(f) hp(B) aim_angle_i16(h) stance_u8(B)] * p_count |
+#   | p_count(B) | [id(B) x(f) y(f) hp(H) max_hp(H) aim_angle_i16(h) stance_u8(B)] * p_count |
 #   | b_count(B) | [id(B) owner(B) x(f) y(f)] * b_count |
 #   | d_count(B) | [obstacle_id(B)] * d_count |
 
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBff")
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffHhB")   # id x y hp(u16) aim_angle_i16 stance_u8
+_PLAYER_ENTRY  = struct.Struct("!BffHHhB")   # id x y hp(u16) max_hp(u16) aim_angle_i16 stance_u8
 _BULLET_ENTRY  = struct.Struct("!BBff")
 
 # stance 編碼表
@@ -66,7 +66,7 @@ def pack_state(state: GameState) -> bytes:
     players = list(state.players.values())
     p_data  = bytes([len(players)]) + b"".join(
         _PLAYER_ENTRY.pack(
-            p.id, p.x, p.y, max(0, p.hp),
+            p.id, p.x, p.y, max(0, p.hp), max(1, p.max_hp),
             int(p.aim_angle),                   # signed int16，struct '!' 會正確處理負值
             _STANCE_TO_INT.get(p.stance, 0),
         )
@@ -92,11 +92,11 @@ def unpack_state(data: bytes) -> GameState:
 
     p_count = data[offset]; offset += 1
     for _ in range(p_count):
-        pid, x, y, hp, aim_i16, stance_u8 = _PLAYER_ENTRY.unpack(
+        pid, x, y, hp, max_hp, aim_i16, stance_u8 = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
         state.players[pid] = Player(id=pid, x=x, y=y,
-                                    hp=hp, max_hp=hp,   # max_hp 從 state 同步
+                                    hp=hp, max_hp=max_hp,
                                     aim_angle=float(aim_i16), stance=stance)
         offset += _PLAYER_ENTRY.size
 
