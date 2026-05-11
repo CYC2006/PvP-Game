@@ -169,11 +169,11 @@ def draw_char_select(screen: pygame.Surface,
         sprite.set_alpha(alpha)
         card_surf.blit(sprite, (w // 2 - sp_w // 2, int(h * 0.08)))
 
-        # 名稱
+        # 名稱（放大字體）
         name_col  = COL_NAME_CTR if is_center else COL_NAME
-        name_surf = font_sm.render(char["name"], True, (*name_col, alpha))
+        name_surf = font_lg.render(char["name"], True, (*name_col, alpha))
         card_surf.blit(name_surf,
-                       (w // 2 - name_surf.get_width() // 2, h - int(h * 0.16)))
+                       (w // 2 - name_surf.get_width() // 2, h - int(h * 0.18)))
 
         screen.blit(card_surf, rect.topleft)
 
@@ -271,9 +271,12 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int) -> None:
         lbl = font_sm.render(label, True, COL_STAT_LABEL)
         screen.blit(lbl, (cx - lbl.get_width() // 2, panel_y + 10))
 
-        # Value
+        # Value（若文字超出欄寬則自動縮小字體）
+        max_val_w = col_w - 10
         if value:
             val_surf = font_lg.render(value, True, COL_STAT_VAL)
+            if val_surf.get_width() > max_val_w:
+                val_surf = font_sm.render(value, True, COL_STAT_VAL)
         else:
             val_surf = font_sm.render("—", True, COL_STAT_EMPTY)
         screen.blit(val_surf, (cx - val_surf.get_width() // 2, panel_y + 32))
