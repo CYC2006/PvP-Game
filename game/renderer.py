@@ -3,7 +3,7 @@ import math
 import time
 import random
 import pygame
-from game.state import GameState, MAX_HP, MAP_WIDTH, MAP_HEIGHT, PLAYER_RADIUS, BULLET_RADIUS
+from game.state import GameState, MAP_WIDTH, MAP_HEIGHT, PLAYER_RADIUS, BULLET_RADIUS
 from game.input import MAGAZINE_SIZE, RELOAD_TIME_MS
 
 LOGICAL_W = 1280
