@@ -271,12 +271,9 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int) -> None:
         lbl = font_sm.render(label, True, COL_STAT_LABEL)
         screen.blit(lbl, (cx - lbl.get_width() // 2, panel_y + 10))
 
-        # Value（若文字超出欄寬則自動縮小字體）
-        max_val_w = col_w - 10
+        # Value
         if value:
             val_surf = font_lg.render(value, True, COL_STAT_VAL)
-            if val_surf.get_width() > max_val_w:
-                val_surf = font_sm.render(value, True, COL_STAT_VAL)
         else:
             val_surf = font_sm.render("—", True, COL_STAT_EMPTY)
         screen.blit(val_surf, (cx - val_surf.get_width() // 2, panel_y + 32))

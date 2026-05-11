@@ -46,7 +46,7 @@ CHAR_STATS: dict = {
         "name":        "Bear",
         "folder":      "Man Brown",
         "hp":          150,
-        "gun":         "Machine Gun",
+        "gun":         "Machine",
         "damage":      "15~20",
         "mag":         "50",
         "fire_rate":   5,
