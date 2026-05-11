@@ -66,7 +66,7 @@ CHAR_STATS: dict = {
         "name":        "Robot",
         "folder":      "Robot 1",
         "hp":          120,
-        "gun":         "Laser Gun",
+        "gun":         "Laser",
         "damage":      "",          # 特殊
         "mag":         "",          # 無彈夾
         "fire_rate":   0,
@@ -96,7 +96,7 @@ CHAR_STATS: dict = {
         "name":        "Dancer",
         "folder":      "Woman Green",
         "hp":          140,
-        "gun":         "Poison Gas",
+        "gun":         "Poison",
         "damage":      "",          # 持續傷害（特殊）
         "mag":         "",          # 無彈夾
         "fire_rate":   0,
