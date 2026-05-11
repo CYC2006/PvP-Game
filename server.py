@@ -5,8 +5,8 @@ import sys
 from game.state    import GameState
 from game.obstacle import load_map
 from network.protocol import (
-    PKT_JOIN, PKT_CMD,
-    pack_joined, pack_state,
+    PKT_JOIN, PKT_CMD, PKT_CHAR_SELECT,
+    pack_joined, pack_state, pack_game_start,
     unpack_command, packet_type,
 )
 
@@ -39,8 +39,10 @@ def run():
     sock.setblocking(False)
 
     state: GameState          = GameState()
-    clients: dict[int, tuple] = {}
-    addr_to_id: dict          = {}
+    clients: dict[int, tuple] = {}   # pid → addr
+    addr_to_id: dict          = {}   # addr → pid
+    player_chars: dict        = {}   # pid → char_id（選角完成後才有）
+    game_started: bool        = False
 
     print(f"[Server] Listening on {get_local_ip()}:{PORT}")
     print(f"[Server] Waiting for {MAX_PLAYERS} players...")
@@ -57,6 +59,7 @@ def run():
 
             ptype = packet_type(data)
 
+            # ── 加入 ──────────────────────────────────────────────
             if ptype == PKT_JOIN:
                 if addr not in addr_to_id:
                     if len(clients) < MAX_PLAYERS:
@@ -66,11 +69,29 @@ def run():
                         state.add_player(pid)
                         sock.sendto(pack_joined(pid), addr)
                         print(f"[Server] Player {pid} joined from {addr}")
-                        if len(clients) == MAX_PLAYERS:
-                            print("[Server] Game start!")
 
+            # ── 選角 ──────────────────────────────────────────────
+            elif ptype == PKT_CHAR_SELECT:
+                if addr in addr_to_id and not game_started and len(data) >= 2:
+                    pid     = addr_to_id[addr]
+                    char_id = data[1]
+                    player_chars[pid] = char_id
+                    print(f"[Server] Player {pid} selected char {char_id}")
+
+                    # 雙方都選完 → 開始遊戲
+                    if len(player_chars) == MAX_PLAYERS:
+                        game_started = True
+                        payload = pack_game_start()
+                        for a in clients.values():
+                            try:
+                                sock.sendto(payload, a)
+                            except Exception:
+                                pass
+                        print("[Server] Both selected — Game start!")
+
+            # ── 指令（遊戲進行中才處理）──────────────────────────
             elif ptype == PKT_CMD:
-                if addr in addr_to_id and len(clients) == MAX_PLAYERS:
+                if addr in addr_to_id and game_started:
                     cmd = unpack_command(data)
                     state.apply_command(
                         cmd.player_id,
@@ -79,15 +100,15 @@ def run():
                         cmd.crouching, cmd.stance,
                     )
 
-        # ── Tick ──────────────────────────────────────────────────
-        now = time.perf_counter()
-        if now >= next_tick:
-            next_tick += TICK_DT
-            state.tick += 1
-            state.step_bullets(obstacles, obstacle_hp)
-            state.resolve_player_collisions(obstacles)
+        # ── Tick（遊戲進行中才跑）────────────────────────────────
+        if game_started:
+            now = time.perf_counter()
+            if now >= next_tick:
+                next_tick += TICK_DT
+                state.tick += 1
+                state.step_bullets(obstacles, obstacle_hp)
+                state.resolve_player_collisions(obstacles)
 
-            if len(clients) == MAX_PLAYERS:
                 payload = pack_state(state)
                 for addr in clients.values():
                     try:

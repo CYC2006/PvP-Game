@@ -3,10 +3,12 @@ from game.command import PlayerCommand
 from game.state import GameState, Player, Bullet
 
 # --- Packet types ---
-PKT_JOIN   = 0x01
-PKT_JOINED = 0x02
-PKT_CMD    = 0x03
-PKT_STATE  = 0x04
+PKT_JOIN        = 0x01
+PKT_JOINED      = 0x02
+PKT_CMD         = 0x03
+PKT_STATE       = 0x04
+PKT_CHAR_SELECT = 0x05   # client → server: 選好角色（2 bytes: type + char_id）
+PKT_GAME_START  = 0x06   # server → clients: 雙方都選完，遊戲開始
 
 # PKT_STATE 格式:
 #   | type(1) | tick(I) |
@@ -107,6 +109,14 @@ def unpack_state(data: bytes) -> GameState:
     state.destroyed_obstacles = set(data[offset: offset + d_count])
 
     return state
+
+
+def pack_char_select(char_id: int) -> bytes:
+    return bytes([PKT_CHAR_SELECT, char_id & 0xFF])
+
+
+def pack_game_start() -> bytes:
+    return bytes([PKT_GAME_START])
 
 
 def packet_type(data: bytes) -> int:

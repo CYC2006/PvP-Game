@@ -4,13 +4,14 @@ import sys
 import time
 import pygame
 
-from game.input    import read_input
-from game.renderer import draw, LOGICAL_W, LOGICAL_H
-from game.state    import GameState
-from game.obstacle import load_map
+from game.input      import read_input
+from game.renderer   import draw, LOGICAL_W, LOGICAL_H
+from game.state      import GameState
+from game.obstacle   import load_map
+from game.charselect import draw_char_select, handle_click
 from network.protocol import (
-    PKT_JOINED, PKT_STATE,
-    pack_join, pack_command,
+    PKT_JOINED, PKT_STATE, PKT_GAME_START,
+    pack_join, pack_command, pack_char_select,
     unpack_joined, unpack_state,
     packet_type,
 )
@@ -55,6 +56,57 @@ def screen_to_logical(sx: int, sy: int,
     return int((sx - off_x) / scale), int((sy - off_y) / scale)
 
 
+def char_select_loop(sock, server_addr, screen, logical_surf,
+                     font_lg, font_sm, clock) -> bool:
+    """
+    選角畫面主迴圈。
+    回傳 True 表示雙方都選完，進入遊戲；False 表示玩家關閉視窗。
+    """
+    selected_idx   = -1   # -1 = 尚未選擇
+    my_ready       = False
+    opponent_ready = False
+
+    while True:
+        # ── 事件 ──────────────────────────────────────────────────
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return False
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # 取得 logical 座標（選角畫面 1:1，不需 viewport 換算）
+                new_idx = handle_click(event.pos, selected_idx, my_ready)
+                if new_idx != selected_idx or not my_ready:
+                    selected_idx = new_idx
+                    if selected_idx >= 0:
+                        my_ready = True
+                        sock.sendto(pack_char_select(selected_idx), server_addr)
+                        print(f"[Client] Selected char {selected_idx}")
+
+        # ── 收封包 ────────────────────────────────────────────────
+        while True:
+            try:
+                data, _ = sock.recvfrom(BUF_SIZE)
+                ptype = packet_type(data)
+                if ptype == PKT_GAME_START:
+                    opponent_ready = True
+                    return True           # 雙方都選完，開始遊戲
+            except (BlockingIOError, ConnectionResetError, OSError):
+                break
+
+        # ── 繪製 ──────────────────────────────────────────────────
+        sw, sh = screen.get_size()
+        scaled_w, scaled_h, off_x, off_y, _ = get_viewport(sw, sh)
+
+        draw_char_select(logical_surf, font_lg, font_sm,
+                         selected_idx, my_ready, opponent_ready)
+        screen.fill((0, 0, 0))
+        scaled = pygame.transform.scale(logical_surf, (scaled_w, scaled_h))
+        screen.blit(scaled, (off_x, off_y))
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
 def run(server_ip: str) -> None:
     server_addr = (server_ip, PORT)
 
@@ -70,14 +122,24 @@ def run(server_ip: str) -> None:
     pygame.mouse.set_visible(True)
     screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
     pygame.display.set_caption(f"PvP Game — Player {player_id}")
-    font       = pygame.font.SysFont("monospace", 15)
-    clock      = pygame.time.Clock()
+    font_lg      = pygame.font.SysFont("monospace", 22, bold=True)
+    font_sm      = pygame.font.SysFont("monospace", 15)
+    clock        = pygame.time.Clock()
     logical_surf = pygame.Surface((LOGICAL_W, LOGICAL_H))
 
+    # ── 選角畫面 ──────────────────────────────────────────────────
+    game_ok = char_select_loop(sock, server_addr, screen, logical_surf,
+                               font_lg, font_sm, clock)
+    if not game_ok:
+        pygame.quit()
+        sock.close()
+        return
+
+    # ── 遊戲主迴圈 ────────────────────────────────────────────────
     state      = GameState()
     keys_held: set = set()
     fullscreen = False
-    stance     = "stand"   # "stand" | "machine"（E 鍵切換）
+    stance     = "stand"
 
     running = True
     while running:
@@ -107,7 +169,6 @@ def run(server_ip: str) -> None:
         shift_held = (pygame.K_LSHIFT in keys_held or pygame.K_RSHIFT in keys_held)
         cmd, effective_stance, ammo, is_reloading = read_input(
             player_id, keys_held, logical_mouse, stance, shift_held)
-        # aim_angle: 0° = 上, 90° = 右（用於旋轉 sprite）
         aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
         try:
             sock.sendto(pack_command(cmd), server_addr)
@@ -125,7 +186,7 @@ def run(server_ip: str) -> None:
         if latest:
             state = unpack_state(latest)
 
-        draw(logical_surf, state, player_id, font, obstacles,
+        draw(logical_surf, state, player_id, font_sm, obstacles,
              effective_stance, aim_angle_deg, ammo, is_reloading)
 
         screen.fill((0, 0, 0))
