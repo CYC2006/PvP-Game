@@ -16,13 +16,14 @@ LOGICAL_H = 720
 # ── 角色清單（從 char_data 自動建構，不在此處維護數值）─────────────────────
 CHARACTERS = [
     {
-        "char_key": key,
-        "folder":   CHAR_STATS[key]["folder"],
-        "name":     get_stat(key, "name"),
-        "hp":       get_stat(key, "hp"),
-        "gun":      get_stat(key, "gun"),
-        "damage":   get_stat(key, "damage"),
-        "mag":      get_stat(key, "mag"),
+        "char_key":    key,
+        "folder":      CHAR_STATS[key]["folder"],
+        "name":        get_stat(key, "name"),
+        "hp":          get_stat(key, "hp"),
+        "gun":         get_stat(key, "gun"),
+        "damage":      get_stat(key, "damage"),
+        "ammo":        get_stat(key, "mag"),
+        "reload_time": get_stat(key, "reload_time"),
     }
     for key in CHAR_ORDER
 ]
@@ -237,16 +238,19 @@ def draw_char_select(screen: pygame.Surface,
 
 
 def _draw_stats_panel(screen, font_lg, font_sm, top_y: int) -> None:
-    """顯示中央角色的數值：血量 | 槍種 | 傷害 | 彈夾。"""
-    char   = CHARACTERS[_target_idx]
+    """顯示中央角色的數值：HP | GUN | DAMAGE | AMMO | RELOAD。"""
+    char    = CHARACTERS[_target_idx]
+    reload  = char["reload_time"]
+    reload_str = f"{reload}s" if reload else ""
     fields = [
         ("HP",     str(char["hp"])),
         ("GUN",    char["gun"]),
         ("DAMAGE", char["damage"]),
-        ("MAG",    char["mag"]),
+        ("AMMO",   char["ammo"]),
+        ("RELOAD", reload_str),
     ]
 
-    panel_w  = 560
+    panel_w  = 620
     panel_h  = 72
     panel_x  = CENTER_X - panel_w // 2
     panel_y  = top_y
