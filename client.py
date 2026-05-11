@@ -36,7 +36,7 @@ def connect(sock: socket.socket, server_addr: tuple) -> int:
                 pid = unpack_joined(data)
                 print(f"[Client] Joined as Player {pid}")
                 return pid
-        except BlockingIOError:
+        except (BlockingIOError, ConnectionResetError, OSError):
             pass
         time.sleep(0.05)
 
@@ -120,7 +120,7 @@ def run(server_ip: str) -> None:
                 data, _ = sock.recvfrom(BUF_SIZE)
                 if packet_type(data) == PKT_STATE:
                     latest = data
-            except BlockingIOError:
+            except (BlockingIOError, ConnectionResetError, OSError):
                 break
         if latest:
             state = unpack_state(latest)
