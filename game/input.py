@@ -1,7 +1,7 @@
 import pygame
 from game.command import PlayerCommand
 
-SHOOT_COOLDOWN_MS = 300
+SHOOT_COOLDOWN_MS = 60
 
 _last_shot_time: int = 0
 

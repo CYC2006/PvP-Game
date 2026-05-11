@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 import math
+import random
 
 MAP_WIDTH  = 1920   # 縮小以方便測試（原 3840）
 MAP_HEIGHT = 1080   # 縮小以方便測試（原 2160）
@@ -87,6 +88,11 @@ class GameState:
             return
         ux  = aim_x / length          # 瞄準方向單位向量
         uy  = aim_y / length
+        # 後座力散佈：±5° 隨機偏角
+        spread = math.radians(random.uniform(-5.0, 5.0))
+        cos_s, sin_s = math.cos(spread), math.sin(spread)
+        ux, uy = ux * cos_s - uy * sin_s, ux * sin_s + uy * cos_s
+
         ndx = ux * BULLET_SPEED
         ndy = uy * BULLET_SPEED
         # 槍口位置 = 中心 + 前方偏移 + 右肩偏移
