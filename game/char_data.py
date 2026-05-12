@@ -22,7 +22,7 @@ to know whether a value is scalar or a list.
 #   speed        移動速度（像素/tick）；基準值 = 3.0
 #   fire_rate    射速（發/秒）；0 表示特殊/不適用
 #   reload_time  換彈時間（秒）；0 表示無需換彈
-#   bullet_speed 子彈移動速度（像素/tick）；基準值 = 8.0（≈ 1×）
+#   bullet_speed 子彈速度乘數；1.0 = 基準速度（BULLET_SPEED = 8.0 px/tick）
 #   spread       子彈最大偏角（±度）；0 = 完全精準
 
 CHAR_STATS: dict = {
@@ -40,7 +40,7 @@ CHAR_STATS: dict = {
         "mag":          "12",
         "fire_rate":    3,
         "reload_time":  2,
-        "bullet_speed": 10,   # 1.25×
+        "bullet_speed": 1.0,
         "spread":       3,
     },
     "manBrown": {
@@ -55,7 +55,7 @@ CHAR_STATS: dict = {
         "mag":          "50",
         "fire_rate":    5,
         "reload_time":  4,
-        "bullet_speed": 8,    # 1× baseline
+        "bullet_speed": 1.2,
         "spread":       7,
     },
     "manOld": {
@@ -70,7 +70,7 @@ CHAR_STATS: dict = {
         "mag":          "5",
         "fire_rate":    0.5,
         "reload_time":  5,
-        "bullet_speed": 20,   # 2.5× 超快
+        "bullet_speed": 2.5,
         "spread":       1,
     },
     "soldier1": {
@@ -85,7 +85,7 @@ CHAR_STATS: dict = {
         "mag":          "40",
         "fire_rate":    8,
         "reload_time":  3,
-        "bullet_speed": 12,   # 1.5×
+        "bullet_speed": 1.5,
         "spread":       4,
     },
     "survivor1": {
@@ -100,7 +100,7 @@ CHAR_STATS: dict = {
         "mag":          "",          # 無彈夾（無限）
         "fire_rate":    4,
         "reload_time":  0,
-        "bullet_speed": 14,   # 1.75× 手裡劍飛快
+        "bullet_speed": 0.8,
         "spread":       2,
     },
 
@@ -117,7 +117,7 @@ CHAR_STATS: dict = {
         "mag":          "6",
         "fire_rate":    2,
         "reload_time":  4,
-        "bullet_speed": 7,    # 0.875× 散彈較慢
+        "bullet_speed": 0.875,
         "spread":       15,
     },
     "robot1": {
@@ -132,7 +132,7 @@ CHAR_STATS: dict = {
         "mag":          "",
         "fire_rate":    0,
         "reload_time":  0,
-        "bullet_speed": 20,   # 2.5× 雷射
+        "bullet_speed": 2.5,
         "spread":       0,
     },
     "womanGreen": {
@@ -147,7 +147,7 @@ CHAR_STATS: dict = {
         "mag":          "",
         "fire_rate":    0,
         "reload_time":  0,
-        "bullet_speed": 5,    # 0.625× 毒霧緩慢
+        "bullet_speed": 0.625,
         "spread":       12,
     },
     "zoimbie1": {
@@ -162,7 +162,7 @@ CHAR_STATS: dict = {
         "mag":          "",
         "fire_rate":    2,
         "reload_time":  0,
-        "bullet_speed": 4,    # 0.5× 很慢
+        "bullet_speed": 0.5,
         "spread":       20,
     },
 }

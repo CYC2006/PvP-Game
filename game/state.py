@@ -92,7 +92,7 @@ class GameState:
         p.speed        = float(get_stat(char_key, "speed"))
         p.damage_min   = get_stat(char_key, "damage_min")
         p.damage_max   = get_stat(char_key, "damage_max")
-        p.bullet_speed = float(get_stat(char_key, "bullet_speed"))
+        p.bullet_speed = float(get_stat(char_key, "bullet_speed")) * BULLET_SPEED
         p.spread       = float(get_stat(char_key, "spread"))
 
     def apply_command(self, player_id: int, dx: float, dy: float,

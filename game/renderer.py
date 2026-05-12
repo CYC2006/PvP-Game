@@ -334,7 +334,7 @@ def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float):
 
     elif char_key == "survivor1":       # Assassin — 旋轉手裡劍（4角星）
         spin = math.radians(time.perf_counter() * 540 % 360)  # 1.5轉/秒
-        outer, inner = 7, 3
+        outer, inner = 8, 4
         pts = []
         for i in range(8):
             r = outer if i % 2 == 0 else inner
