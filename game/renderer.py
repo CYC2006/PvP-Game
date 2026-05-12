@@ -100,7 +100,7 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
     for oid in newly_destroyed:
         if oid in obstacles:
             obs = obstacles[oid]
-            _spawn_particles(obs.x, obs.y, obs.kind, count=18)  # 多一點粒子
+            _spawn_particles(obs.x, obs.y, obs.kind, count=40, destroy=True)
     _prev_destroyed.clear()
     _prev_destroyed.update(state.destroyed_obstacles)
 
@@ -137,16 +137,27 @@ def _shake_offset(oid: int) -> tuple:
     return int(amp * math.sin(t)), int(amp * math.sin(t * 1.3 + 1.0))
 
 
-def _spawn_particles(bx: float, by: float, kind: str, count: int = 12) -> None:
-    """在被擊中位置朝四周噴出同色系粒子。"""
+def _spawn_particles(bx: float, by: float, kind: str,
+                     count: int = 12, destroy: bool = False) -> None:
+    """在被擊中位置朝四周噴出同色系粒子。
+    destroy=True 時使用更大的速度、尺寸與壽命（障礙物摧毀特效）。
+    """
     now    = time.perf_counter()
     colors = PARTICLE_COLORS.get(kind, [(128, 128, 128)])
+    if destroy:
+        speed_range    = (90, 320)
+        life_range     = (0.40, 0.80)
+        size_range     = (6.0, 16.0)
+    else:
+        speed_range    = (40, 140)
+        life_range     = (0.20, 0.45)
+        size_range     = (2.0, 5.5)
     for _ in range(count):
         angle    = random.uniform(0, math.tau)
-        speed    = random.uniform(40, 140)
-        max_life = random.uniform(0.20, 0.45)
+        speed    = random.uniform(*speed_range)
+        max_life = random.uniform(*life_range)
         color    = random.choice(colors)
-        max_size = random.uniform(2.0, 5.5)
+        max_size = random.uniform(*size_range)
         _particles.append([
             bx, by,
             math.cos(angle) * speed,
