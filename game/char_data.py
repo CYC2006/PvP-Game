@@ -111,14 +111,17 @@ CHAR_STATS: dict = {
         "hp":           200,
         "speed":        2.0,
         "gun":          "Shotgun",
-        "damage":       "",          # 越靠近越痛（待實作）
-        "damage_min":   20,
-        "damage_max":   40,
+        "damage":       "6~10 ×10",  # 每顆散彈 6~10，十顆全中最高 100
+        "damage_min":   6,
+        "damage_max":   10,
         "mag":          "6",
         "fire_rate":    2,
         "reload_time":  4,
         "bullet_speed": 0.875,
         "spread":       15,
+        "pellet_count": 10,          # 散彈槍：一次射出 10 顆
+        "bullet_range": 150,         # 散彈最遠射程（px）
+        "bullet_range_min": 130,     # 散彈最短射程（px）；每顆隨機落在 min~max
     },
     "robot1": {
         "name":         "Robot",

@@ -18,13 +18,16 @@ class Player:
     id: int
     x: float
     y: float
-    speed: float       = PLAYER_SPEED
-    hp: int            = DEFAULT_MAX_HP
-    max_hp: int        = DEFAULT_MAX_HP   # 依角色設定，respawn 恢復到此值
-    damage_min: int    = 1                # 子彈最小傷害（由 server 依角色設定）
-    damage_max: int    = 1                # 子彈最大傷害
-    bullet_speed: float = BULLET_SPEED   # 子彈速度（像素/tick），依角色設定
-    spread: float      = 5.0             # 子彈最大偏角（±度），依角色設定
+    speed: float        = PLAYER_SPEED
+    hp: int             = DEFAULT_MAX_HP
+    max_hp: int         = DEFAULT_MAX_HP   # 依角色設定，respawn 恢復到此值
+    damage_min: int     = 1                # 子彈最小傷害（由 server 依角色設定）
+    damage_max: int     = 1                # 子彈最大傷害
+    bullet_speed: float = BULLET_SPEED    # 子彈速度（像素/tick），依角色設定
+    spread: float       = 5.0             # 子彈最大偏角（±度），依角色設定
+    pellet_count: int   = 1               # 散彈槍：一次發射的子彈數量
+    bullet_range: float = BULLET_MAX_RANGE  # 子彈最大射程（px）
+    bullet_range_min: float = 0           # >0 時每顆散彈隨機射程 [min, range]
     aim_angle: float   = 0.0             # 瞄準角度（度），0=上, 90=右；同步給對手
     stance: str        = "stand"         # "stand" | "machine" | "hold" | "reload"
 
@@ -61,7 +64,8 @@ class Bullet:
     dx: float
     dy: float
     distance_travelled: float = 0.0
-    aim_angle: float = 0.0   # 飛行方向（度）atan2(dy,dx)，供 client 繪圖用
+    aim_angle: float = 0.0            # 飛行方向（度）atan2(dy,dx)，供 client 繪圖用
+    max_range: float = BULLET_MAX_RANGE  # 最大射程（px）；散彈槍可設極短
 
     def step(self) -> None:
         self.x += self.dx
@@ -70,7 +74,7 @@ class Bullet:
 
     def is_expired(self) -> bool:
         return (
-            self.distance_travelled >= BULLET_MAX_RANGE
+            self.distance_travelled >= self.max_range
             or self.x < 0 or self.x > MAP_WIDTH
             or self.y < 0 or self.y > MAP_HEIGHT
         )
@@ -96,7 +100,7 @@ class GameState:
 
     def apply_char_stats(self, player_id: int, char_key: str) -> None:
         """遊戲開始後由 server 呼叫，將角色數值套用到 Player。"""
-        from game.char_data import get_stat
+        from game.char_data import get_stat, CHAR_STATS
         if player_id not in self.players:
             return
         p = self.players[player_id]
@@ -107,6 +111,11 @@ class GameState:
         p.damage_max   = get_stat(char_key, "damage_max")
         p.bullet_speed = float(get_stat(char_key, "bullet_speed")) * BULLET_SPEED
         p.spread       = float(get_stat(char_key, "spread"))
+        # 散彈槍專屬欄位（其他角色無此欄位時取預設值）
+        char_cfg          = CHAR_STATS.get(char_key, {})
+        p.pellet_count    = int(char_cfg.get("pellet_count", 1))
+        p.bullet_range    = float(char_cfg.get("bullet_range", BULLET_MAX_RANGE))
+        p.bullet_range_min = float(char_cfg.get("bullet_range_min", 0))
 
     def apply_command(self, player_id: int, dx: float, dy: float,
                       shooting: bool, aim_x: float, aim_y: float,
@@ -126,29 +135,41 @@ class GameState:
         length = math.hypot(aim_x, aim_y)
         if length == 0:
             return
-        ux  = aim_x / length
-        uy  = aim_y / length
-        # 後座力散佈：依角色 spread 屬性決定最大偏角
-        if player.spread > 0:
-            dev = math.radians(random.uniform(-player.spread, player.spread))
-            cos_s, sin_s = math.cos(dev), math.sin(dev)
-            ux, uy = ux * cos_s - uy * sin_s, ux * sin_s + uy * cos_s
+        ux = aim_x / length
+        uy = aim_y / length
 
-        ndx = ux * player.bullet_speed
-        ndy = uy * player.bullet_speed
+        # 槍口偏移（固定用主瞄準方向計算，所有散彈共用同一出口）
         barrel_fwd   = PLAYER_RADIUS + 10
         barrel_right = 14
-        rx = -uy
-        ry =  ux
-        bid = self._next_bullet_id
-        self._next_bullet_id = (self._next_bullet_id + 1) % 256
-        self.bullets[bid] = Bullet(
-            id=bid, owner_id=owner_id,
-            x=player.x + ux * barrel_fwd + rx * barrel_right,
-            y=player.y + uy * barrel_fwd + ry * barrel_right,
-            dx=ndx, dy=ndy,
-            aim_angle=math.degrees(math.atan2(ndy, ndx)),
-        )
+        rx, ry = -uy, ux
+        spawn_x = player.x + ux * barrel_fwd + rx * barrel_right
+        spawn_y = player.y + uy * barrel_fwd + ry * barrel_right
+
+        for _ in range(player.pellet_count):
+            # 每顆散彈獨立隨機偏角
+            pux, puy = ux, uy
+            if player.spread > 0:
+                dev = math.radians(random.uniform(-player.spread, player.spread))
+                cos_s, sin_s = math.cos(dev), math.sin(dev)
+                pux = ux * cos_s - uy * sin_s
+                puy = ux * sin_s + uy * cos_s
+
+            ndx = pux * player.bullet_speed
+            ndy = puy * player.bullet_speed
+            # 每顆散彈各自隨機射程（min>0 時），製造遠近不一的散射效果
+            if player.bullet_range_min > 0:
+                pellet_range = random.uniform(player.bullet_range_min, player.bullet_range)
+            else:
+                pellet_range = player.bullet_range
+            bid = self._next_bullet_id
+            self._next_bullet_id = (self._next_bullet_id + 1) % 256
+            self.bullets[bid] = Bullet(
+                id=bid, owner_id=owner_id,
+                x=spawn_x, y=spawn_y,
+                dx=ndx, dy=ndy,
+                aim_angle=math.degrees(math.atan2(ndy, ndx)),
+                max_range=pellet_range,
+            )
 
     def step_bullets(self, obstacles: dict = None,
                      obstacle_hp: dict = None) -> None:

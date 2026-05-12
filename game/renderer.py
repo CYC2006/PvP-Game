@@ -497,6 +497,9 @@ def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float):
             pts.append((r * math.cos(ang), r * math.sin(ang)))
         pygame.draw.polygon(screen, color, [(sx + x, sy + y) for x, y in pts])
 
+    elif char_key == "manBlue":          # Rambo — 散彈圓點
+        pygame.draw.circle(screen, color, (sx, sy), 4)
+
     else:                               # Agent（Pistol）& 其他 — 標準圓形
         pygame.draw.circle(screen, color, (sx, sy), BULLET_RADIUS)
 
