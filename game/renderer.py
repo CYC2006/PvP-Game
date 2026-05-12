@@ -110,10 +110,26 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
     _prev_destroyed.update(state.destroyed_obstacles)
 
     # ── 2. 消失子彈偵測 ───────────────────────────────────────────
+    # newly_destroyed 的障礙物已在步驟 1 生成粒子，這裡跳過它們，
+    # 避免子彈同幀摧毀障礙物時誤用旁邊 box_1 的顏色。
+    skip_oids = state.destroyed_obstacles   # 包含本幀新摧毀
     for bid, (bx, by) in _prev_bullet_pos.items():
         if bid not in cur_ids and obstacles:
+            # 先看是否打中本幀才摧毀的障礙物（給它震動但不重複生成粒子）
+            hit_newly = False
+            for oid in newly_destroyed:
+                if oid in obstacles:
+                    obs = obstacles[oid]
+                    check_r = BULLET_RADIUS + max(obs.width, obs.height) * 0.55
+                    if obs.collides_circle(bx, by, check_r):
+                        hit_newly = True
+                        break
+            if hit_newly:
+                continue  # 摧毀粒子已在步驟 1 生成，不再重複
+
+            # 打中仍存活的障礙物 → 震動 + 命中粒子
             for oid, obs in obstacles.items():
-                if oid in state.destroyed_obstacles:
+                if oid in skip_oids:
                     continue
                 check_r = BULLET_RADIUS + max(obs.width, obs.height) * 0.55
                 if obs.collides_circle(bx, by, check_r):
