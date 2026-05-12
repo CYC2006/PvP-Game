@@ -293,7 +293,13 @@ def _get_obstacle_sprite(kind: str, w: int, h: int) -> pygame.Surface:
         path = os.path.join("assets", "Obstacles", f"{kind}.png")
         try:
             img = pygame.image.load(path).convert_alpha()
-            _sprite_cache[key] = pygame.transform.scale(img, (w, h))
+            # 樹類：保持原始長寬比（以 config width 為基準，height 依比例計算）
+            if kind.startswith("tree"):
+                orig_w, orig_h = img.get_width(), img.get_height()
+                scaled_h = max(1, int(w * orig_h / orig_w))
+                _sprite_cache[key] = pygame.transform.scale(img, (w, scaled_h))
+            else:
+                _sprite_cache[key] = pygame.transform.scale(img, (w, h))
         except Exception:
             # 找不到圖片時用純色方塊代替
             surf = pygame.Surface((w, h), pygame.SRCALPHA)
