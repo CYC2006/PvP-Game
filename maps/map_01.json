@@ -490,7 +490,7 @@
     },
     {
       "id": 61,
-      "kind": "tree_1",
+      "kind": "tree_2",
       "x": 1050,
       "y": 200,
       "angle_deg": 0,
@@ -502,23 +502,23 @@
       "x": 1480,
       "y": 580,
       "angle_deg": 0,
-      "scale": 0.9
+      "scale": 0.95
     },
     {
       "id": 63,
-      "kind": "tree_1",
+      "kind": "tree_2",
       "x": 280,
       "y": 870,
       "angle_deg": 0,
-      "scale": 1.05
+      "scale": 1.0
     },
     {
       "id": 64,
-      "kind": "tree_1",
+      "kind": "tree_2",
       "x": 960,
       "y": 820,
       "angle_deg": 0,
-      "scale": 1.0
+      "scale": 1.05
     }
   ]
 }
