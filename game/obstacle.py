@@ -9,9 +9,8 @@ OBSTACLE_CONFIG: dict = {
     "rock_1": {"width": 80, "height": 80, "hp": 200, "shape": "circle", "destructible": True, "radius_ratio": 0.70},
     "rock_2": {"width": 80, "height": 80, "hp": 200, "shape": "circle", "destructible": True, "radius_ratio": 0.52},
     # solid=False：玩家與子彈可直接穿過；最頂層繪製；本地玩家在樹下時半透明
-    "tree_1": {"width": 220, "height": 220, "hp": 9999, "shape": "circle",
-               "destructible": False, "solid": False, "radius_ratio": 0.65},
-    "tree_2": {"width": 300, "height": 300, "hp": 9999, "shape": "circle",
+    # base 240；map 裡用 scale 0.83~1.25 讓實際尺寸落在 200~300px
+    "tree_1": {"width": 240, "height": 240, "hp": 9999, "shape": "circle",
                "destructible": False, "solid": False, "radius_ratio": 0.65},
 }
 
