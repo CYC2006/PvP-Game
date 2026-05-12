@@ -100,7 +100,7 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
     for oid in newly_destroyed:
         if oid in obstacles:
             obs = obstacles[oid]
-            _spawn_particles(obs.x, obs.y, obs.kind, count=40, destroy=True)
+            _spawn_particles(obs.x, obs.y, obs.kind, count=30, destroy=True)
     _prev_destroyed.clear()
     _prev_destroyed.update(state.destroyed_obstacles)
 
@@ -145,9 +145,9 @@ def _spawn_particles(bx: float, by: float, kind: str,
     now    = time.perf_counter()
     colors = PARTICLE_COLORS.get(kind, [(128, 128, 128)])
     if destroy:
-        speed_range    = (90, 320)
-        life_range     = (0.40, 0.80)
-        size_range     = (6.0, 16.0)
+        speed_range    = (60, 240)
+        life_range     = (0.30, 0.60)
+        size_range     = (6.0, 10.0)
     else:
         speed_range    = (40, 140)
         life_range     = (0.20, 0.45)
