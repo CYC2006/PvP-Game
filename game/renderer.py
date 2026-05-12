@@ -223,7 +223,11 @@ def _spawn_particles(bx: float, by: float, kind: str,
     """
     now    = time.perf_counter()
     colors = PARTICLE_COLORS.get(kind, [(128, 128, 128)])
-    if destroy:
+    if destroy and kind == "box_special":
+        speed_range    = (80, 300)
+        life_range     = (0.40, 0.75)
+        size_range     = (10.0, 18.0)
+    elif destroy:
         speed_range    = (60, 240)
         life_range     = (0.30, 0.60)
         size_range     = (6.0, 10.0)
