@@ -293,6 +293,12 @@ def _get_obstacle_sprite(kind: str, w: int, h: int) -> pygame.Surface:
         path = os.path.join("assets", "Obstacles", f"{kind}.png")
         try:
             img = pygame.image.load(path).convert_alpha()
+            # 樹類：PNG 背景為純黑（無 alpha 通道），用 colorkey 轉為透明 per-pixel alpha
+            if kind.startswith("tree"):
+                img.set_colorkey((0, 0, 0))
+                clean = pygame.Surface(img.get_size(), pygame.SRCALPHA)
+                clean.blit(img, (0, 0))
+                img = clean
             _sprite_cache[key] = pygame.transform.scale(img, (w, h))
         except Exception:
             # 找不到圖片時用純色方塊代替

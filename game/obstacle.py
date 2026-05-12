@@ -9,7 +9,7 @@ OBSTACLE_CONFIG: dict = {
     "rock_1": {"width": 80, "height": 80, "hp": 200, "shape": "circle", "destructible": True, "radius_ratio": 0.70},
     "rock_2": {"width": 80, "height": 80, "hp": 200, "shape": "circle", "destructible": True, "radius_ratio": 0.52},
     # solid=False：玩家與子彈可直接穿過；最頂層繪製；本地玩家在樹下時半透明
-    "tree_1": {"width": 160, "height": 160, "hp": 9999, "shape": "circle",
+    "tree_1": {"width": 240, "height": 240, "hp": 9999, "shape": "circle",
                "destructible": False, "solid": False, "radius_ratio": 0.65},
 }
 
