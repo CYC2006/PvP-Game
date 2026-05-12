@@ -69,12 +69,14 @@ _prev_destroyed: set = set()
 
 # 各障礙物種類的粒子顏色（同色系深淺變化）
 PARTICLE_COLORS: dict = {
-    "box_1":  [(165, 108, 52), (195, 142, 68), (145, 88, 38),
-               (220, 168, 92), (130,  75, 30)],
-    "rock_1": [(138, 132, 122), (112, 108, 100), (158, 152, 142),
-               ( 88,  84,  78), (175, 170, 160)],
-    "rock_2": [(118, 113, 105), (143, 138, 128), ( 93,  90,  84),
-               (168, 162, 153), (105, 100,  93)],
+    "box_1":       [(165, 108, 52), (195, 142, 68), (145, 88, 38),
+                    (220, 168, 92), (130,  75, 30)],
+    "box_special": [(255, 215,   0), (255, 180,  20), (255, 240, 80),
+                    (220, 160,   0), (255, 255, 140)],
+    "rock_1":      [(138, 132, 122), (112, 108, 100), (158, 152, 142),
+                    ( 88,  84,  78), (175, 170, 160)],
+    "rock_2":      [(118, 113, 105), (143, 138, 128), ( 93,  90,  84),
+                    (168, 162, 153), (105, 100,  93)],
 }
 
 # HUD stance 顯示顏色
@@ -100,7 +102,10 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
     for oid in newly_destroyed:
         if oid in obstacles:
             obs = obstacles[oid]
-            _spawn_particles(obs.x, obs.y, obs.kind, count=30, destroy=True)
+            if obs.kind == "box_special":
+                _spawn_particles(obs.x, obs.y, obs.kind, count=55, destroy=True)
+            else:
+                _spawn_particles(obs.x, obs.y, obs.kind, count=30, destroy=True)
     _prev_destroyed.clear()
     _prev_destroyed.update(state.destroyed_obstacles)
 
@@ -255,6 +260,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _draw_obstacles(screen, obstacles, state.destroyed_obstacles, cx, cy)
 
     _draw_particles(screen, cx, cy)
+    _draw_gold_ingots(screen, state, cx, cy)
     _draw_bullets(screen, state, cx, cy, player_chars or {})
     _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg,
                   player_chars or {})
@@ -305,6 +311,27 @@ def _draw_obstacles(screen, obstacles: dict, destroyed: set, cx, cy):
 
 
 # ── 子彈 ──────────────────────────────────────────────────────────────────────
+
+def _draw_gold_ingots(screen, state, cx, cy) -> None:
+    """在地圖上繪製散落的金錠（旋轉菱形 + 光暈）。"""
+    now = time.perf_counter()
+    for ingot in state.gold_ingots.values():
+        sx, sy = _ws(ingot.x, ingot.y, cx, cy)
+        if -20 <= sx <= SCREEN_W + 20 and -20 <= sy <= SCREEN_H + 20:
+            # 漂浮旋轉動畫（每顆用 id 錯開相位）
+            spin = now * 120 + ingot.id * 47
+            a    = math.radians(spin % 360)
+            r    = 7
+            pts  = [(sx + r * math.cos(a + i * math.pi / 2),
+                     sy + r * math.sin(a + i * math.pi / 2)) for i in range(4)]
+            # 外光暈
+            pygame.draw.polygon(screen, (255, 200, 0, 80),  pts)
+            pygame.draw.circle(screen, (255, 230, 80), (sx, sy), r + 3, 1)
+            # 主體菱形
+            pygame.draw.polygon(screen, (255, 215, 0), pts)
+            # 高光點
+            pygame.draw.circle(screen, (255, 255, 180), (int(sx - 2), int(sy - 2)), 2)
+
 
 def _rot_pts(cx, cy, pts, angle_rad):
     """將一組相對座標點以 (cx,cy) 為原點旋轉後回傳螢幕座標。"""
@@ -419,6 +446,10 @@ def _draw_hud(screen, state, my_id, font, my_stance="stand",
         screen.blit(font.render(f"[E] {my_stance.upper()}", True, stance_col), (8, 44))
         # 彈藥 HUD
         _draw_ammo_hud(screen, font, ammo, is_reloading)
+        # 金錠計數
+        gold = state.gold_counts.get(my_id, 0)
+        gold_surf = font.render(f"◆ {gold}", True, (255, 215, 0))
+        screen.blit(gold_surf, (8, 62))
     _draw_hp_bar(screen, state, my_id, font)
 
 

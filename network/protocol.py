@@ -1,6 +1,6 @@
 import struct
 from game.command import PlayerCommand
-from game.state import GameState, Player, Bullet
+from game.state import GameState, Player, Bullet, GoldIngot
 
 # --- Packet types ---
 PKT_JOIN        = 0x01
@@ -12,15 +12,17 @@ PKT_GAME_START  = 0x06   # server → clients: 雙方都選完，遊戲開始
 
 # PKT_STATE 格式:
 #   | type(1) | tick(I) |
-#   | p_count(B) | [id(B) x(f) y(f) hp(H) max_hp(H) aim_angle_i16(h) stance_u8(B)] * p_count |
-#   | b_count(B) | [id(B) owner(B) x(f) y(f)] * b_count |
+#   | p_count(B) | [id(B) x(f) y(f) hp(H) max_hp(H) aim_angle_i16(h) stance_u8(B) gold(H)] * p_count |
+#   | b_count(B) | [id(B) owner(B) x(f) y(f) angle_i16(h)] * b_count |
 #   | d_count(B) | [obstacle_id(B)] * d_count |
+#   | g_count(B) | [id(B) x(f) y(f)] * g_count |
 
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBff")
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffHHhB")   # id x y hp(u16) max_hp(u16) aim_angle_i16 stance_u8
-_BULLET_ENTRY  = struct.Struct("!BBffh")   # id owner x y angle_i16
+_PLAYER_ENTRY  = struct.Struct("!BffHHhBH")  # id x y hp max_hp aim_angle stance gold
+_BULLET_ENTRY  = struct.Struct("!BBffh")      # id owner x y angle_i16
+_GOLD_ENTRY    = struct.Struct("!Bff")        # id x y
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -67,8 +69,9 @@ def pack_state(state: GameState) -> bytes:
     p_data  = bytes([len(players)]) + b"".join(
         _PLAYER_ENTRY.pack(
             p.id, p.x, p.y, max(0, p.hp), max(1, p.max_hp),
-            int(p.aim_angle),                   # signed int16，struct '!' 會正確處理負值
+            int(p.aim_angle),
             _STANCE_TO_INT.get(p.stance, 0),
+            state.gold_counts.get(p.id, 0),
         )
         for p in players
     )
@@ -85,7 +88,13 @@ def pack_state(state: GameState) -> bytes:
     destroyed = [d for d in state.destroyed_obstacles if 0 <= d <= 255]
     d_data    = bytes([len(destroyed)]) + bytes(destroyed)
 
-    return header + p_data + b_data + d_data
+    # 金錠
+    ingots = list(state.gold_ingots.values())
+    g_data = bytes([len(ingots)]) + b"".join(
+        _GOLD_ENTRY.pack(g.id, g.x, g.y) for g in ingots
+    )
+
+    return header + p_data + b_data + d_data + g_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -95,12 +104,13 @@ def unpack_state(data: bytes) -> GameState:
 
     p_count = data[offset]; offset += 1
     for _ in range(p_count):
-        pid, x, y, hp, max_hp, aim_i16, stance_u8 = _PLAYER_ENTRY.unpack(
+        pid, x, y, hp, max_hp, aim_i16, stance_u8, gold = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
-        state.players[pid] = Player(id=pid, x=x, y=y,
-                                    hp=hp, max_hp=max_hp,
-                                    aim_angle=float(aim_i16), stance=stance)
+        p = Player(id=pid, x=x, y=y, hp=hp, max_hp=max_hp,
+                   aim_angle=float(aim_i16), stance=stance)
+        state.players[pid] = p
+        state.gold_counts[pid] = gold
         offset += _PLAYER_ENTRY.size
 
     b_count = data[offset]; offset += 1
@@ -113,6 +123,13 @@ def unpack_state(data: bytes) -> GameState:
 
     d_count = data[offset]; offset += 1
     state.destroyed_obstacles = set(data[offset: offset + d_count])
+    offset += d_count
+
+    g_count = data[offset]; offset += 1
+    for _ in range(g_count):
+        gid, gx, gy = _GOLD_ENTRY.unpack(data[offset: offset + _GOLD_ENTRY.size])
+        state.gold_ingots[gid] = GoldIngot(id=gid, x=gx, y=gy)
+        offset += _GOLD_ENTRY.size
 
     return state
 

@@ -26,7 +26,7 @@
     },
     {
       "id": 3,
-      "kind": "box_1",
+      "kind": "box_special",
       "x": 490,
       "y": 816,
       "angle_deg": 38,
@@ -90,7 +90,7 @@
     },
     {
       "id": 11,
-      "kind": "box_1",
+      "kind": "box_special",
       "x": 633,
       "y": 805,
       "angle_deg": 42,
@@ -210,7 +210,7 @@
     },
     {
       "id": 26,
-      "kind": "box_1",
+      "kind": "box_special",
       "x": 759,
       "y": 155,
       "angle_deg": 20,
@@ -226,7 +226,7 @@
     },
     {
       "id": 28,
-      "kind": "box_1",
+      "kind": "box_special",
       "x": 248,
       "y": 547,
       "angle_deg": 25,

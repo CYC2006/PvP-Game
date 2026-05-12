@@ -42,6 +42,16 @@ class Player:
         self.y  = float(MAP_HEIGHT // 2)
 
 
+GOLD_RADIUS = 10   # 玩家撿取金錠的碰撞半徑
+
+
+@dataclass
+class GoldIngot:
+    id: int
+    x: float
+    y: float
+
+
 @dataclass
 class Bullet:
     id: int
@@ -71,8 +81,11 @@ class GameState:
     players: dict            = field(default_factory=dict)
     bullets: dict            = field(default_factory=dict)
     destroyed_obstacles: set = field(default_factory=set)
+    gold_ingots: dict        = field(default_factory=dict)   # gid → GoldIngot
+    gold_counts: dict        = field(default_factory=dict)   # pid → int
     tick: int                = 0
     _next_bullet_id: int     = 0
+    _next_gold_id: int       = 0
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -190,11 +203,38 @@ class GameState:
                         obstacle_hp[oid] -= obs_dmg
                         if obstacle_hp[oid] <= 0:
                             self.destroyed_obstacles.add(oid)
+                            if obs.kind == "box_special":
+                                self._spawn_gold(obs.x, obs.y)
                     expired.append(bid)
                     break
 
         for bid in expired:
             self.bullets.pop(bid, None)
+
+    def _spawn_gold(self, x: float, y: float) -> None:
+        """在 box_special 破壞位置周圍散落 2~5 顆金錠。"""
+        for _ in range(random.randint(2, 5)):
+            angle = random.uniform(0, math.tau)
+            dist  = random.uniform(20, 70)
+            gid   = self._next_gold_id
+            self._next_gold_id = (self._next_gold_id + 1) % 256
+            self.gold_ingots[gid] = GoldIngot(
+                id=gid,
+                x=x + math.cos(angle) * dist,
+                y=y + math.sin(angle) * dist,
+            )
+
+    def step_gold_collection(self) -> None:
+        """任一玩家碰到金錠就撿起，累計計數。"""
+        collected = []
+        for gid, ingot in self.gold_ingots.items():
+            for pid, player in self.players.items():
+                if math.hypot(player.x - ingot.x, player.y - ingot.y) < PLAYER_RADIUS + GOLD_RADIUS:
+                    self.gold_counts[pid] = self.gold_counts.get(pid, 0) + 1
+                    collected.append(gid)
+                    break
+        for gid in collected:
+            self.gold_ingots.pop(gid, None)
 
     def resolve_player_collisions(self, obstacles: dict = None) -> None:
         if not obstacles:

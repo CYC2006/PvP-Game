@@ -114,6 +114,7 @@ def run():
                 state.tick += 1
                 state.step_bullets(obstacles, obstacle_hp)
                 state.resolve_player_collisions(obstacles)
+                state.step_gold_collection()
 
                 payload = pack_state(state)
                 for addr in clients.values():
