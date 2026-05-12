@@ -255,7 +255,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _draw_obstacles(screen, obstacles, state.destroyed_obstacles, cx, cy)
 
     _draw_particles(screen, cx, cy)
-    _draw_bullets(screen, state, cx, cy)
+    _draw_bullets(screen, state, cx, cy, player_chars or {})
     _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg,
                   player_chars or {})
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading)
@@ -306,13 +306,53 @@ def _draw_obstacles(screen, obstacles: dict, destroyed: set, cx, cy):
 
 # ── 子彈 ──────────────────────────────────────────────────────────────────────
 
-def _draw_bullets(screen, state, cx, cy):
+def _rot_pts(cx, cy, pts, angle_rad):
+    """將一組相對座標點以 (cx,cy) 為原點旋轉後回傳螢幕座標。"""
+    cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
+    return [(cx + x * cos_a - y * sin_a,
+             cy + x * sin_a + y * cos_a) for x, y in pts]
+
+
+def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float):
+    """依角色繪製不同形狀的子彈，color 為玩家顏色（藍/紅）。"""
+    a = math.radians(angle_deg)   # 飛行方向（標準數學角，0=右，90=下）
+
+    if char_key == "manBrown":          # Bear — 短矩形彈殼（10×4）
+        pts = [(-5, -2), (5, -2), (5, 2), (-5, 2)]
+        pygame.draw.polygon(screen, color, _rot_pts(sx, sy, pts, a))
+
+    elif char_key == "manOld":          # Sniper — 細長針形（24×2），前白後漸暗
+        tip  = [(-12, 0), (12, -1), (12, 1)]          # 針尖三角
+        body = [(-12, -1), (4, -1), (4, 1), (-12, 1)] # 針身矩形
+        dim  = tuple(max(0, c - 60) for c in color)
+        pygame.draw.polygon(screen, dim,   _rot_pts(sx, sy, body, a))
+        pygame.draw.polygon(screen, color, _rot_pts(sx, sy, tip,  a))
+
+    elif char_key == "soldier1":        # Soldier — 菱形（6×6）
+        pts = [(0, -6), (4, 0), (0, 6), (-4, 0)]
+        pygame.draw.polygon(screen, color, _rot_pts(sx, sy, pts, a))
+
+    elif char_key == "survivor1":       # Assassin — 旋轉手裡劍（4角星）
+        spin = math.radians(time.perf_counter() * 540 % 360)  # 1.5轉/秒
+        outer, inner = 7, 3
+        pts = []
+        for i in range(8):
+            r = outer if i % 2 == 0 else inner
+            ang = spin + i * math.pi / 4
+            pts.append((r * math.cos(ang), r * math.sin(ang)))
+        pygame.draw.polygon(screen, color, [(sx + x, sy + y) for x, y in pts])
+
+    else:                               # Agent（Pistol）& 其他 — 標準圓形
+        pygame.draw.circle(screen, color, (sx, sy), BULLET_RADIUS)
+
+
+def _draw_bullets(screen, state, cx, cy, player_chars: dict):
     for bullet in state.bullets.values():
         sx, sy = _ws(bullet.x, bullet.y, cx, cy)
-        if -BULLET_RADIUS <= sx <= SCREEN_W + BULLET_RADIUS \
-                and -BULLET_RADIUS <= sy <= SCREEN_H + BULLET_RADIUS:
-            color = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
-            pygame.draw.circle(screen, color, (sx, sy), BULLET_RADIUS)
+        if -20 <= sx <= SCREEN_W + 20 and -20 <= sy <= SCREEN_H + 20:
+            color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
+            char_key = player_chars.get(bullet.owner_id, "hitman1")
+            _draw_bullet_shape(screen, char_key, color, sx, sy, bullet.aim_angle)
 
 
 # ── 玩家 ──────────────────────────────────────────────────────────────────────

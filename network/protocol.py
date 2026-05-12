@@ -20,7 +20,7 @@ _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBff")
 _STATE_HDR     = struct.Struct("!BI")
 _PLAYER_ENTRY  = struct.Struct("!BffHHhB")   # id x y hp(u16) max_hp(u16) aim_angle_i16 stance_u8
-_BULLET_ENTRY  = struct.Struct("!BBff")
+_BULLET_ENTRY  = struct.Struct("!BBffh")   # id owner x y angle_i16
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -75,7 +75,10 @@ def pack_state(state: GameState) -> bytes:
 
     bullets = list(state.bullets.values())
     b_data  = bytes([len(bullets)]) + b"".join(
-        _BULLET_ENTRY.pack(b.id, b.owner_id, b.x, b.y) for b in bullets
+        _BULLET_ENTRY.pack(b.id, b.owner_id, b.x, b.y,
+                           int(b.aim_angle) if -32768 <= int(b.aim_angle) <= 32767
+                           else 0)
+        for b in bullets
     )
 
     # 已摧毀障礙物 ID（最多 255 個，每個 1 byte）
@@ -102,8 +105,10 @@ def unpack_state(data: bytes) -> GameState:
 
     b_count = data[offset]; offset += 1
     for _ in range(b_count):
-        bid, owner, bx, by = _BULLET_ENTRY.unpack(data[offset: offset + _BULLET_ENTRY.size])
-        state.bullets[bid] = Bullet(id=bid, owner_id=owner, x=bx, y=by, dx=0.0, dy=0.0)
+        bid, owner, bx, by, angle_i16 = _BULLET_ENTRY.unpack(
+            data[offset: offset + _BULLET_ENTRY.size])
+        state.bullets[bid] = Bullet(id=bid, owner_id=owner, x=bx, y=by,
+                                    dx=0.0, dy=0.0, aim_angle=float(angle_i16))
         offset += _BULLET_ENTRY.size
 
     d_count = data[offset]; offset += 1

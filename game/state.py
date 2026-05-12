@@ -51,6 +51,7 @@ class Bullet:
     dx: float
     dy: float
     distance_travelled: float = 0.0
+    aim_angle: float = 0.0   # 飛行方向（度）atan2(dy,dx)，供 client 繪圖用
 
     def step(self) -> None:
         self.x += self.dx
@@ -133,6 +134,7 @@ class GameState:
             x=player.x + ux * barrel_fwd + rx * barrel_right,
             y=player.y + uy * barrel_fwd + ry * barrel_right,
             dx=ndx, dy=ndy,
+            aim_angle=math.degrees(math.atan2(ndy, ndx)),
         )
 
     def step_bullets(self, obstacles: dict = None,
