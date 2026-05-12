@@ -88,6 +88,7 @@ class GameState:
         p = self.players[player_id]
         p.max_hp       = get_stat(char_key, "hp")
         p.hp           = p.max_hp
+        p.speed        = float(get_stat(char_key, "speed"))
         p.damage_min   = get_stat(char_key, "damage_min")
         p.damage_max   = get_stat(char_key, "damage_max")
         p.bullet_speed = float(get_stat(char_key, "bullet_speed"))

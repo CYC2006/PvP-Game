@@ -19,6 +19,7 @@ to know whether a value is scalar or a list.
 #   damage_min   最小傷害（server 計算用）
 #   damage_max   最大傷害（server 計算用）
 #   mag          彈夾容量字串（顯示用）；無彈夾概念填 ""
+#   speed        移動速度（像素/tick）；基準值 = 3.0
 #   fire_rate    射速（發/秒）；0 表示特殊/不適用
 #   reload_time  換彈時間（秒）；0 表示無需換彈
 #   bullet_speed 子彈移動速度（像素/tick）；基準值 = 8.0（≈ 1×）
@@ -31,6 +32,7 @@ CHAR_STATS: dict = {
         "name":         "Agent",
         "folder":       "Hitman 1",
         "hp":           100,
+        "speed":        3.0,
         "gun":          "Pistol",
         "damage":       "25~30",
         "damage_min":   25,
@@ -45,6 +47,7 @@ CHAR_STATS: dict = {
         "name":         "Bear",
         "folder":       "Man Brown",
         "hp":           150,
+        "speed":        2.5,
         "gun":          "Machine",
         "damage":       "15~20",
         "damage_min":   15,
@@ -59,6 +62,7 @@ CHAR_STATS: dict = {
         "name":         "Sniper",
         "folder":       "Man Old",
         "hp":           70,
+        "speed":        3.5,
         "gun":          "Sniper",
         "damage":       "75~80",
         "damage_min":   75,
@@ -73,6 +77,7 @@ CHAR_STATS: dict = {
         "name":         "Soldier",
         "folder":       "Soldier 1",
         "hp":           180,
+        "speed":        3.5,
         "gun":          "Rifle",
         "damage":       "10~15",
         "damage_min":   10,
@@ -87,6 +92,7 @@ CHAR_STATS: dict = {
         "name":         "Assassin",
         "folder":       "Survivor 1",
         "hp":           100,
+        "speed":        6.0,
         "gun":          "Shuriken",
         "damage":       "35~40",
         "damage_min":   35,
@@ -103,6 +109,7 @@ CHAR_STATS: dict = {
         "name":         "Rambo",
         "folder":       "Man Blue",
         "hp":           200,
+        "speed":        2.0,
         "gun":          "Shotgun",
         "damage":       "",          # 越靠近越痛（待實作）
         "damage_min":   20,
@@ -117,6 +124,7 @@ CHAR_STATS: dict = {
         "name":         "Robot",
         "folder":       "Robot 1",
         "hp":           120,
+        "speed":        4.0,
         "gun":          "Laser",
         "damage":       "",          # 特殊（待實作）
         "damage_min":   15,
@@ -131,6 +139,7 @@ CHAR_STATS: dict = {
         "name":         "Dancer",
         "folder":       "Woman Green",
         "hp":           140,
+        "speed":        4.0,
         "gun":          "Poison",
         "damage":       "",          # 持續傷害（待實作）
         "damage_min":   5,
@@ -145,6 +154,7 @@ CHAR_STATS: dict = {
         "name":         "Zombie",
         "folder":       "Zombie 1",
         "hp":           300,
+        "speed":        4.5,
         "gun":          "Hand",
         "damage":       "",          # 特殊（待實作）
         "damage_min":   20,
