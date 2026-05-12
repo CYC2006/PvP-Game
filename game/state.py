@@ -207,11 +207,25 @@ class GameState:
                             self.destroyed_obstacles.add(oid)
                             if obs.kind == "box_special":
                                 self._spawn_gold(obs.x, obs.y)
+                            elif obs.kind == "box_normal" and random.random() < 0.20:
+                                self._spawn_gold_single(obs.x, obs.y)
                     expired.append(bid)
                     break
 
         for bid in expired:
             self.bullets.pop(bid, None)
+
+    def _spawn_gold_single(self, x: float, y: float) -> None:
+        """box_normal 破壞時 20% 機率掉 1 顆金錠，位置稍微隨機偏移。"""
+        angle = random.uniform(0, math.tau)
+        dist  = random.uniform(10, 30)
+        gid   = self._next_gold_id
+        self._next_gold_id = (self._next_gold_id + 1) % 256
+        self.gold_ingots[gid] = GoldIngot(
+            id=gid,
+            x=x + math.cos(angle) * dist,
+            y=y + math.sin(angle) * dist,
+        )
 
     def _spawn_gold(self, x: float, y: float) -> None:
         """在 box_special 破壞位置周圍散落 2~5 顆金錠。"""
