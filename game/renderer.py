@@ -67,6 +67,10 @@ _particles: list = []
 # 上一幀已摧毀的障礙物 ID，用來偵測「本幀新摧毀」以補觸發粒子
 _prev_destroyed: set = set()
 
+# ── 地面殘骸（純視覺，永久留存）────────────────────────────────────────────
+# 每筆：{'x','y','polys':[[(dx,dy),...],...],'color':(r,g,b),'outline':(r,g,b)}
+_debris: list = []
+
 # 各障礙物種類的粒子顏色（同色系深淺變化）
 PARTICLE_COLORS: dict = {
     "box_1":       [(165, 108, 52), (195, 142, 68), (145, 88, 38),
@@ -106,6 +110,7 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
                 _spawn_particles(obs.x, obs.y, obs.kind, count=55, destroy=True)
             else:
                 _spawn_particles(obs.x, obs.y, obs.kind, count=30, destroy=True)
+            _add_debris(obs.x, obs.y, obs.kind)
     _prev_destroyed.clear()
     _prev_destroyed.update(state.destroyed_obstacles)
 
@@ -156,6 +161,59 @@ def _shake_offset(oid: int) -> tuple:
     amp = SHAKE_AMP * (remaining / duration)
     t   = (duration - remaining) * SHAKE_FREQ * math.tau
     return int(amp * math.sin(t)), int(amp * math.sin(t * 1.3 + 1.0))
+
+
+def _add_debris(x: float, y: float, kind: str) -> None:
+    """障礙物被摧毀時在地面生成永久殘骸（純視覺）。"""
+    if kind in ("box_1", "box_special"):
+        # 2~3 根木板交錯
+        col  = (95, 62, 28) if kind == "box_1" else (105, 78, 30)
+        outl = (70, 45, 18) if kind == "box_1" else (80,  58, 18)
+        polys = []
+        for _ in range(random.randint(2, 3)):
+            ang  = random.uniform(0, math.pi)
+            pw   = random.uniform(24, 40)   # 板長
+            ph   = random.uniform(3,  6)    # 板寬
+            ox   = random.uniform(-14, 14)
+            oy   = random.uniform(-14, 14)
+            ca, sa = math.cos(ang), math.sin(ang)
+            hw, hh = pw / 2, ph / 2
+            corners = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+            polys.append([(ox + dx*ca - dy*sa, oy + dx*sa + dy*ca)
+                          for dx, dy in corners])
+        _debris.append({'x': x, 'y': y, 'polys': polys,
+                        'color': col, 'outline': outl})
+
+    elif kind in ("rock_1", "rock_2"):
+        # 3~5 顆小碎石
+        col  = (88,  84,  78)
+        outl = (65,  62,  58)
+        polys = []
+        for _ in range(random.randint(3, 5)):
+            ox    = random.uniform(-28, 28)
+            oy    = random.uniform(-28, 28)
+            r     = random.uniform(4, 9)
+            sides = random.randint(4, 6)
+            base  = random.uniform(0, math.tau)
+            polys.append([
+                (ox + r * random.uniform(0.65, 1.0) * math.cos(base + i * math.tau / sides),
+                 oy + r * random.uniform(0.65, 1.0) * math.sin(base + i * math.tau / sides))
+                for i in range(sides)
+            ])
+        _debris.append({'x': x, 'y': y, 'polys': polys,
+                        'color': col, 'outline': outl})
+
+
+def _draw_debris(screen, cx, cy) -> None:
+    """將地面殘骸繪製在障礙物圖層之上、粒子之下。"""
+    for item in _debris:
+        sx, sy = _ws(item['x'], item['y'], cx, cy)
+        if -120 <= sx <= SCREEN_W + 120 and -120 <= sy <= SCREEN_H + 120:
+            for poly in item['polys']:
+                pts = [(int(sx + dx), int(sy + dy)) for dx, dy in poly]
+                if len(pts) >= 3:
+                    pygame.draw.polygon(screen, item['color'],  pts)
+                    pygame.draw.polygon(screen, item['outline'], pts, 1)
 
 
 def _spawn_particles(bx: float, by: float, kind: str,
@@ -275,6 +333,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _process_hits(state, obstacles)
         _draw_obstacles(screen, obstacles, state.destroyed_obstacles, cx, cy)
 
+    _draw_debris(screen, cx, cy)
     _draw_particles(screen, cx, cy)
     _draw_gold_ingots(screen, state, cx, cy)
     _draw_bullets(screen, state, cx, cy, player_chars or {})
