@@ -3,7 +3,7 @@ import json
 from dataclasses import dataclass
 
 OBSTACLE_CONFIG: dict = {
-    "box_1":       {"width": 64, "height": 64, "hp": 50,  "shape": "obb", "destructible": True},
+    "box_normal":  {"width": 64, "height": 64, "hp": 50,  "shape": "obb", "destructible": True},
     "box_special": {"width": 64, "height": 64, "hp": 100, "shape": "obb", "destructible": True},
     # radius_ratio：石頭在 PNG 裡只佔部分面積，用量測到的視覺半徑比例取代 HITBOX_RATIO
     "rock_1": {"width": 80, "height": 80, "hp": 200, "shape": "circle", "destructible": True, "radius_ratio": 0.70},

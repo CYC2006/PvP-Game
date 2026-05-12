@@ -73,7 +73,7 @@ _debris: list = []
 
 # 各障礙物種類的粒子顏色（同色系深淺變化）
 PARTICLE_COLORS: dict = {
-    "box_1":       [(165, 108, 52), (195, 142, 68), (145, 88, 38),
+    "box_normal":       [(165, 108, 52), (195, 142, 68), (145, 88, 38),
                     (220, 168, 92), (130,  75, 30)],
     "box_special": [(255, 215,   0), (255, 180,  20), (255, 240, 80),
                     (220, 160,   0), (255, 255, 140)],
@@ -116,7 +116,7 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
 
     # ── 2. 消失子彈偵測 ───────────────────────────────────────────
     # newly_destroyed 的障礙物已在步驟 1 生成粒子，這裡跳過它們，
-    # 避免子彈同幀摧毀障礙物時誤用旁邊 box_1 的顏色。
+    # 避免子彈同幀摧毀障礙物時誤用旁邊 box_normal 的顏色。
     skip_oids = state.destroyed_obstacles   # 包含本幀新摧毀
     for bid, (bx, by) in _prev_bullet_pos.items():
         if bid not in cur_ids and obstacles:
@@ -165,10 +165,10 @@ def _shake_offset(oid: int) -> tuple:
 
 def _add_debris(x: float, y: float, kind: str) -> None:
     """障礙物被摧毀時在地面生成永久殘骸（純視覺）。"""
-    if kind in ("box_1", "box_special"):
+    if kind in ("box_normal", "box_special"):
         # 2~3 根木板交錯
-        col  = (95, 62, 28) if kind == "box_1" else (105, 78, 30)
-        outl = (70, 45, 18) if kind == "box_1" else (80,  58, 18)
+        col  = (95, 62, 28) if kind == "box_normal" else (105, 78, 30)
+        outl = (70, 45, 18) if kind == "box_normal" else (80,  58, 18)
         polys = []
         for _ in range(random.randint(2, 3)):
             ang  = random.uniform(0, math.pi)
