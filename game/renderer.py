@@ -339,6 +339,12 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     _draw_bullets(screen, state, cx, cy, player_chars or {})
     _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg,
                   player_chars or {})
+
+    # 樹/草叢繪製在玩家之上（最頂層），本地玩家在樹下時半透明
+    if obstacles:
+        _draw_trees(screen, obstacles, state.destroyed_obstacles,
+                    cx, cy, me.x, me.y)
+
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading)
 
 
@@ -368,8 +374,11 @@ def _draw_map(screen, cx, cy):
 # ── 障礙物 ────────────────────────────────────────────────────────────────────
 
 def _draw_obstacles(screen, obstacles: dict, destroyed: set, cx, cy):
+    """繪製實體障礙物（跳過 solid=False 的樹/草叢，它們在最頂層另外繪製）。"""
     for oid, obs in obstacles.items():
         if oid in destroyed:
+            continue
+        if not obs.solid:          # 樹/草叢留給 _draw_trees
             continue
         sx, sy = _ws(obs.x, obs.y, cx, cy)
         w, h = int(obs.width), int(obs.height)
@@ -383,6 +392,40 @@ def _draw_obstacles(screen, obstacles: dict, destroyed: set, cx, cy):
         ox, oy  = _shake_offset(oid)
         screen.blit(rotated, (sx - rotated.get_width()  // 2 + ox,
                                sy - rotated.get_height() // 2 + oy))
+
+
+def _draw_trees(screen, obstacles: dict, destroyed: set,
+                cx, cy, my_wx: float, my_wy: float) -> None:
+    """將樹/草叢繪製在最頂層（玩家之上）。
+    若本地玩家的圓心落在樹的視覺範圍內，該樹對本地玩家顯示為半透明（草叢躲藏效果）。
+    對手的畫面不做任何透明處理，所以對手看不到躲在樹後的玩家。
+    """
+    for oid, obs in obstacles.items():
+        if obs.solid:              # 只處理非實體障礙物
+            continue
+        if oid in destroyed:
+            continue
+        sx, sy = _ws(obs.x, obs.y, cx, cy)
+        w, h   = int(obs.width), int(obs.height)
+        if sx < -w or sx > SCREEN_W + w or sy < -h or sy > SCREEN_H + h:
+            continue
+
+        sprite  = _get_obstacle_sprite(obs.kind, w, h)
+        rotated = pygame.transform.rotate(sprite, -math.degrees(obs.angle))
+        draw_x  = sx - rotated.get_width()  // 2
+        draw_y  = sy - rotated.get_height() // 2
+
+        # 判斷本地玩家是否在樹的視覺圓內 → 半透明顯示
+        dist      = math.hypot(my_wx - obs.x, my_wy - obs.y)
+        visual_r  = obs.width / 2   # 視覺半徑（完整圓形）
+        if dist < visual_r + PLAYER_RADIUS:
+            # 半透明：對本地玩家可見，對手看到的是完整不透明的樹
+            semi = rotated.copy()
+            # BLEND_RGBA_MULT 對每個像素的 alpha 乘上係數（110/255 ≈ 43% 不透明度）
+            semi.fill((255, 255, 255, 110), special_flags=pygame.BLEND_RGBA_MULT)
+            screen.blit(semi, (draw_x, draw_y))
+        else:
+            screen.blit(rotated, (draw_x, draw_y))
 
 
 # ── 子彈 ──────────────────────────────────────────────────────────────────────

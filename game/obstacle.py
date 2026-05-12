@@ -8,6 +8,9 @@ OBSTACLE_CONFIG: dict = {
     # radius_ratio：石頭在 PNG 裡只佔部分面積，用量測到的視覺半徑比例取代 HITBOX_RATIO
     "rock_1": {"width": 80, "height": 80, "hp": 200, "shape": "circle", "destructible": True, "radius_ratio": 0.70},
     "rock_2": {"width": 80, "height": 80, "hp": 200, "shape": "circle", "destructible": True, "radius_ratio": 0.52},
+    # solid=False：玩家與子彈可直接穿過；最頂層繪製；本地玩家在樹下時半透明
+    "tree_1": {"width": 160, "height": 160, "hp": 9999, "shape": "circle",
+               "destructible": False, "solid": False, "radius_ratio": 0.65},
 }
 
 # hitbox 比視覺小一圈，讓「擦邊而過」體驗更舒適
@@ -27,6 +30,7 @@ class Obstacle:
     shape:        str   = "obb"       # "obb" | "circle"
     destructible: bool  = True        # False → 子彈會彈開但不扣血、不摧毀
     radius_ratio: float = HITBOX_RATIO  # circle shape 用：碰撞半徑 = (width/2)*ratio
+    solid:        bool  = True        # False → 玩家/子彈穿透，繪製於最頂層（樹/草叢）
 
     # ── circle shape 用的碰撞半徑 ────────────────────────────────
     @property
@@ -133,6 +137,7 @@ def load_map(path: str) -> dict:
             shape=cfg.get("shape", "obb"),
             destructible=cfg.get("destructible", True),
             radius_ratio=cfg.get("radius_ratio", HITBOX_RATIO),
+            solid=cfg.get("solid", True),
         )
         obstacles[obs.id] = obs
     return obstacles

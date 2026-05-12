@@ -82,7 +82,7 @@
     },
     {
       "id": 10,
-      "kind": "box_normal",
+      "kind": "box_special",
       "x": 1801,
       "y": 466,
       "angle_deg": -25,
@@ -146,7 +146,7 @@
     },
     {
       "id": 18,
-      "kind": "box_normal",
+      "kind": "box_special",
       "x": 1573,
       "y": 369,
       "angle_deg": 19,
@@ -234,7 +234,7 @@
     },
     {
       "id": 29,
-      "kind": "box_normal",
+      "kind": "box_special",
       "x": 1206,
       "y": 955,
       "angle_deg": -44,
@@ -362,7 +362,7 @@
     },
     {
       "id": 45,
-      "kind": "box_normal",
+      "kind": "box_special",
       "x": 1724,
       "y": 847,
       "angle_deg": -24,
@@ -479,6 +479,46 @@
       "y": 168,
       "angle_deg": -19,
       "scale": 1.41
+    },
+    {
+      "id": 60,
+      "kind": "tree_1",
+      "x": 420,
+      "y": 430,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 61,
+      "kind": "tree_1",
+      "x": 1050,
+      "y": 200,
+      "angle_deg": 0,
+      "scale": 1.1
+    },
+    {
+      "id": 62,
+      "kind": "tree_1",
+      "x": 1480,
+      "y": 580,
+      "angle_deg": 0,
+      "scale": 0.9
+    },
+    {
+      "id": 63,
+      "kind": "tree_1",
+      "x": 280,
+      "y": 870,
+      "angle_deg": 0,
+      "scale": 1.05
+    },
+    {
+      "id": 64,
+      "kind": "tree_1",
+      "x": 960,
+      "y": 820,
+      "angle_deg": 0,
+      "scale": 1.0
     }
   ]
 }

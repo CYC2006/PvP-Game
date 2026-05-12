@@ -191,6 +191,8 @@ class GameState:
             for oid, obs in obstacles.items():
                 if oid in self.destroyed_obstacles:
                     continue
+                if not obs.solid:          # 非實體（樹/草叢）→ 子彈穿透
+                    continue
                 if obs.collides_circle(bullet.x, bullet.y, BULLET_RADIUS):
                     if obstacle_hp is not None and obs.destructible:
                         shooter = self.players.get(bullet.owner_id)
@@ -242,6 +244,8 @@ class GameState:
         for player in self.players.values():
             for oid, obs in obstacles.items():
                 if oid in self.destroyed_obstacles:
+                    continue
+                if not obs.solid:          # 非實體（樹/草叢）→ 玩家穿透
                     continue
                 new_x, new_y = obs.push_out_circle(player.x, player.y, PLAYER_RADIUS)
                 player.x = new_x
