@@ -177,7 +177,14 @@ class GameState:
                     continue
                 if obs.collides_circle(bullet.x, bullet.y, BULLET_RADIUS):
                     if obstacle_hp is not None and obs.destructible:
-                        obstacle_hp[oid] -= 1
+                        shooter = self.players.get(bullet.owner_id)
+                        if shooter and shooter.damage_min < shooter.damage_max:
+                            obs_dmg = random.randint(shooter.damage_min, shooter.damage_max)
+                        elif shooter:
+                            obs_dmg = shooter.damage_min
+                        else:
+                            obs_dmg = 1
+                        obstacle_hp[oid] -= obs_dmg
                         if obstacle_hp[oid] <= 0:
                             self.destroyed_obstacles.add(oid)
                     expired.append(bid)
