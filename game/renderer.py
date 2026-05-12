@@ -445,7 +445,7 @@ def _draw_gold_ingots(screen, state, cx, cy) -> None:
             # 漂浮旋轉動畫（每顆用 id 錯開相位）
             spin = now * 120 + ingot.id * 47
             a    = math.radians(spin % 360)
-            r    = 7
+            r    = 10
             pts  = [(sx + r * math.cos(a + i * math.pi / 2),
                      sy + r * math.sin(a + i * math.pi / 2)) for i in range(4)]
             # 外光暈
@@ -454,7 +454,7 @@ def _draw_gold_ingots(screen, state, cx, cy) -> None:
             # 主體菱形
             pygame.draw.polygon(screen, (255, 215, 0), pts)
             # 高光點
-            pygame.draw.circle(screen, (255, 255, 180), (int(sx - 2), int(sy - 2)), 2)
+            pygame.draw.circle(screen, (255, 255, 180), (int(sx - 2), int(sy - 2)), 3)
 
 
 def _rot_pts(cx, cy, pts, angle_rad):
