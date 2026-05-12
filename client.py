@@ -1,4 +1,5 @@
 import math
+import os
 import socket
 import sys
 import time
@@ -134,8 +135,10 @@ def run(server_ip: str) -> None:
     pygame.mouse.set_visible(True)
     screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
     pygame.display.set_caption(f"PvP Game — Player {player_id}")
-    font_lg      = pygame.font.SysFont("monospace", 22, bold=True)
-    font_sm      = pygame.font.SysFont("monospace", 15)
+    _font_bold = os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf")
+    _font_reg  = os.path.join("assets", "fonts", "MapleMono-NF-Regular.ttf")
+    font_lg = pygame.font.Font(_font_bold, 22)
+    font_sm = pygame.font.Font(_font_reg,  15)
     clock        = pygame.time.Clock()
     logical_surf = pygame.Surface((LOGICAL_W, LOGICAL_H))
 
