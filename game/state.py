@@ -28,6 +28,10 @@ class Player:
     pellet_count: int   = 1               # 散彈槍：一次發射的子彈數量
     bullet_range: float = BULLET_MAX_RANGE  # 子彈最大射程（px）
     bullet_range_min: float = 0           # >0 時每顆散彈隨機射程 [min, range]
+    bullet_decel: float  = 0.0            # 毒氣泡等：每 tick 減速量（px/tick²）
+    bullet_linger: int   = 0             # 停止後存活 tick 數（0 = 停止即消失）
+    bullet_speed_min: float = 0.0        # >0 時每顆子彈初速在 [min, speed] 間隨機
+    dot_interval: int   = 0             # >0：穿透玩家，每 N tick 傷害一次（DoT 子彈）
     aim_angle: float   = 0.0             # 瞄準角度（度），0=上, 90=右；同步給對手
     stance: str        = "stand"         # "stand" | "machine" | "hold" | "reload"
 
@@ -64,15 +68,34 @@ class Bullet:
     dx: float
     dy: float
     distance_travelled: float = 0.0
-    aim_angle: float = 0.0            # 飛行方向（度）atan2(dy,dx)，供 client 繪圖用
-    max_range: float = BULLET_MAX_RANGE  # 最大射程（px）；散彈槍可設極短
+    aim_angle: float  = 0.0            # 飛行方向（度）atan2(dy,dx)，供 client 繪圖用
+    max_range: float  = BULLET_MAX_RANGE  # 最大射程（px）
+    decel: float      = 0.0            # 每 tick 減少的速度量（px/tick²）；0 = 等速
+    linger_ticks: int = 0              # 停止後再存活的 tick 數（倒數至 0 才消失）
+    dot_interval: int = 0              # >0：穿透玩家，每 N tick 傷害一次
+    spawn_tick: int   = 0              # 建立時的 tick（DoT 半徑成長計算用）
+    bubble_radius_max: float = 0.0     # DoT 泡泡最大碰撞半徑 px（由 server 亂數，client 同步）
 
     def step(self) -> None:
         self.x += self.dx
         self.y += self.dy
         self.distance_travelled += math.hypot(self.dx, self.dy)
+        if self.decel > 0:
+            speed = math.hypot(self.dx, self.dy)
+            if speed <= self.decel:
+                self.dx = 0.0
+                self.dy = 0.0
+            else:
+                factor = (speed - self.decel) / speed
+                self.dx *= factor
+                self.dy *= factor
+        # 停止後 linger 倒數
+        if self.decel > 0 and self.dx == 0.0 and self.dy == 0.0 and self.linger_ticks > 0:
+            self.linger_ticks -= 1
 
     def is_expired(self) -> bool:
+        if self.decel > 0 and self.dx == 0.0 and self.dy == 0.0:
+            return self.linger_ticks == 0   # linger 倒數完才消失
         return (
             self.distance_travelled >= self.max_range
             or self.x < 0 or self.x > MAP_WIDTH
@@ -90,6 +113,7 @@ class GameState:
     tick: int                = 0
     _next_bullet_id: int     = 0
     _next_gold_id: int       = 0
+    _dot_cooldown: dict      = field(default_factory=dict)  # {(bid, pid): next_hit_tick}
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -111,11 +135,21 @@ class GameState:
         p.damage_max   = get_stat(char_key, "damage_max")
         p.bullet_speed = float(get_stat(char_key, "bullet_speed")) * BULLET_SPEED
         p.spread       = float(get_stat(char_key, "spread"))
-        # 散彈槍專屬欄位（其他角色無此欄位時取預設值）
-        char_cfg          = CHAR_STATS.get(char_key, {})
-        p.pellet_count    = int(char_cfg.get("pellet_count", 1))
-        p.bullet_range    = float(char_cfg.get("bullet_range", BULLET_MAX_RANGE))
+        # 特殊武器專屬欄位（其他角色無此欄位時取預設值）
+        char_cfg           = CHAR_STATS.get(char_key, {})
+        p.pellet_count     = int(char_cfg.get("pellet_count", 1))
+        p.bullet_range     = float(char_cfg.get("bullet_range", BULLET_MAX_RANGE))
         p.bullet_range_min = float(char_cfg.get("bullet_range_min", 0))
+        # bullet_lifetime > 0：子彈線性減速，lifetime 秒後速度歸零消失
+        lifetime = float(char_cfg.get("bullet_lifetime", 0))
+        if lifetime > 0:
+            tick_rate = 60
+            p.bullet_decel = p.bullet_speed / (lifetime * tick_rate)
+        else:
+            p.bullet_decel = 0.0
+        p.bullet_linger    = int(char_cfg.get("bullet_linger", 0) * 60)  # 秒→tick
+        p.bullet_speed_min = float(char_cfg.get("bullet_speed_min", 0)) * BULLET_SPEED
+        p.dot_interval     = int(char_cfg.get("dot_interval", 0))
 
     def apply_command(self, player_id: int, dx: float, dy: float,
                       shooting: bool, aim_x: float, aim_y: float,
@@ -154,10 +188,17 @@ class GameState:
                 pux = ux * cos_s - uy * sin_s
                 puy = ux * sin_s + uy * cos_s
 
-            ndx = pux * player.bullet_speed
-            ndy = puy * player.bullet_speed
-            # 每顆散彈各自隨機射程（min>0 時），製造遠近不一的散射效果
-            if player.bullet_range_min > 0:
+            # 初速隨機（bullet_speed_min > 0）；decel 固定，速度慢的飛得近
+            if player.bullet_speed_min > 0:
+                spd = random.uniform(player.bullet_speed_min, player.bullet_speed)
+            else:
+                spd = player.bullet_speed
+            ndx = pux * spd
+            ndy = puy * spd
+            # 射程：減速子彈靠速度歸零消失，無需限制距離
+            if player.bullet_decel > 0:
+                pellet_range = BULLET_MAX_RANGE * 999
+            elif player.bullet_range_min > 0:
                 pellet_range = random.uniform(player.bullet_range_min, player.bullet_range)
             else:
                 pellet_range = player.bullet_range
@@ -169,6 +210,14 @@ class GameState:
                 dx=ndx, dy=ndy,
                 aim_angle=math.degrees(math.atan2(ndy, ndx)),
                 max_range=pellet_range,
+                decel=player.bullet_decel,
+                linger_ticks=player.bullet_linger,
+                dot_interval=player.dot_interval,
+                spawn_tick=self.tick,
+                bubble_radius_max=(
+                    random.uniform(BULLET_RADIUS * 5, BULLET_RADIUS * 7)
+                    if player.dot_interval > 0 else 0.0
+                ),
             )
 
     def step_bullets(self, obstacles: dict = None,
@@ -184,57 +233,117 @@ class GameState:
                 continue
 
             hit = False
+            shooter = self.players.get(bullet.owner_id)
+            does_damage = not (shooter and shooter.damage_min == 0 and shooter.damage_max == 0)
 
-            # 子彈 vs 玩家
-            for pid, player in self.players.items():
-                if pid == bullet.owner_id:
-                    continue
-                if math.hypot(bullet.x - player.x, bullet.y - player.y) < PLAYER_RADIUS + BULLET_RADIUS:
-                    # 依射手角色計算傷害
-                    shooter = self.players.get(bullet.owner_id)
-                    if shooter and shooter.damage_min < shooter.damage_max:
-                        damage = random.randint(shooter.damage_min, shooter.damage_max)
-                    elif shooter:
-                        damage = shooter.damage_min
-                    else:
-                        damage = 1
-                    player.hp -= damage
-                    if player.hp <= 0:
-                        player.respawn()
-                    expired.append(bid)
-                    hit = True
-                    break
+            # DoT 子彈的動態碰撞半徑（隨泡泡成長）
+            _BUBBLE_LIFE_TICKS = 120  # 2.0s × 60 fps
+            if bullet.dot_interval > 0 and bullet.bubble_radius_max > 0:
+                age   = self.tick - bullet.spawn_tick
+                t_grow = min(1.0, age / _BUBBLE_LIFE_TICKS)
+                coll_r = (BULLET_RADIUS * 2
+                          + (bullet.bubble_radius_max - BULLET_RADIUS * 2) * t_grow)
+            else:
+                coll_r = float(BULLET_RADIUS)
+
+            # ── 子彈 vs 玩家 ────────────────────────────────────────────
+            if bullet.dot_interval > 0:
+                # DoT 子彈（毒氣泡）：穿透玩家，以動態半徑每 dot_interval tick 傷害一次
+                for pid, player in self.players.items():
+                    if pid == bullet.owner_id:
+                        continue
+                    if math.hypot(bullet.x - player.x,
+                                  bullet.y - player.y) < PLAYER_RADIUS + coll_r:
+                        key = (bid, pid)
+                        if self.tick >= self._dot_cooldown.get(key, 0):
+                            if shooter and shooter.damage_min < shooter.damage_max:
+                                damage = random.randint(shooter.damage_min, shooter.damage_max)
+                            elif shooter:
+                                damage = shooter.damage_min
+                            else:
+                                damage = 1
+                            player.hp -= damage
+                            if player.hp <= 0:
+                                player.respawn()
+                            self._dot_cooldown[key] = self.tick + bullet.dot_interval
+            elif does_damage:
+                # 一般子彈：碰到玩家即消失
+                for pid, player in self.players.items():
+                    if pid == bullet.owner_id:
+                        continue
+                    if math.hypot(bullet.x - player.x,
+                                  bullet.y - player.y) < PLAYER_RADIUS + coll_r:
+                        if shooter and shooter.damage_min < shooter.damage_max:
+                            damage = random.randint(shooter.damage_min, shooter.damage_max)
+                        elif shooter:
+                            damage = shooter.damage_min
+                        else:
+                            damage = 1
+                        player.hp -= damage
+                        if player.hp <= 0:
+                            player.respawn()
+                        expired.append(bid)
+                        hit = True
+                        break
 
             if hit:
                 continue
 
-            # 子彈 vs 障礙物
+            # ── 子彈 vs 障礙物 ──────────────────────────────────────────
             for oid, obs in obstacles.items():
                 if oid in self.destroyed_obstacles:
                     continue
                 if not obs.solid:          # 非實體（樹/草叢）→ 子彈穿透
                     continue
-                if obs.collides_circle(bullet.x, bullet.y, BULLET_RADIUS):
-                    if obstacle_hp is not None and obs.destructible:
-                        shooter = self.players.get(bullet.owner_id)
-                        if shooter and shooter.damage_min < shooter.damage_max:
-                            obs_dmg = random.randint(shooter.damage_min, shooter.damage_max)
-                        elif shooter:
-                            obs_dmg = shooter.damage_min
-                        else:
-                            obs_dmg = 1
-                        obstacle_hp[oid] -= obs_dmg
-                        if obstacle_hp[oid] <= 0:
-                            self.destroyed_obstacles.add(oid)
-                            if obs.kind == "box_special":
-                                self._spawn_gold(obs.x, obs.y)
-                            elif obs.kind == "box_normal" and random.random() < 0.20:
-                                self._spawn_gold_single(obs.x, obs.y)
-                    expired.append(bid)
-                    break
+                if obs.collides_circle(bullet.x, bullet.y, coll_r):
+                    if bullet.dot_interval > 0:
+                        # DoT 子彈（毒氣泡）：撞牆時停住，不消失，持續傷害障礙物
+                        if bullet.dx != 0.0 or bullet.dy != 0.0:
+                            bullet.dx = 0.0
+                            bullet.dy = 0.0   # 停在障礙物旁，觸發 linger 倒數
+                        if obstacle_hp is not None and obs.destructible and does_damage:
+                            key = (bid, -oid)  # 負 oid 與玩家 id 區分
+                            if self.tick >= self._dot_cooldown.get(key, 0):
+                                if shooter and shooter.damage_min < shooter.damage_max:
+                                    obs_dmg = random.randint(shooter.damage_min,
+                                                             shooter.damage_max)
+                                elif shooter:
+                                    obs_dmg = shooter.damage_min
+                                else:
+                                    obs_dmg = 1
+                                obstacle_hp[oid] -= obs_dmg
+                                if obstacle_hp[oid] <= 0:
+                                    self.destroyed_obstacles.add(oid)
+                                    if obs.kind == "box_special":
+                                        self._spawn_gold(obs.x, obs.y)
+                                    elif obs.kind == "box_normal" and random.random() < 0.20:
+                                        self._spawn_gold_single(obs.x, obs.y)
+                                self._dot_cooldown[key] = self.tick + bullet.dot_interval
+                        break   # 只對第一個相交的障礙物作用
+                    else:
+                        # 一般子彈：碰到障礙物即消失，可能破壞
+                        if obstacle_hp is not None and obs.destructible and does_damage:
+                            if shooter and shooter.damage_min < shooter.damage_max:
+                                obs_dmg = random.randint(shooter.damage_min, shooter.damage_max)
+                            elif shooter:
+                                obs_dmg = shooter.damage_min
+                            else:
+                                obs_dmg = 1
+                            obstacle_hp[oid] -= obs_dmg
+                            if obstacle_hp[oid] <= 0:
+                                self.destroyed_obstacles.add(oid)
+                                if obs.kind == "box_special":
+                                    self._spawn_gold(obs.x, obs.y)
+                                elif obs.kind == "box_normal" and random.random() < 0.20:
+                                    self._spawn_gold_single(obs.x, obs.y)
+                        expired.append(bid)
+                        break
 
         for bid in expired:
             self.bullets.pop(bid, None)
+            # 清除該子彈的 DoT 冷卻記錄
+            for k in [k for k in self._dot_cooldown if k[0] == bid]:
+                del self._dot_cooldown[k]
 
     def _spawn_gold_single(self, x: float, y: float) -> None:
         """box_normal 破壞時 20% 機率掉 1 顆金錠，位置稍微隨機偏移。"""

@@ -3,11 +3,11 @@ import json
 from dataclasses import dataclass
 
 OBSTACLE_CONFIG: dict = {
-    "box_normal":  {"width": 64, "height": 64, "hp": 50,  "shape": "obb", "destructible": True},
-    "box_special": {"width": 64, "height": 64, "hp": 100, "shape": "obb", "destructible": True},
+    "box_normal":  {"width": 64, "height": 64, "hp": 60,  "shape": "obb", "destructible": True},
+    "box_special": {"width": 64, "height": 64, "hp": 120, "shape": "obb", "destructible": True},
     # radius_ratio：石頭在 PNG 裡只佔部分面積，用量測到的視覺半徑比例取代 HITBOX_RATIO
-    "rock_1": {"width": 80, "height": 80, "hp": 200, "shape": "circle", "destructible": True, "radius_ratio": 0.70},
-    "rock_2": {"width": 80, "height": 80, "hp": 200, "shape": "circle", "destructible": True, "radius_ratio": 0.52},
+    "rock_1": {"width": 80, "height": 80, "hp": 240, "shape": "circle", "destructible": True, "radius_ratio": 0.70},
+    "rock_2": {"width": 80, "height": 80, "hp": 240, "shape": "circle", "destructible": True, "radius_ratio": 0.52},
     # solid=False：玩家與子彈可直接穿過；最頂層繪製；本地玩家在樹下時半透明
     # base 240；map 裡用 scale 0.83~1.25 讓實際尺寸落在 200~300px
     "tree_1": {"width": 240, "height": 240, "hp": 9999, "shape": "circle",

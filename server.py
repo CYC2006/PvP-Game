@@ -82,7 +82,8 @@ def run():
                     # 雙方都選完 → 套用角色數值 → 開始遊戲
                     if len(player_chars) == MAX_PLAYERS:
                         game_started = True
-                        from game.char_data import CHAR_ORDER
+                        from game.char_data import CHAR_ORDER, reload
+                        reload()   # 每局開始重新讀取 chars.csv
                         for p_id, c_id in player_chars.items():
                             char_key = CHAR_ORDER[c_id]
                             state.apply_char_stats(p_id, char_key)

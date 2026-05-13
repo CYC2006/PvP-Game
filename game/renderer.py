@@ -34,17 +34,9 @@ HP_PIP_GAP           = 4
 PLAYER_SPRITE_SCALE  = 1.5   # 原圖 33–54 × 43 px，放大後約 50–81 × 65 px
 
 # 角色定義：char_key → (資料夾名稱, 檔名前綴)
-CHAR_DIR: dict = {
-    "hitman1":    ("Hitman 1",    "hitman1"),
-    "manBlue":    ("Man Blue",    "manBlue"),
-    "manBrown":   ("Man Brown",   "manBrown"),
-    "manOld":     ("Man Old",     "manOld"),
-    "robot1":     ("Robot 1",     "robot1"),
-    "soldier1":   ("Soldier 1",   "soldier1"),
-    "survivor1":  ("Survivor 1",  "survivor1"),
-    "womanGreen": ("Woman Green", "womanGreen"),
-    "zoimbie1":   ("Zombie 1",    "zoimbie1"),
-}
+# folder 來自 chars.csv，不在此處維護
+from game.char_data import CHAR_STATS as _CHAR_STATS
+CHAR_DIR: dict = {key: (s['folder'], key) for key, s in _CHAR_STATS.items()}
 
 # 障礙物圖片快取：(kind, w, h) → Surface
 _sprite_cache: dict = {}
@@ -56,6 +48,10 @@ _player_cache: dict = {}
 _shake_timers: dict = {}
 # 上一幀子彈位置 {bid: (x, y)}，用來偵測消失的子彈
 _prev_bullet_pos: dict = {}
+
+# 毒氣泡動畫追蹤：bid → spawn_time, bid → max_radius（5~7× agent bullet）
+_bubble_spawn_time: dict = {}
+_bubble_max_radius: dict = {}
 
 SHAKE_AMP  = 5    # 最大位移像素
 SHAKE_FREQ = 40   # 振盪頻率 Hz
@@ -497,6 +493,8 @@ def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float):
             pts.append((r * math.cos(ang), r * math.sin(ang)))
         pygame.draw.polygon(screen, color, [(sx + x, sy + y) for x, y in pts])
 
+    # womanGreen 改在 _draw_bullets 直接處理（需要 bid 與時間資訊）
+
     elif char_key == "manBlue":          # Rambo — 散彈圓點
         pygame.draw.circle(screen, color, (sx, sy), 4)
 
@@ -504,13 +502,43 @@ def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float):
         pygame.draw.circle(screen, color, (sx, sy), BULLET_RADIUS)
 
 
+_BUBBLE_INIT_R  = BULLET_RADIUS * 2        # 初始半徑：2× agent 子彈（10px）
+_BUBBLE_LIFE    = 2.0                       # 氣泡總壽命（秒）：1s 飛行 + 1s 停留
+
+
 def _draw_bullets(screen, state, cx, cy, player_chars: dict):
+    now = time.perf_counter()
+    current_bids = set(state.bullets.keys())
+
+    # 清除已消失子彈的動畫快取
+    for bid in list(_bubble_spawn_time.keys()):
+        if bid not in current_bids:
+            _bubble_spawn_time.pop(bid, None)
+            _bubble_max_radius.pop(bid, None)
+
     for bullet in state.bullets.values():
         sx, sy = _ws(bullet.x, bullet.y, cx, cy)
-        if -20 <= sx <= SCREEN_W + 20 and -20 <= sy <= SCREEN_H + 20:
+        if -60 <= sx <= SCREEN_W + 60 and -60 <= sy <= SCREEN_H + 60:
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
-            _draw_bullet_shape(screen, char_key, color, sx, sy, bullet.aim_angle)
+
+            if char_key == "womanGreen":
+                # 首次出現：記錄 spawn time；最終半徑由 server 設定，保持雙端一致
+                if bullet.id not in _bubble_spawn_time:
+                    _bubble_spawn_time[bullet.id] = now
+                    # 優先使用 server 傳來的 bubble_radius_max，否則取預設值
+                    rmax = getattr(bullet, "bubble_radius_max", 0.0)
+                    _bubble_max_radius[bullet.id] = (
+                        rmax if rmax > 0 else BULLET_RADIUS * 6)
+                age = now - _bubble_spawn_time[bullet.id]
+                t   = min(1.0, age / _BUBBLE_LIFE)              # 0→1 over 2s
+                r   = max(1, int(_BUBBLE_INIT_R + (_bubble_max_radius[bullet.id]
+                                                    - _BUBBLE_INIT_R) * t))
+                surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+                pygame.draw.circle(surf, (*color, 120), (r, r), r)
+                screen.blit(surf, (sx - r, sy - r))
+            else:
+                _draw_bullet_shape(screen, char_key, color, sx, sy, bullet.aim_angle)
 
 
 # ── 玩家 ──────────────────────────────────────────────────────────────────────

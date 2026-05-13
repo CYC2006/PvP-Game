@@ -20,7 +20,7 @@ CHARACTERS = [
         "folder":      CHAR_STATS[key]["folder"],
         "name":        get_stat(key, "name"),
         "hp":          get_stat(key, "hp"),
-        "speed":       get_stat(key, "speed"),
+        "speed":       round(get_stat(key, "speed") * 60),  # px/tick → px/s
         "gun":         get_stat(key, "gun"),
         "damage":      get_stat(key, "damage"),
         "ammo":        get_stat(key, "mag"),
@@ -228,7 +228,7 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int,
         rate_str = ""
 
     spd = char["speed"]
-    spd_str = str(int(spd)) if spd == int(spd) else str(spd)
+    spd_str = f"{spd} px/s"
 
     fields = [
         ("HP",     str(char["hp"])),

@@ -1,180 +1,103 @@
 """
-Character data — single source of truth for all character stats.
+Character data — 從專案根目錄 chars.csv 讀取。
 
-Current format:  each stat is a scalar value.
-Future upgrade system: replace any scalar with a list indexed by level.
-  e.g.  "hp": 100            (level 0 only)
-        "hp": [100, 115, 130] (level 0 / 1 / 2)
+chars.csv 速度欄位說明：
+  speed_pxs        移動速度（px/s）；÷60 → px/tick 存入 CHAR_STATS['speed']
+  bspeed_pxs       子彈速度（px/s）；÷480 → 乘數 存入 CHAR_STATS['bullet_speed']
+  bspeed_min_pxs   子彈初速下限（px/s）；同上換算
 
-Use get_stat(char_key, stat, level=0) everywhere so callers never need
-to know whether a value is scalar or a list.
+對外介面與原來完全相同：
+  CHAR_STATS   dict[char_key → stat dict]
+  CHAR_ORDER   list[char_key]（依 CSV 行序）
+  get_stat(char_key, stat, level=0)
 """
 
-# ── 欄位說明 ────────────────────────────────────────────────────────────────
-#   name         顯示名稱
-#   folder       assets/Player/ 下的資料夾名稱
-#   hp           最大血量
-#   gun          槍種名稱（顯示用）
-#   damage       傷害描述字串（顯示用）；特殊效果填 ""
-#   damage_min   最小傷害（server 計算用）
-#   damage_max   最大傷害（server 計算用）
-#   mag          彈夾容量字串（顯示用）；無彈夾概念填 ""
-#   speed        移動速度（像素/tick）；基準值 = 3.0
-#   fire_rate    射速（發/秒）；0 表示特殊/不適用
-#   reload_time  換彈時間（秒）；0 表示無需換彈
-#   bullet_speed 子彈速度乘數；1.0 = 基準速度（BULLET_SPEED = 8.0 px/tick）
-#   spread       子彈最大偏角（±度）；0 = 完全精準
+import csv
+import os
 
-CHAR_STATS: dict = {
+_CSV_PATH   = os.path.join(os.path.dirname(__file__), '..', 'chars.csv')
+_TICK_RATE  = 60       # fps
+_BULLET_BASE = 8.0     # BULLET_SPEED (px/tick) in state.py
+_BSPEED_DENOM = _BULLET_BASE * _TICK_RATE   # 480：px/s → 乘數 換算基底
 
-    # ── 已實作角色 ─────────────────────────────────────────────────────────
-    "hitman1": {
-        "name":         "Agent",
-        "folder":       "Hitman 1",
-        "hp":           100,
-        "speed":        3.0,
-        "gun":          "Pistol",
-        "damage":       "25~30",
-        "damage_min":   25,
-        "damage_max":   30,
-        "mag":          "12",
-        "fire_rate":    3,
-        "reload_time":  2,
-        "bullet_speed": 1.0,
-        "spread":       3,
-    },
-    "manBrown": {
-        "name":         "Bear",
-        "folder":       "Man Brown",
-        "hp":           150,
-        "speed":        2.5,
-        "gun":          "Machine",
-        "damage":       "15~20",
-        "damage_min":   15,
-        "damage_max":   20,
-        "mag":          "50",
-        "fire_rate":    5,
-        "reload_time":  4,
-        "bullet_speed": 1.2,
-        "spread":       7,
-    },
-    "manOld": {
-        "name":         "Sniper",
-        "folder":       "Man Old",
-        "hp":           70,
-        "speed":        3.5,
-        "gun":          "Sniper",
-        "damage":       "75~80",
-        "damage_min":   75,
-        "damage_max":   80,
-        "mag":          "5",
-        "fire_rate":    0.5,
-        "reload_time":  5,
-        "bullet_speed": 2.5,
-        "spread":       1,
-    },
-    "soldier1": {
-        "name":         "Soldier",
-        "folder":       "Soldier 1",
-        "hp":           180,
-        "speed":        3.5,
-        "gun":          "Rifle",
-        "damage":       "10~15",
-        "damage_min":   10,
-        "damage_max":   15,
-        "mag":          "40",
-        "fire_rate":    8,
-        "reload_time":  3,
-        "bullet_speed": 1.5,
-        "spread":       4,
-    },
-    "survivor1": {
-        "name":         "Assassin",
-        "folder":       "Survivor 1",
-        "hp":           100,
-        "speed":        6.0,
-        "gun":          "Shuriken",
-        "damage":       "35~40",
-        "damage_min":   35,
-        "damage_max":   40,
-        "mag":          "",          # 無彈夾（無限）
-        "fire_rate":    4,
-        "reload_time":  0,
-        "bullet_speed": 0.8,
-        "spread":       2,
-    },
 
-    # ── 未實作角色（damage_min/max 為預留值）──────────────────────────────
-    "manBlue": {
-        "name":         "Rambo",
-        "folder":       "Man Blue",
-        "hp":           200,
-        "speed":        2.0,
-        "gun":          "Shotgun",
-        "damage":       "6~10 ×10",  # 每顆散彈 6~10，十顆全中最高 100
-        "damage_min":   6,
-        "damage_max":   10,
-        "mag":          "6",
-        "fire_rate":    2,
-        "reload_time":  4,
-        "bullet_speed": 0.875,
-        "spread":       15,
-        "pellet_count": 10,          # 散彈槍：一次射出 10 顆
-        "bullet_range": 150,         # 散彈最遠射程（px）
-        "bullet_range_min": 130,     # 散彈最短射程（px）；每顆隨機落在 min~max
-    },
-    "robot1": {
-        "name":         "Robot",
-        "folder":       "Robot 1",
-        "hp":           120,
-        "speed":        4.0,
-        "gun":          "Laser",
-        "damage":       "",          # 特殊（待實作）
-        "damage_min":   15,
-        "damage_max":   25,
-        "mag":          "",
-        "fire_rate":    0,
-        "reload_time":  0,
-        "bullet_speed": 2.5,
-        "spread":       0,
-    },
-    "womanGreen": {
-        "name":         "Dancer",
-        "folder":       "Woman Green",
-        "hp":           140,
-        "speed":        4.0,
-        "gun":          "Poison",
-        "damage":       "",          # 持續傷害（待實作）
-        "damage_min":   5,
-        "damage_max":   10,
-        "mag":          "",
-        "fire_rate":    0,
-        "reload_time":  0,
-        "bullet_speed": 0.625,
-        "spread":       12,
-    },
-    "zoimbie1": {
-        "name":         "Zombie",
-        "folder":       "Zombie 1",
-        "hp":           300,
-        "speed":        4.5,
-        "gun":          "Hand",
-        "damage":       "",          # 特殊（待實作）
-        "damage_min":   20,
-        "damage_max":   30,
-        "mag":          "",
-        "fire_rate":    2,
-        "reload_time":  0,
-        "bullet_speed": 0.5,
-        "spread":       20,
-    },
-}
+def _load() -> tuple[dict, list]:
+    stats: dict = {}
+    order: list = []
 
-# 固定的角色順序（選角頁面 / char_id 索引用）
-CHAR_ORDER: list = [
-    "hitman1", "manBlue", "manBrown", "manOld", "robot1",
-    "soldier1", "survivor1", "womanGreen", "zoimbie1",
-]
+    with open(_CSV_PATH, encoding='utf-8', newline='') as f:
+        # 跳過以 # 開頭的注釋行
+        lines = [l for l in f if not l.startswith('#')]
+
+    for row in csv.DictReader(lines):
+        key = row['char_key'].strip()
+        order.append(key)
+
+        def f(col: str, default: float = 0.0) -> float:
+            v = row.get(col, '').strip()
+            return float(v) if v else default
+
+        def i(col: str, default: int = 0) -> int:
+            v = row.get(col, '').strip()
+            return int(v) if v else default
+
+        def s(col: str) -> str:
+            return row.get(col, '').strip()
+
+        d: dict = {
+            'name':         s('name'),
+            'folder':       s('folder'),
+            'hp':           i('hp'),
+            'speed':        f('speed_pxs') / _TICK_RATE,        # px/s → px/tick
+            'gun':          s('gun'),
+            'damage_min':   i('dmg_min'),
+            'damage_max':   i('dmg_max'),
+            'mag':          s('mag'),
+            'fire_rate':    f('fire_rate'),
+            'reload_time':  f('reload_time'),
+            'bullet_speed': f('bspeed_pxs') / _BSPEED_DENOM,   # px/s → 乘數
+            'spread':       f('spread'),
+        }
+
+        # 特殊武器欄位（空白 → 略過；apply_char_stats 會用預設值）
+        _opt = [
+            ('bspeed_min_pxs', 'bullet_speed_min', lambda v: float(v) / _BSPEED_DENOM),
+            ('pellet_count',   'pellet_count',      lambda v: int(v)),
+            ('bullet_range',   'bullet_range',      lambda v: float(v)),
+            ('range_min',      'bullet_range_min',  lambda v: float(v)),
+            ('lifetime',       'bullet_lifetime',   lambda v: float(v)),
+            ('linger',         'bullet_linger',     lambda v: float(v)),
+            ('dot_interval',   'dot_interval',      lambda v: int(v)),
+        ]
+        for csv_col, stat_key, conv in _opt:
+            v = row.get(csv_col, '').strip()
+            if v:
+                d[stat_key] = conv(v)
+
+        # damage 顯示字串：由 dmg_min/dmg_max/pellet_count 自動生成
+        dmin, dmax = d['damage_min'], d['damage_max']
+        pellets    = d.get('pellet_count', 1)
+        if dmin == 0 and dmax == 0:
+            d['damage'] = ""
+        elif dmin == dmax:
+            d['damage'] = str(dmin)
+        elif pellets > 1:
+            d['damage'] = f"{dmin}~{dmax} ×{pellets}"   # ×
+        else:
+            d['damage'] = f"{dmin}~{dmax}"
+
+        stats[key] = d
+
+    return stats, order
+
+
+CHAR_STATS, CHAR_ORDER = _load()
+
+
+def reload() -> None:
+    """重新從 CSV 載入所有角色數值（每局開始前呼叫，改完 CSV 不用重啟程式）。"""
+    global CHAR_STATS, CHAR_ORDER
+    CHAR_STATS, CHAR_ORDER = _load()
 
 
 def get_stat(char_key: str, stat: str, level: int = 0):
