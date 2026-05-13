@@ -61,6 +61,7 @@ class GoldIngot:
     id: int
     x: float
     y: float
+    kind: str = "gold"   # "gold" | "health"
 
 
 @dataclass
@@ -356,8 +357,12 @@ class GameState:
                                     self.destroyed_obstacles.add(oid)
                                     if obs.kind == "box_special":
                                         self._spawn_gold(obs.x, obs.y)
-                                    elif obs.kind == "box_normal" and random.random() < 0.20:
-                                        self._spawn_gold_single(obs.x, obs.y)
+                                    elif obs.kind == "box_normal":
+                                        r = random.random()
+                                        if r < 0.10:
+                                            self._spawn_gold_single(obs.x, obs.y)
+                                        elif r < 0.20:
+                                            self._spawn_health_pack(obs.x, obs.y)
                                 self._dot_cooldown[key] = self.tick + bullet.dot_interval
                         break   # 只對第一個相交的障礙物作用
                     else:
@@ -374,8 +379,12 @@ class GameState:
                                 self.destroyed_obstacles.add(oid)
                                 if obs.kind == "box_special":
                                     self._spawn_gold(obs.x, obs.y)
-                                elif obs.kind == "box_normal" and random.random() < 0.20:
-                                    self._spawn_gold_single(obs.x, obs.y)
+                                elif obs.kind == "box_normal":
+                                    r = random.random()
+                                    if r < 0.10:
+                                        self._spawn_gold_single(obs.x, obs.y)
+                                    elif r < 0.20:
+                                        self._spawn_health_pack(obs.x, obs.y)
                         expired.append(bid)
                         break
 
@@ -386,7 +395,7 @@ class GameState:
                 del self._dot_cooldown[k]
 
     def _spawn_gold_single(self, x: float, y: float) -> None:
-        """box_normal 破壞時 20% 機率掉 1 顆金錠，位置稍微隨機偏移。"""
+        """掉落 1 顆金錠，位置稍微隨機偏移。"""
         angle = random.uniform(0, math.tau)
         dist  = random.uniform(10, 30)
         gid   = self._next_gold_id
@@ -395,6 +404,20 @@ class GameState:
             id=gid,
             x=x + math.cos(angle) * dist,
             y=y + math.sin(angle) * dist,
+            kind="gold",
+        )
+
+    def _spawn_health_pack(self, x: float, y: float) -> None:
+        """掉落 1 個血包，位置稍微隨機偏移。"""
+        angle = random.uniform(0, math.tau)
+        dist  = random.uniform(10, 30)
+        gid   = self._next_gold_id
+        self._next_gold_id = (self._next_gold_id + 1) % 256
+        self.gold_ingots[gid] = GoldIngot(
+            id=gid,
+            x=x + math.cos(angle) * dist,
+            y=y + math.sin(angle) * dist,
+            kind="health",
         )
 
     def _spawn_gold(self, x: float, y: float) -> None:
@@ -411,12 +434,16 @@ class GameState:
             )
 
     def step_gold_collection(self) -> None:
-        """任一玩家碰到金錠就撿起，累計計數。"""
+        """任一玩家碰到金錠/血包就撿起。金錠累計計數；血包回復最大血量 30%（不超過滿血）。"""
         collected = []
         for gid, ingot in self.gold_ingots.items():
             for pid, player in self.players.items():
                 if math.hypot(player.x - ingot.x, player.y - ingot.y) < PLAYER_RADIUS + GOLD_RADIUS:
-                    self.gold_counts[pid] = self.gold_counts.get(pid, 0) + 1
+                    if ingot.kind == "health":
+                        heal = int(player.max_hp * 0.30)
+                        player.hp = min(player.max_hp, player.hp + heal)
+                    else:
+                        self.gold_counts[pid] = self.gold_counts.get(pid, 0) + 1
                     collected.append(gid)
                     break
         for gid in collected:

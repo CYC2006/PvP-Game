@@ -22,7 +22,7 @@ _CMD_STRUCT    = struct.Struct("!BBffBff")
 _STATE_HDR     = struct.Struct("!BI")
 _PLAYER_ENTRY  = struct.Struct("!BffHHhBH")  # id x y hp max_hp aim_angle stance gold
 _BULLET_ENTRY  = struct.Struct("!BBffh")      # id owner x y angle_i16
-_GOLD_ENTRY    = struct.Struct("!Bff")        # id x y
+_GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -91,7 +91,8 @@ def pack_state(state: GameState) -> bytes:
     # 金錠
     ingots = list(state.gold_ingots.values())
     g_data = bytes([len(ingots)]) + b"".join(
-        _GOLD_ENTRY.pack(g.id, g.x, g.y) for g in ingots
+        _GOLD_ENTRY.pack(g.id, g.x, g.y, 1 if g.kind == "health" else 0)
+        for g in ingots
     )
 
     return header + p_data + b_data + d_data + g_data
@@ -127,8 +128,9 @@ def unpack_state(data: bytes) -> GameState:
 
     g_count = data[offset]; offset += 1
     for _ in range(g_count):
-        gid, gx, gy = _GOLD_ENTRY.unpack(data[offset: offset + _GOLD_ENTRY.size])
-        state.gold_ingots[gid] = GoldIngot(id=gid, x=gx, y=gy)
+        gid, gx, gy, kind_byte = _GOLD_ENTRY.unpack(data[offset: offset + _GOLD_ENTRY.size])
+        state.gold_ingots[gid] = GoldIngot(id=gid, x=gx, y=gy,
+                                            kind="health" if kind_byte == 1 else "gold")
         offset += _GOLD_ENTRY.size
 
     return state

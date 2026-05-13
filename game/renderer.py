@@ -439,24 +439,29 @@ def _draw_trees(screen, obstacles: dict, destroyed: set,
 # ── 子彈 ──────────────────────────────────────────────────────────────────────
 
 def _draw_gold_ingots(screen, state, cx, cy) -> None:
-    """在地圖上繪製散落的金錠（旋轉菱形 + 光暈）。"""
+    """在地圖上繪製散落的金錠與血包（旋轉菱形 + 光暈）。"""
     now = time.perf_counter()
     for ingot in state.gold_ingots.values():
         sx, sy = _ws(ingot.x, ingot.y, cx, cy)
         if -20 <= sx <= SCREEN_W + 20 and -20 <= sy <= SCREEN_H + 20:
-            # 漂浮旋轉動畫（每顆用 id 錯開相位）
             spin = now * 120 + ingot.id * 47
             a    = math.radians(spin % 360)
-            r    = 10
+            r    = 20 if ingot.kind == "health" else 10
             pts  = [(sx + r * math.cos(a + i * math.pi / 2),
                      sy + r * math.sin(a + i * math.pi / 2)) for i in range(4)]
-            # 外光暈
-            pygame.draw.polygon(screen, (255, 200, 0, 80),  pts)
-            pygame.draw.circle(screen, (255, 230, 80), (sx, sy), r + 3, 1)
-            # 主體菱形
-            pygame.draw.polygon(screen, (255, 215, 0), pts)
-            # 高光點
-            pygame.draw.circle(screen, (255, 255, 180), (int(sx - 2), int(sy - 2)), 3)
+
+            if ingot.kind == "health":
+                col_main = (220,  80, 100)   # 紅偏粉
+                col_ring = (240, 130, 145)
+                col_glow = (255, 180, 190)
+            else:
+                col_main = (255, 215,   0)   # 金色
+                col_ring = (255, 230,  80)
+                col_glow = (255, 255, 180)
+
+            pygame.draw.polygon(screen, col_main, pts)
+            pygame.draw.circle(screen, col_ring, (sx, sy), r + 3, 1)
+            pygame.draw.circle(screen, col_glow, (int(sx - 2), int(sy - 2)), 3)
 
 
 def _rot_pts(cx, cy, pts, angle_rad):
