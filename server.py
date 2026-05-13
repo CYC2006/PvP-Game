@@ -44,6 +44,9 @@ def run():
     addr_to_id: dict          = {}   # addr → pid
     player_chars: dict        = {}   # pid → char_id（選角完成後才有）
     game_started: bool        = False
+    last_seen: dict[int, float] = {}  # pid → 最後收到封包的時間
+    paused: bool              = False
+    TIMEOUT                   = 3.0   # 超過幾秒沒收到封包視為斷線
 
     print(f"[Server] Listening on {get_local_ip()}:{PORT}")
     print(f"[Server] Waiting for {MAX_PLAYERS} players...")
@@ -60,6 +63,10 @@ def run():
 
             ptype = packet_type(data)
 
+            # ── 更新最後收到封包時間 ──────────────────────────────
+            if addr in addr_to_id:
+                last_seen[addr_to_id[addr]] = time.perf_counter()
+
             # ── 加入 ──────────────────────────────────────────────
             if ptype == PKT_JOIN:
                 if addr not in addr_to_id:
@@ -69,6 +76,7 @@ def run():
                         addr_to_id[addr] = pid
                         state.add_player(pid)
                         sock.sendto(pack_joined(pid), addr)
+                        last_seen[pid] = time.perf_counter()
                         print(f"[Server] Player {pid} joined from {addr}")
 
             # ── 選角 ──────────────────────────────────────────────
@@ -107,13 +115,32 @@ def run():
                         cmd.crouching, cmd.stance,
                     )
 
-        # ── Tick（遊戲進行中才跑）────────────────────────────────
+        # ── 斷線偵測（遊戲中才檢查）─────────────────────────────
         if game_started:
+            now = time.perf_counter()
+            any_disconnected = any(
+                now - last_seen.get(pid, now) > TIMEOUT
+                for pid in clients
+            )
+            if any_disconnected and not paused:
+                paused = True
+                disconnected = [
+                    pid for pid in clients
+                    if now - last_seen.get(pid, now) > TIMEOUT
+                ]
+                print(f"[Server] Player {disconnected} disconnected — game paused")
+            elif not any_disconnected and paused:
+                paused = False
+                print("[Server] All players reconnected — game resumed")
+
+        # ── Tick（遊戲進行中且未暫停才跑）───────────────────────
+        if game_started and not paused:
             now = time.perf_counter()
             if now >= next_tick:
                 next_tick += TICK_DT
                 state.tick += 1
                 state.step_bullets(obstacles, obstacle_hp)
+                state.step_pending_pellets()
                 state.resolve_player_collisions(obstacles)
                 state.step_gold_collection()
 

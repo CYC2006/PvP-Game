@@ -24,8 +24,8 @@ CHARACTERS = [
         "gun":         get_stat(key, "gun"),
         "damage":      get_stat(key, "damage"),
         "ammo":        get_stat(key, "mag"),
-        "reload_time": get_stat(key, "reload_time"),
-        "fire_rate":   get_stat(key, "fire_rate"),
+        "reload_time":   get_stat(key, "reload_time"),
+        "fire_interval": get_stat(key, "fire_interval"),
     }
     for key in CHAR_ORDER
 ]
@@ -110,8 +110,6 @@ def handle_event(event: pygame.event.Event) -> bool:
             _target_idx = min(N - 1, _target_idx + 1)
         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
             return True
-    elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-        return True
     return False
 
 
@@ -205,7 +203,7 @@ def draw_char_select(screen: pygame.Surface,
     # ── 提示文字（未確認時顯示）──────────────────────────────────
     hint_y = CARD_Y + CARD_H // 2 + 22
     if not my_ready:
-        hint_surf = font_sm.render("← → scroll  /  Click or Enter to confirm",
+        hint_surf = font_sm.render("← → scroll  /  Enter to confirm",
                                    True, COL_HINT)
         screen.blit(hint_surf, (CENTER_X - hint_surf.get_width() // 2, hint_y))
 
@@ -221,11 +219,11 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int,
     reload = char["reload_time"]
     reload_str = f"{reload}s" if reload else ""
 
-    rate = char["fire_rate"]
-    if rate and rate > 0:
-        rate_str = f"{int(rate) if rate == int(rate) else rate}/s"
+    interval = char["fire_interval"]
+    if interval and interval > 0:
+        interval_str = f"{int(interval) if interval == int(interval) else interval}s"
     else:
-        rate_str = ""
+        interval_str = ""
 
     spd = char["speed"]
     spd_str = f"{spd} px/s"
@@ -236,8 +234,8 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int,
         ("GUN",    char["gun"]),
         ("DAMAGE", char["damage"]),
         ("AMMO",   char["ammo"]),
-        ("RELOAD", reload_str),
-        ("RATE",   rate_str),
+        ("RELOAD",    reload_str),
+        ("INTERVAL",  interval_str),
     ]
 
     panel_w  = 1100

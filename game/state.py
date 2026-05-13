@@ -25,21 +25,26 @@ class Player:
     damage_max: int     = 1                # 子彈最大傷害
     bullet_speed: float = BULLET_SPEED    # 子彈速度（像素/tick），依角色設定
     spread: float       = 5.0             # 子彈最大偏角（±度），依角色設定
-    pellet_count: int   = 1               # 散彈槍：一次發射的子彈數量
+    pellet_count: int    = 1               # 散彈槍：一次發射的子彈數量
+    pellet_interval: float = 0.0          # >0：各散彈之間的發射間隔（tick，支援 0.5 = 2發/tick）
     bullet_range: float = BULLET_MAX_RANGE  # 子彈最大射程（px）
     bullet_range_min: float = 0           # >0 時每顆散彈隨機射程 [min, range]
     bullet_decel: float  = 0.0            # 毒氣泡等：每 tick 減速量（px/tick²）
     bullet_linger: int   = 0             # 停止後存活 tick 數（0 = 停止即消失）
     bullet_speed_min: float = 0.0        # >0 時每顆子彈初速在 [min, speed] 間隨機
     dot_interval: int   = 0             # >0：穿透玩家，每 N tick 傷害一次（DoT 子彈）
-    aim_angle: float   = 0.0             # 瞄準角度（度），0=上, 90=右；同步給對手
-    stance: str        = "stand"         # "stand" | "machine" | "hold" | "reload"
+    shoot_slow: float       = 1.0   # 射擊時的移動速度倍率（0~1，1=無懲罰）
+    _shoot_slow_ticks: int  = 0     # 每次射擊後減速持續 tick 數（= fire_interval × 60）
+    _shoot_slow_timer: int  = 0     # 當前剩餘減速 tick（>0 表示正在減速中）
+    aim_angle: float        = 0.0   # 瞄準角度（度），0=上, 90=右；同步給對手
+    stance: str             = "stand"  # "stand" | "machine" | "hold" | "reload"
 
-    def move(self, dx: float, dy: float, crouching: bool = False) -> None:
+    def move(self, dx: float, dy: float, crouching: bool = False,
+             speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
         if length > 0:
             dx, dy = dx / length, dy / length
-        speed = self.speed * (0.5 if crouching else 1.0)
+        speed = self.speed * (0.5 if crouching else 1.0) * speed_mult
         self.x = max(PLAYER_RADIUS, min(MAP_WIDTH  - PLAYER_RADIUS, self.x + dx * speed))
         self.y = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS, self.y + dy * speed))
 
@@ -113,7 +118,8 @@ class GameState:
     tick: int                = 0
     _next_bullet_id: int     = 0
     _next_gold_id: int       = 0
-    _dot_cooldown: dict      = field(default_factory=dict)  # {(bid, pid): next_hit_tick}
+    _dot_cooldown: dict      = field(default_factory=dict)   # {(bid, pid): next_hit_tick}
+    _pending_pellets: list   = field(default_factory=list)   # [(fire_tick, Bullet)]
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -149,7 +155,11 @@ class GameState:
             p.bullet_decel = 0.0
         p.bullet_linger    = int(char_cfg.get("bullet_linger", 0) * 60)  # 秒→tick
         p.bullet_speed_min = float(char_cfg.get("bullet_speed_min", 0)) * BULLET_SPEED
-        p.dot_interval     = int(char_cfg.get("dot_interval", 0))
+        p.dot_interval       = int(char_cfg.get("dot_interval", 0))
+        p.shoot_slow         = float(char_cfg.get("shoot_slow", 1.0))
+        p._shoot_slow_ticks  = int(char_cfg.get("shoot_slow_dur", 0))
+        p._shoot_slow_timer  = 0
+        p.pellet_interval    = float(char_cfg.get("pellet_interval", 0.0))
 
     def apply_command(self, player_id: int, dx: float, dy: float,
                       shooting: bool, aim_x: float, aim_y: float,
@@ -157,7 +167,13 @@ class GameState:
         if player_id not in self.players:
             return
         player = self.players[player_id]
-        player.move(dx, dy, crouching)
+        # 射擊觸發計時器；計時器倒數中套用移動懲罰
+        if shooting:
+            player._shoot_slow_timer = player._shoot_slow_ticks
+        elif player._shoot_slow_timer > 0:
+            player._shoot_slow_timer -= 1
+        mult = player.shoot_slow if player._shoot_slow_timer > 0 else 1.0
+        player.move(dx, dy, crouching, speed_mult=mult)
         player.stance = stance
         if math.hypot(aim_x, aim_y) > 0:
             player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
@@ -179,7 +195,7 @@ class GameState:
         spawn_x = player.x + ux * barrel_fwd + rx * barrel_right
         spawn_y = player.y + uy * barrel_fwd + ry * barrel_right
 
-        for _ in range(player.pellet_count):
+        for pellet_i in range(player.pellet_count):
             # 每顆散彈獨立隨機偏角
             pux, puy = ux, uy
             if player.spread > 0:
@@ -198,13 +214,15 @@ class GameState:
             # 射程：減速子彈靠速度歸零消失，無需限制距離
             if player.bullet_decel > 0:
                 pellet_range = BULLET_MAX_RANGE * 999
+            elif math.isinf(player.bullet_range):
+                pellet_range = player.bullet_range   # inf：子彈永遠不因距離消失
             elif player.bullet_range_min > 0:
                 pellet_range = random.uniform(player.bullet_range_min, player.bullet_range)
             else:
                 pellet_range = player.bullet_range
             bid = self._next_bullet_id
             self._next_bullet_id = (self._next_bullet_id + 1) % 256
-            self.bullets[bid] = Bullet(
+            bullet = Bullet(
                 id=bid, owner_id=owner_id,
                 x=spawn_x, y=spawn_y,
                 dx=ndx, dy=ndy,
@@ -219,6 +237,24 @@ class GameState:
                     if player.dot_interval > 0 else 0.0
                 ),
             )
+            # pellet_interval > 0：第一顆立即發射，其餘排進待發佇列
+            if player.pellet_interval > 0 and pellet_i > 0:
+                fire_tick = self.tick + pellet_i * player.pellet_interval
+                self._pending_pellets.append((fire_tick, bullet))
+            else:
+                self.bullets[bid] = bullet
+
+    def step_pending_pellets(self) -> None:
+        """將佇列中到達發射時間的散彈加入戰場。"""
+        if not self._pending_pellets:
+            return
+        remaining = []
+        for fire_tick, bullet in self._pending_pellets:
+            if self.tick >= fire_tick:
+                self.bullets[bullet.id] = bullet
+            else:
+                remaining.append((fire_tick, bullet))
+        self._pending_pellets = remaining
 
     def step_bullets(self, obstacles: dict = None,
                      obstacle_hp: dict = None) -> None:

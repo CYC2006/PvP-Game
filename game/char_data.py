@@ -49,25 +49,28 @@ def _load() -> tuple[dict, list]:
             'folder':       s('folder'),
             'hp':           i('hp'),
             'speed':        f('speed_pxs') / _TICK_RATE,        # px/s → px/tick
-            'gun':          s('gun'),
-            'damage_min':   i('dmg_min'),
-            'damage_max':   i('dmg_max'),
-            'mag':          s('mag'),
-            'fire_rate':    f('fire_rate'),
-            'reload_time':  f('reload_time'),
-            'bullet_speed': f('bspeed_pxs') / _BSPEED_DENOM,   # px/s → 乘數
-            'spread':       f('spread'),
+            'gun':           s('gun'),
+            'damage_min':    i('dmg_min'),
+            'damage_max':    i('dmg_max'),
+            'mag':           s('mag'),
+            'fire_interval': f('fire_interval'),    # 每次射擊間隔（秒）
+            'reload_time':   f('reload_time'),
+            'bullet_speed':  f('bspeed_pxs') / _BSPEED_DENOM,   # px/s → 乘數
+            'spread':        f('spread'),
         }
 
         # 特殊武器欄位（空白 → 略過；apply_char_stats 會用預設值）
         _opt = [
-            ('bspeed_min_pxs', 'bullet_speed_min', lambda v: float(v) / _BSPEED_DENOM),
-            ('pellet_count',   'pellet_count',      lambda v: int(v)),
-            ('bullet_range',   'bullet_range',      lambda v: float(v)),
-            ('range_min',      'bullet_range_min',  lambda v: float(v)),
-            ('lifetime',       'bullet_lifetime',   lambda v: float(v)),
-            ('linger',         'bullet_linger',     lambda v: float(v)),
-            ('dot_interval',   'dot_interval',      lambda v: int(v)),
+            ('bspeed_min_pxs',        'bullet_speed_min', lambda v: float(v) / _BSPEED_DENOM),
+            ('pellet_count',          'pellet_count',      lambda v: int(float(v))),
+            ('pellet_interval(tick)', 'pellet_interval',   lambda v: float(v)),
+            ('shoot_slow',           'shoot_slow',         lambda v: float(v)),
+            ('shoot_slow_dur(tick)', 'shoot_slow_dur',     lambda v: int(float(v))),
+            ('brange_px',             'bullet_range',      lambda v: float(v)),
+            ('brange_min_px',         'bullet_range_min',  lambda v: float(v)),
+            ('lifetime',              'bullet_lifetime',   lambda v: float(v)),
+            ('linger',                'bullet_linger',     lambda v: float(v)),
+            ('dot_interval',          'dot_interval',      lambda v: int(float(v))),
         ]
         for csv_col, stat_key, conv in _opt:
             v = row.get(csv_col, '').strip()

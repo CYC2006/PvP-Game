@@ -22,8 +22,8 @@ def init_char(char_key: str) -> None:
 
     from game.char_data import get_stat
 
-    rate = get_stat(char_key, "fire_rate")
-    SHOOT_COOLDOWN_MS = int(1000 / rate) if rate and rate > 0 else 9999
+    interval = get_stat(char_key, "fire_interval")
+    SHOOT_COOLDOWN_MS = int(interval * 1000) if interval and interval > 0 else 9999
 
     mag_str = get_stat(char_key, "mag")
     MAGAZINE_SIZE = int(mag_str) if mag_str and str(mag_str).strip().isdigit() else 9999

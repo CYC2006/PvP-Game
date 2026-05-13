@@ -117,12 +117,15 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
     for bid, (bx, by) in _prev_bullet_pos.items():
         if bid not in cur_ids and obstacles:
             # 先看是否打中本幀才摧毀的障礙物（給它震動但不重複生成粒子）
+            # 偵測半徑：子彈半徑 + 小緩衝（補償伺服器/渲染器之間的一幀延遲）
+            # 不用 obs 尺寸比例，避免射程耗盡的散彈誤觸發鄰近障礙物震動
+            HIT_CHECK_R = BULLET_RADIUS + 10
+
             hit_newly = False
             for oid in newly_destroyed:
                 if oid in obstacles:
                     obs = obstacles[oid]
-                    check_r = BULLET_RADIUS + max(obs.width, obs.height) * 0.55
-                    if obs.collides_circle(bx, by, check_r):
+                    if obs.collides_circle(bx, by, HIT_CHECK_R):
                         hit_newly = True
                         break
             if hit_newly:
@@ -132,8 +135,7 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
             for oid, obs in obstacles.items():
                 if oid in skip_oids:
                     continue
-                check_r = BULLET_RADIUS + max(obs.width, obs.height) * 0.55
-                if obs.collides_circle(bx, by, check_r):
+                if obs.collides_circle(bx, by, HIT_CHECK_R):
                     dur = random.uniform(0.2, 0.3)
                     _shake_timers[oid] = (now + dur, dur)
                     _spawn_particles(bx, by, obs.kind)
