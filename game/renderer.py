@@ -481,8 +481,8 @@ def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float):
         pygame.draw.polygon(screen, dim,   _rot_pts(sx, sy, body, a))
         pygame.draw.polygon(screen, color, _rot_pts(sx, sy, tip,  a))
 
-    elif char_key == "soldier1":        # Soldier — 菱形（6×6）
-        pts = [(0, -6), (4, 0), (0, 6), (-4, 0)]
+    elif char_key == "soldier1":        # Soldier — 與 Machine Gun 相同的短矩形彈殼（10×4）
+        pts = [(-5, -2), (5, -2), (5, 2), (-5, 2)]
         pygame.draw.polygon(screen, color, _rot_pts(sx, sy, pts, a))
 
     elif char_key == "survivor1":       # Assassin — 旋轉手裡劍（4角星）

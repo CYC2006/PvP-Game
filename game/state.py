@@ -39,12 +39,11 @@ class Player:
     aim_angle: float        = 0.0   # 瞄準角度（度），0=上, 90=右；同步給對手
     stance: str             = "stand"  # "stand" | "machine" | "hold" | "reload"
 
-    def move(self, dx: float, dy: float, crouching: bool = False,
-             speed_mult: float = 1.0) -> None:
+    def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
         if length > 0:
             dx, dy = dx / length, dy / length
-        speed = self.speed * (0.5 if crouching else 1.0) * speed_mult
+        speed = self.speed * speed_mult
         self.x = max(PLAYER_RADIUS, min(MAP_WIDTH  - PLAYER_RADIUS, self.x + dx * speed))
         self.y = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS, self.y + dy * speed))
 
@@ -163,17 +162,22 @@ class GameState:
 
     def apply_command(self, player_id: int, dx: float, dy: float,
                       shooting: bool, aim_x: float, aim_y: float,
-                      crouching: bool = False, stance: str = "stand") -> None:
+                      running: bool = False, stance: str = "machine") -> None:
         if player_id not in self.players:
             return
         player = self.players[player_id]
-        # 射擊觸發計時器；計時器倒數中套用移動懲罰
+        # 射擊觸發計時器；計時器倒數中套用移動懲罰（shoot_slow 優先於 run）
         if shooting:
             player._shoot_slow_timer = player._shoot_slow_ticks
         elif player._shoot_slow_timer > 0:
             player._shoot_slow_timer -= 1
-        mult = player.shoot_slow if player._shoot_slow_timer > 0 else 1.0
-        player.move(dx, dy, crouching, speed_mult=mult)
+        if player._shoot_slow_timer > 0:
+            mult = player.shoot_slow   # 射擊僵直：速度下降
+        elif running:
+            mult = 1.2                 # 跑步：速度 ×1.2
+        else:
+            mult = 1.0
+        player.move(dx, dy, speed_mult=mult)
         player.stance = stance
         if math.hypot(aim_x, aim_y) > 0:
             player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))

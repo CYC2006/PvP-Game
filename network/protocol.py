@@ -43,9 +43,9 @@ def unpack_joined(data: bytes) -> int:
 
 
 def pack_command(cmd: PlayerCommand) -> bytes:
-    # bit 0 = shooting, bit 1 = crouching, bits 2-3 = stance
+    # bit 0 = shooting, bit 1 = running, bits 2-3 = stance
     stance_bits = _STANCE_TO_INT.get(cmd.stance, 0) << 2
-    flags = int(cmd.shooting) | (int(cmd.crouching) << 1) | stance_bits
+    flags = int(cmd.shooting) | (int(cmd.running) << 1) | stance_bits
     return _CMD_STRUCT.pack(
         PKT_CMD, cmd.player_id,
         cmd.move_x, cmd.move_y,
@@ -56,10 +56,10 @@ def pack_command(cmd: PlayerCommand) -> bytes:
 
 def unpack_command(data: bytes) -> PlayerCommand:
     _, pid, mx, my, flags, ax, ay = _CMD_STRUCT.unpack(data[:_CMD_STRUCT.size])
-    stance = _INT_TO_STANCE.get((flags >> 2) & 0x03, "stand")
+    stance = _INT_TO_STANCE.get((flags >> 2) & 0x03, "machine")
     return PlayerCommand(player_id=pid, move_x=mx, move_y=my,
                          shooting=bool(flags & 0x01), aim_x=ax, aim_y=ay,
-                         crouching=bool(flags & 0x02), stance=stance)
+                         running=bool(flags & 0x02), stance=stance)
 
 
 def pack_state(state: GameState) -> bytes:

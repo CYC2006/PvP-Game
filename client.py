@@ -160,24 +160,20 @@ def run(server_ip: str) -> None:
     state      = GameState()
     keys_held: set = set()
     fullscreen = False
-    stance     = "stand"
-
-    running = True
-    while running:
+    game_running = True
+    while game_running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                game_running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
+                    game_running = False
                 elif event.key == pygame.K_F11:
                     fullscreen = not fullscreen
                     if fullscreen:
                         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
                     else:
                         screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
-                elif event.key == pygame.K_e:
-                    stance = "machine" if stance == "stand" else "stand"
                 keys_held.add(event.key)
             elif event.type == pygame.KEYUP:
                 keys_held.discard(event.key)
@@ -189,7 +185,7 @@ def run(server_ip: str) -> None:
 
         shift_held = (pygame.K_LSHIFT in keys_held or pygame.K_RSHIFT in keys_held)
         cmd, effective_stance, ammo, is_reloading = read_input(
-            player_id, keys_held, logical_mouse, stance, shift_held)
+            player_id, keys_held, logical_mouse, shift_held)
         aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
         try:
             sock.sendto(pack_command(cmd), server_addr)

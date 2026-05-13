@@ -9,5 +9,5 @@ class PlayerCommand:
     shooting: bool      # left mouse button held
     aim_x: float        # world-space direction vector (not normalised)
     aim_y: float
-    crouching: bool = False  # shift + movement → hold stance, 0.5× speed
-    stance: str = "stand"   # "stand" | "machine" | "hold"（同步給對手）
+    running: bool = False    # shift held → run, 1.2× speed
+    stance: str = "machine" # "machine" | "reload"（同步給對手）

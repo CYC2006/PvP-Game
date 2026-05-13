@@ -40,14 +40,12 @@ def init_char(char_key: str) -> None:
 
 def read_input(player_id: int, keys_held: set,
                logical_mouse: tuple,
-               stance: str,
                shift_held: bool) -> tuple:
     """
-    stance      : "stand" | "machine"（由 client 透過 E 鍵切換）
-    shift_held  : Shift 是否被按住
+    shift_held  : Shift 是否被按住（run 模式，速度 ×1.2）
 
     回傳 (PlayerCommand, effective_stance, ammo, is_reloading)
-    effective_stance : "stand" | "machine" | "hold" | "reload"
+    effective_stance : "machine" | "reload"
     """
     global _last_shot_time, _ammo, _reloading, _reload_start_ms
 
@@ -57,7 +55,7 @@ def read_input(player_id: int, keys_held: set,
     if pygame.K_a in keys_held or pygame.K_LEFT  in keys_held: dx -= 1.0
     if pygame.K_d in keys_held or pygame.K_RIGHT in keys_held: dx += 1.0
 
-    crouching = shift_held
+    running = shift_held
 
     now = pygame.time.get_ticks()
 
@@ -66,13 +64,8 @@ def read_input(player_id: int, keys_held: set,
         _reloading = False
         _ammo      = MAGAZINE_SIZE
 
-    # ── effective_stance：換彈期間固定 reload，不受 Shift 影響 ──
-    if _reloading:
-        effective_stance = "reload"
-    elif crouching:
-        effective_stance = "hold"
-    else:
-        effective_stance = stance
+    # ── effective_stance：換彈期間固定 reload，否則一律 machine ──
+    effective_stance = "reload" if _reloading else "machine"
 
     from game.renderer import LOGICAL_W, LOGICAL_H
     lx, ly = logical_mouse
@@ -82,7 +75,6 @@ def read_input(player_id: int, keys_held: set,
     # ── 射擊（換彈中禁止）────────────────────────────────────────
     shooting = False
     if (not _reloading
-            and effective_stance == "machine"
             and pygame.mouse.get_pressed()[0]
             and (now - _last_shot_time) >= SHOOT_COOLDOWN_MS):
         shooting        = True
@@ -99,7 +91,7 @@ def read_input(player_id: int, keys_held: set,
         move_x=dx, move_y=dy,
         shooting=shooting,
         aim_x=aim_x, aim_y=aim_y,
-        crouching=crouching,
+        running=running,
         stance=effective_stance,
     )
     return cmd, effective_stance, _ammo, _reloading

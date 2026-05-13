@@ -112,7 +112,7 @@ def run():
                         cmd.player_id,
                         cmd.move_x, cmd.move_y,
                         cmd.shooting, cmd.aim_x, cmd.aim_y,
-                        cmd.crouching, cmd.stance,
+                        cmd.running, cmd.stance,
                     )
 
         # ── 斷線偵測（遊戲中才檢查）─────────────────────────────
