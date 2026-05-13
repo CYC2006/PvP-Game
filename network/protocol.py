@@ -18,7 +18,7 @@ PKT_GAME_START  = 0x06   # server → clients: 雙方都選完，遊戲開始
 #   | g_count(B) | [id(B) x(f) y(f)] * g_count |
 
 _JOINED_STRUCT = struct.Struct("!BB")
-_CMD_STRUCT    = struct.Struct("!BBffBff")
+_CMD_STRUCT    = struct.Struct("!BBffBffH")  # +H: speed_mult×1000
 _STATE_HDR     = struct.Struct("!BI")
 _PLAYER_ENTRY  = struct.Struct("!BffHHhBH")  # id x y hp max_hp aim_angle stance gold
 _BULLET_ENTRY  = struct.Struct("!BBffh")      # id owner x y angle_i16
@@ -46,20 +46,23 @@ def pack_command(cmd: PlayerCommand) -> bytes:
     # bit 0 = shooting, bit 1 = running, bits 2-3 = stance
     stance_bits = _STANCE_TO_INT.get(cmd.stance, 0) << 2
     flags = int(cmd.shooting) | (int(cmd.running) << 1) | stance_bits
+    speed_raw = max(0, min(65535, int(cmd.speed_mult * 1000)))
     return _CMD_STRUCT.pack(
         PKT_CMD, cmd.player_id,
         cmd.move_x, cmd.move_y,
         flags,
         cmd.aim_x, cmd.aim_y,
+        speed_raw,
     )
 
 
 def unpack_command(data: bytes) -> PlayerCommand:
-    _, pid, mx, my, flags, ax, ay = _CMD_STRUCT.unpack(data[:_CMD_STRUCT.size])
+    _, pid, mx, my, flags, ax, ay, speed_raw = _CMD_STRUCT.unpack(data[:_CMD_STRUCT.size])
     stance = _INT_TO_STANCE.get((flags >> 2) & 0x03, "machine")
     return PlayerCommand(player_id=pid, move_x=mx, move_y=my,
                          shooting=bool(flags & 0x01), aim_x=ax, aim_y=ay,
-                         running=bool(flags & 0x02), stance=stance)
+                         running=bool(flags & 0x02), stance=stance,
+                         speed_mult=speed_raw / 1000.0)
 
 
 def pack_state(state: GameState) -> bytes:

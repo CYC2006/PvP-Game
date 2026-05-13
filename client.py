@@ -184,7 +184,7 @@ def run(server_ip: str) -> None:
         logical_mouse  = screen_to_logical(raw_mx, raw_my, off_x, off_y, scale)
 
         shift_held = (pygame.K_LSHIFT in keys_held or pygame.K_RSHIFT in keys_held)
-        cmd, effective_stance, ammo, is_reloading = read_input(
+        cmd, effective_stance, ammo, is_reloading, skill_cooldowns = read_input(
             player_id, keys_held, logical_mouse, shift_held)
         aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
         try:
@@ -205,7 +205,7 @@ def run(server_ip: str) -> None:
 
         draw(logical_surf, state, player_id, font_sm, obstacles,
              effective_stance, aim_angle_deg, ammo, is_reloading,
-             player_chars)
+             player_chars, skill_cooldowns)
 
         screen.fill((0, 0, 0))
         scaled = pygame.transform.scale(logical_surf, (scaled_w, scaled_h))

@@ -5,8 +5,14 @@ chars.csv 速度欄位說明：
   speed_pxs        移動速度（px/s）；÷60 → px/tick 存入 CHAR_STATS['speed']
   bspeed_pxs       子彈速度（px/s）；÷480 → 乘數 存入 CHAR_STATS['bullet_speed']
   bspeed_min_pxs   子彈初速下限（px/s）；同上換算
+  cd_rmb/cd_space/cd_e/cd_r  各技能冷卻（秒）；0 = 技能未實作
 
-對外介面與原來完全相同：
+角色專屬子彈屬性（不通用，不放 CSV，在 _CHAR_EXTRA 硬寫）：
+  bullet_lifetime  子彈存活時間（秒，用於 womanGreen 毒氣泡）
+  bullet_linger    子彈停止後殘留秒數
+  dot_interval     DoT 每 N tick 傷害一次
+
+對外介面：
   CHAR_STATS   dict[char_key → stat dict]
   CHAR_ORDER   list[char_key]（依 CSV 行序）
   get_stat(char_key, stat, level=0)
@@ -15,10 +21,19 @@ chars.csv 速度欄位說明：
 import csv
 import os
 
-_CSV_PATH   = os.path.join(os.path.dirname(__file__), '..', 'chars.csv')
-_TICK_RATE  = 60       # fps
-_BULLET_BASE = 8.0     # BULLET_SPEED (px/tick) in state.py
+_CSV_PATH     = os.path.join(os.path.dirname(__file__), '..', 'chars.csv')
+_TICK_RATE    = 60
+_BULLET_BASE  = 8.0
 _BSPEED_DENOM = _BULLET_BASE * _TICK_RATE   # 480：px/s → 乘數 換算基底
+
+# 不通用的子彈屬性，不放 CSV，按角色硬寫
+_CHAR_EXTRA: dict = {
+    'womanGreen': {
+        'bullet_lifetime': 1.0,   # 秒
+        'bullet_linger':   1.0,   # 秒（停止後殘留）
+        'dot_interval':    30,    # tick
+    },
+}
 
 
 def _load() -> tuple[dict, list]:
@@ -68,14 +83,20 @@ def _load() -> tuple[dict, list]:
             ('shoot_slow_dur(tick)', 'shoot_slow_dur',     lambda v: int(float(v))),
             ('brange_px',             'bullet_range',      lambda v: float(v)),
             ('brange_min_px',         'bullet_range_min',  lambda v: float(v)),
-            ('lifetime',              'bullet_lifetime',   lambda v: float(v)),
-            ('linger',                'bullet_linger',     lambda v: float(v)),
-            ('dot_interval',          'dot_interval',      lambda v: int(float(v))),
+            # 技能冷卻（秒），0 = 技能未實作
+            ('cd_rmb',   'cd_rmb',   lambda v: float(v)),
+            ('cd_space', 'cd_space', lambda v: float(v)),
+            ('cd_e',     'cd_e',     lambda v: float(v)),
+            ('cd_r',     'cd_r',     lambda v: float(v)),
         ]
         for csv_col, stat_key, conv in _opt:
             v = row.get(csv_col, '').strip()
             if v:
                 d[stat_key] = conv(v)
+
+        # 角色專屬子彈屬性（不通用，從 _CHAR_EXTRA 補入）
+        for k, val in _CHAR_EXTRA.get(key, {}).items():
+            d[k] = val
 
         # damage 顯示字串：由 dmg_min/dmg_max/pellet_count 自動生成
         dmin, dmax = d['damage_min'], d['damage_max']

@@ -163,7 +163,8 @@ class GameState:
 
     def apply_command(self, player_id: int, dx: float, dy: float,
                       shooting: bool, aim_x: float, aim_y: float,
-                      running: bool = False, stance: str = "machine") -> None:
+                      running: bool = False, stance: str = "machine",
+                      speed_mult: float = 1.0) -> None:
         if player_id not in self.players:
             return
         player = self.players[player_id]
@@ -172,7 +173,9 @@ class GameState:
             player._shoot_slow_timer = player._shoot_slow_ticks
         elif player._shoot_slow_timer > 0:
             player._shoot_slow_timer -= 1
-        if player._shoot_slow_timer > 0:
+        if speed_mult != 1.0:
+            mult = speed_mult          # 技能位移（衝刺等）：最高優先
+        elif player._shoot_slow_timer > 0:
             mult = player.shoot_slow   # 射擊僵直：速度下降
         elif running:
             mult = 1.2                 # 跑步：速度 ×1.2

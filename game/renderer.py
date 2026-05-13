@@ -33,6 +33,20 @@ HP_BAR_H             = 18
 HP_PIP_GAP           = 4
 PLAYER_SPRITE_SCALE  = 1.5   # 原圖 33–54 × 43 px，放大後約 50–81 × 65 px
 
+SKILL_CIRCLE_R   = 14
+SKILL_CIRCLE_GAP = 6
+SKILL_STEP       = SKILL_CIRCLE_R * 2 + SKILL_CIRCLE_GAP   # 34 px
+_SKILL_SLOTS     = ('space', 'e', 'r', 'rmb')
+_SKILL_LABELS    = ('SP', 'E', 'R', 'MB')
+
+COL_SKILL_READY_BORDER = (220, 220, 255)
+COL_SKILL_CD_BORDER    = ( 80,  80,  80)
+COL_SKILL_NONE_BORDER  = ( 50,  50,  50)
+COL_SKILL_READY_TEXT   = (255, 255, 255)
+COL_SKILL_CD_TEXT      = (180, 180, 180)
+COL_SKILL_NONE_TEXT    = ( 70,  70,  70)
+COL_SKILL_FILL         = ( 25,  25,  38)
+
 # 角色定義：char_key → (資料夾名稱, 檔名前綴)
 # folder 來自 chars.csv，不在此處維護
 from game.char_data import CHAR_STATS as _CHAR_STATS
@@ -324,7 +338,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
          font: pygame.font.Font, obstacles: dict = None,
          my_stance: str = "stand", aim_angle_deg: float = 0.0,
          ammo: int = MAGAZINE_SIZE, is_reloading: bool = False,
-         player_chars: dict = None) -> None:
+         player_chars: dict = None,
+         skill_cooldowns: dict = None) -> None:
     # player_chars: {pid: char_key}，None 時全部用 hitman1
     screen.fill(COL_BG)
 
@@ -353,7 +368,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _draw_trees(screen, obstacles, state.destroyed_obstacles,
                     cx, cy, me.x, me.y)
 
-    _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading)
+    _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns)
 
 
 # ── 地圖底層 ──────────────────────────────────────────────────────────────────
@@ -550,6 +565,30 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
 
 # ── 玩家 ──────────────────────────────────────────────────────────────────────
 
+def _spawn_dash_dust(px: float, py: float) -> None:
+    """衝刺時在玩家後方噴出灰塵粒子（每幀 3 顆）。"""
+    import game.input as _inp
+    if not _inp._dash_active:
+        return
+    now  = time.perf_counter()
+    ddx, ddy = _inp._dash_dx, _inp._dash_dy
+    base = math.atan2(-ddy, -ddx)          # 衝刺反方向
+    dust_cols = [(190, 180, 165), (168, 160, 148), (210, 202, 188)]
+    for _ in range(3):
+        angle = base + random.uniform(-0.65, 0.65)
+        speed = random.uniform(25, 70)
+        _particles.append([
+            px + random.uniform(-7, 7),
+            py + random.uniform(-7, 7),
+            math.cos(angle) * speed,
+            math.sin(angle) * speed,
+            now,
+            random.uniform(0.12, 0.28),
+            random.choice(dust_cols),
+            random.uniform(2.0, 4.5),
+        ])
+
+
 def _draw_players(screen, state, my_id, cx, cy, font,
                   my_stance="stand", aim_angle_deg=0.0, player_chars=None):
     if player_chars is None:
@@ -564,9 +603,10 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         if pid == my_id:
             stance = my_stance
             angle  = aim_angle_deg
+            _spawn_dash_dust(player.x, player.y)   # 衝刺灰塵
         else:
-            stance = player.stance       # 從 server 同步的 stance
-            angle  = player.aim_angle    # 從 server 同步的瞄準角度
+            stance = player.stance
+            angle  = player.aim_angle
 
         char_key = player_chars.get(pid, "hitman1")
         sprite   = _get_player_sprite(char_key, stance)
@@ -581,10 +621,6 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             head_y = sy - rotated.get_height() // 2 - 10
             _draw_opponent_hp_bar(screen, player.hp, player.max_hp, sx, head_y)
 
-        # 玩家名稱標籤
-        label_y = sy - rotated.get_height() // 2 - 20
-        label = font.render(f"P{pid}", True, COL_TEXT)
-        screen.blit(label, (sx - label.get_width() // 2, label_y))
 
 
 def _draw_opponent_hp_bar(screen, hp: int, max_hp: int, cx: int, y: int):
@@ -603,19 +639,20 @@ def _draw_opponent_hp_bar(screen, hp: int, max_hp: int, cx: int, y: int):
 # ── HUD ──────────────────────────────────────────────────────────────────────
 
 def _draw_hud(screen, state, my_id, font, my_stance="stand",
-              ammo: int = MAGAZINE_SIZE, is_reloading: bool = False):
+              ammo: int = MAGAZINE_SIZE, is_reloading: bool = False,
+              skill_cooldowns: dict = None):
     if my_id in state.players:
         me = state.players[my_id]
         screen.blit(font.render(f"Tick {state.tick}", True, COL_TEXT), (8, 8))
         screen.blit(font.render(f"P{my_id}  ({int(me.x)}, {int(me.y)})", True, COL_TEXT), (8, 26))
         stance_col = COL_STANCE.get(my_stance, COL_TEXT)
         screen.blit(font.render(f"[E] {my_stance.upper()}", True, stance_col), (8, 44))
-        # 彈藥 HUD
         _draw_ammo_hud(screen, font, ammo, is_reloading)
-        # 金錠計數
         gold = state.gold_counts.get(my_id, 0)
         gold_surf = font.render(f"◆ {gold}", True, (255, 215, 0))
         screen.blit(gold_surf, (8, 62))
+    if skill_cooldowns:
+        _draw_skill_hud(screen, font, skill_cooldowns)
     _draw_hp_bar(screen, state, my_id, font)
 
 
@@ -651,6 +688,63 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
         label = font.render(f"AMMO  {ammo_display} / {mag_display}", True, col)
 
     screen.blit(label, (bar_x + bar_w - label.get_width(), ammo_y - 18))
+
+
+def _draw_skill_hud(screen, font, skill_cooldowns: dict) -> None:
+    """血條上方四個技能冷卻圓圈。"""
+    bar_y = SCREEN_H - HP_BAR_Y_FROM_BOTTOM
+    # 圓圈中心 y：血條頂端往上 18px（HP label）再往上 5px + 圓半徑
+    cy = bar_y - 18 - 5 - SKILL_CIRCLE_R   # ≈ 633
+
+    for i, (slot, label) in enumerate(zip(_SKILL_SLOTS, _SKILL_LABELS)):
+        cx = HP_BAR_X + SKILL_CIRCLE_R + i * SKILL_STEP
+
+        remaining_ms, max_ms = skill_cooldowns.get(slot, (-1, -1))
+
+        if remaining_ms == -1:                # 未實作
+            border_col = COL_SKILL_NONE_BORDER
+            text_col   = COL_SKILL_NONE_TEXT
+            text       = '?'
+        elif remaining_ms == 0:               # 就緒
+            border_col = COL_SKILL_READY_BORDER
+            text_col   = COL_SKILL_READY_TEXT
+            text       = label
+        else:                                 # 冷卻中
+            border_col = COL_SKILL_CD_BORDER
+            text_col   = COL_SKILL_CD_TEXT
+            secs       = remaining_ms / 1000.0
+            text       = f"{secs:.0f}" if secs >= 1.0 else f"{secs:.1f}"
+
+        # ── 背景填充 ──────────────────────────────────────────────
+        surf = pygame.Surface((SKILL_CIRCLE_R * 2, SKILL_CIRCLE_R * 2), pygame.SRCALPHA)
+        pygame.draw.circle(surf, (*COL_SKILL_FILL, 200),
+                           (SKILL_CIRCLE_R, SKILL_CIRCLE_R), SKILL_CIRCLE_R)
+        screen.blit(surf, (cx - SKILL_CIRCLE_R, cy - SKILL_CIRCLE_R))
+
+        # ── 冷卻覆蓋（暗色扇形）────────────────────────────────────
+        if 0 < remaining_ms and max_ms > 0:
+            fraction = remaining_ms / max_ms
+            steps    = max(4, int(fraction * 32))
+            start_a  = -math.pi / 2              # 12 點鐘方向
+            sweep    = math.tau * fraction        # 順時針覆蓋
+            pts      = [(cx, cy)]
+            for j in range(steps + 1):
+                a = start_a + sweep * j / steps
+                pts.append((cx + SKILL_CIRCLE_R * math.cos(a),
+                             cy + SKILL_CIRCLE_R * math.sin(a)))
+            pie = pygame.Surface((SKILL_CIRCLE_R * 2 + 2, SKILL_CIRCLE_R * 2 + 2),
+                                  pygame.SRCALPHA)
+            lpts = [(x - cx + SKILL_CIRCLE_R + 1, y - cy + SKILL_CIRCLE_R + 1)
+                    for x, y in pts]
+            pygame.draw.polygon(pie, (10, 10, 20, 180), lpts)
+            screen.blit(pie, (cx - SKILL_CIRCLE_R - 1, cy - SKILL_CIRCLE_R - 1))
+
+        # ── 外框 ──────────────────────────────────────────────────
+        pygame.draw.circle(screen, border_col, (cx, cy), SKILL_CIRCLE_R, 2)
+
+        # ── 文字（居中）──────────────────────────────────────────────
+        txt = font.render(text, True, text_col)
+        screen.blit(txt, (cx - txt.get_width() // 2, cy - txt.get_height() // 2))
 
 
 def _draw_hp_bar(screen, state, my_id, font):
