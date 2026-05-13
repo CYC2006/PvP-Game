@@ -71,6 +71,8 @@ _bubble_max_radius: dict = {}
 _flash_bullet_pos: dict = {}
 # 爆炸特效佇列：[(world_x, world_y, spawn_perf_time)]
 _flash_explosions: list = []
+# 閃光彈旋轉角度累積：bid → 累積 radians
+_flash_spin_angle: dict = {}
 
 SHAKE_AMP  = 5    # 最大位移像素
 SHAKE_FREQ = 40   # 振盪頻率 Hz
@@ -162,7 +164,8 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
 
     _prev_bullet_pos.clear()
     for bid, b in state.bullets.items():
-        _prev_bullet_pos[bid] = (b.x, b.y)
+        if getattr(b, 'bullet_type', 0) == 0:   # 閃光彈不參與震動偵測
+            _prev_bullet_pos[bid] = (b.x, b.y)
 
 
 def _shake_offset(oid: int) -> tuple:
@@ -556,6 +559,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
     for bid in list(_flash_bullet_pos):
         if bid not in current_flash:
             del _flash_bullet_pos[bid]
+            _flash_spin_angle.pop(bid, None)
 
     for bullet in state.bullets.values():
         sx, sy = _ws(bullet.x, bullet.y, cx, cy)
@@ -563,11 +567,22 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
-            # ── 閃光彈 ───────────────────────────────────────────
+            # ── 閃光彈：等減速旋轉長方形 ─────────────────────────
             if getattr(bullet, 'bullet_type', 0) == 1:
+                prev_pos = _flash_bullet_pos.get(bullet.id)
+                speed = (math.hypot(bullet.x - prev_pos[0], bullet.y - prev_pos[1])
+                         if prev_pos else 0.0)     # 從位置差推算速度
                 _flash_bullet_pos[bullet.id] = (bullet.x, bullet.y)
-                pygame.draw.circle(screen, (80, 100, 50), (sx, sy), 7)
-                pygame.draw.circle(screen, (130, 155, 80), (sx, sy), 7, 2)
+                prev  = _flash_spin_angle.get(bullet.id, 0.0)
+                angle = prev + speed * 0.06        # 速度比例旋轉；停止後角度鎖定
+                _flash_spin_angle[bullet.id] = angle
+                a    = angle
+                hw, hh = 8, 4
+                pts  = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+                rpts = [(sx + x*math.cos(a) - y*math.sin(a),
+                         sy + x*math.sin(a) + y*math.cos(a)) for x, y in pts]
+                pygame.draw.polygon(screen, color, rpts)
+                pygame.draw.polygon(screen, (255, 255, 255), rpts, 1)
                 continue
 
             if char_key == "womanGreen":
@@ -618,7 +633,7 @@ def _draw_flash_screen(screen, state, my_id: int) -> None:
     ft = getattr(state.players[my_id], 'flash_ticks', 0)
     if ft <= 0:
         return
-    alpha = 255 if ft > 60 else int(255 * ft / 60)
+    alpha = 255 if ft > 120 else int(255 * ft / 120)  # >120: 全白; 1~120: 2秒漸退
     overlay = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
     overlay.fill((255, 255, 255, alpha))
     screen.blit(overlay, (0, 0))

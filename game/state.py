@@ -347,10 +347,7 @@ class GameState:
                     continue
                 if obs.collides_circle(bullet.x, bullet.y, coll_r):
                     if bullet.bullet_type == 1:
-                        # 閃光彈：撞牆原地停止，繼續等待爆炸
-                        bullet.dx = 0.0
-                        bullet.dy = 0.0
-                        break
+                        continue   # 閃光彈無視障礙物，繼續飛行
                     if bullet.dot_interval > 0:
                         # DoT 子彈（毒氣泡）：撞牆時停住，不消失，持續傷害障礙物
                         if bullet.dx != 0.0 or bullet.dy != 0.0:
@@ -454,7 +451,7 @@ class GameState:
     # ── 技能相關 ──────────────────────────────────────────────────────────────────
 
     _FLASH_RADIUS = 120.0
-    _FLASH_TICKS  = 120   # 2 秒 × 60 fps
+    _FLASH_TICKS  = 180   # 1s 全白 + 2s 恢復 × 60 fps
 
     def _spawn_flash_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         player = self.players.get(owner_id)
@@ -464,9 +461,9 @@ class GameState:
         if length == 0:
             return
         ux, uy = aim_x / length, aim_y / length
-        SPEED  = 8.0    # px/tick（480 px/s）
-        DECEL  = 0.2    # px/tick² → 停止距離 ≈ 160 px
-        LINGER = 60     # 停止後等待 1 秒
+        SPEED  = 8.8    # px/tick → 停止距離 ≈ 198 px（原 160 px 的 1.2 倍）
+        DECEL  = 0.2    # px/tick²
+        LINGER = 12     # 停止後等待 0.2 秒
         bid = self._next_bullet_id
         self._next_bullet_id = (self._next_bullet_id + 1) % 256
         self.bullets[bid] = Bullet(
