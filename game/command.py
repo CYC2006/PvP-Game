@@ -12,3 +12,4 @@ class PlayerCommand:
     running: bool = False    # shift held → run, 1.2× speed
     stance: str = "machine" # "machine" | "reload"（同步給對手）
     speed_mult: float = 1.0 # 技能位移倍率（衝刺時 > 1.0）
+    use_skill_e: bool = False

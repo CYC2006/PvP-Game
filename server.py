@@ -108,6 +108,12 @@ def run():
             elif ptype == PKT_CMD:
                 if addr in addr_to_id and game_started:
                     cmd = unpack_command(data)
+                    # 技能觸發（依角色 char_key 判斷）
+                    if cmd.use_skill_e:
+                        p = state.players.get(cmd.player_id)
+                        if p and p.char_key == 'hitman1':
+                            state._spawn_flash_grenade(
+                                cmd.player_id, cmd.aim_x, cmd.aim_y)
                     state.apply_command(
                         cmd.player_id,
                         cmd.move_x, cmd.move_y,
@@ -144,6 +150,7 @@ def run():
                 state.step_pending_pellets()
                 state.resolve_player_collisions(obstacles)
                 state.step_gold_collection()
+                state.step_status_effects()
 
                 payload = pack_state(state)
                 for addr in clients.values():

@@ -67,6 +67,11 @@ _prev_bullet_pos: dict = {}
 _bubble_spawn_time: dict = {}
 _bubble_max_radius: dict = {}
 
+# 閃光彈追蹤：bid → 最後世界座標；消失時觸發爆炸特效
+_flash_bullet_pos: dict = {}
+# 爆炸特效佇列：[(world_x, world_y, spawn_perf_time)]
+_flash_explosions: list = []
+
 SHAKE_AMP  = 5    # 最大位移像素
 SHAKE_FREQ = 40   # 振盪頻率 Hz
 
@@ -341,12 +346,13 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
          player_chars: dict = None,
          skill_cooldowns: dict = None) -> None:
     # player_chars: {pid: char_key}，None 時全部用 hitman1
-    screen.fill(COL_BG)
 
     if my_id not in state.players:
+        screen.fill(COL_BG)
         _draw_waiting(screen, font)
         return
 
+    screen.fill(COL_BG)
     me = state.players[my_id]
     cx, cy = _camera(me)
 
@@ -367,6 +373,9 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     if obstacles:
         _draw_trees(screen, obstacles, state.destroyed_obstacles,
                     cx, cy, me.x, me.y)
+
+    _draw_flash_explosions(screen, cx, cy)
+    _draw_flash_screen(screen, state, my_id)  # 白色太陽眼鏡疊加層
 
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns)
 
@@ -538,22 +547,37 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             _bubble_spawn_time.pop(bid, None)
             _bubble_max_radius.pop(bid, None)
 
+    # ── 閃光彈消失偵測 → 觸發爆炸特效 ───────────────────────────
+    current_flash = {bid for bid, b in state.bullets.items()
+                     if getattr(b, 'bullet_type', 0) == 1}
+    for bid in set(_flash_bullet_pos) - current_flash:
+        if bid in _flash_bullet_pos:
+            _flash_explosions.append((*_flash_bullet_pos[bid], now))
+    for bid in list(_flash_bullet_pos):
+        if bid not in current_flash:
+            del _flash_bullet_pos[bid]
+
     for bullet in state.bullets.values():
         sx, sy = _ws(bullet.x, bullet.y, cx, cy)
         if -60 <= sx <= SCREEN_W + 60 and -60 <= sy <= SCREEN_H + 60:
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
+            # ── 閃光彈 ───────────────────────────────────────────
+            if getattr(bullet, 'bullet_type', 0) == 1:
+                _flash_bullet_pos[bullet.id] = (bullet.x, bullet.y)
+                pygame.draw.circle(screen, (80, 100, 50), (sx, sy), 7)
+                pygame.draw.circle(screen, (130, 155, 80), (sx, sy), 7, 2)
+                continue
+
             if char_key == "womanGreen":
-                # 首次出現：記錄 spawn time；最終半徑由 server 設定，保持雙端一致
                 if bullet.id not in _bubble_spawn_time:
                     _bubble_spawn_time[bullet.id] = now
-                    # 優先使用 server 傳來的 bubble_radius_max，否則取預設值
                     rmax = getattr(bullet, "bubble_radius_max", 0.0)
                     _bubble_max_radius[bullet.id] = (
                         rmax if rmax > 0 else BULLET_RADIUS * 6)
                 age = now - _bubble_spawn_time[bullet.id]
-                t   = min(1.0, age / _BUBBLE_LIFE)              # 0→1 over 2s
+                t   = min(1.0, age / _BUBBLE_LIFE)
                 r   = max(1, int(_BUBBLE_INIT_R + (_bubble_max_radius[bullet.id]
                                                     - _BUBBLE_INIT_R) * t))
                 surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
@@ -564,6 +588,41 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
 
 
 # ── 玩家 ──────────────────────────────────────────────────────────────────────
+
+def _draw_flash_explosions(screen, cx: float, cy: float) -> None:
+    """繪製閃光彈爆炸擴散白圈（投擲者螢幕可見）。"""
+    now   = time.perf_counter()
+    alive = []
+    DURATION = 0.5
+    MAX_R    = 130
+    for wx, wy, t in _flash_explosions:
+        elapsed = now - t
+        if elapsed >= DURATION:
+            continue
+        alive.append((wx, wy, t))
+        progress = elapsed / DURATION
+        r     = max(1, int(MAX_R * progress))
+        alpha = int(230 * (1.0 - progress))
+        sx, sy = _ws(wx, wy, cx, cy)
+        if -MAX_R <= sx <= SCREEN_W + MAX_R and -MAX_R <= sy <= SCREEN_H + MAX_R:
+            surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (255, 255, 220, alpha), (r, r), r)
+            screen.blit(surf, (sx - r, sy - r))
+    _flash_explosions[:] = alive
+
+
+def _draw_flash_screen(screen, state, my_id: int) -> None:
+    """被閃光彈命中時全螢幕白色太陽眼鏡疊加層（HUD 在其上方）。"""
+    if my_id not in state.players:
+        return
+    ft = getattr(state.players[my_id], 'flash_ticks', 0)
+    if ft <= 0:
+        return
+    alpha = 255 if ft > 60 else int(255 * ft / 60)
+    overlay = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
+    overlay.fill((255, 255, 255, alpha))
+    screen.blit(overlay, (0, 0))
+
 
 def _spawn_dash_dust(px: float, py: float) -> None:
     """衝刺時在玩家後方噴出灰塵粒子（每幀 3 顆）。"""

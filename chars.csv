@@ -1,5 +1,5 @@
 char_key,name,folder,hp,speed_pxs,gun,dmg_min,dmg_max,mag,fire_interval,reload_time,bspeed_pxs,bspeed_min_pxs,spread,pellet_count,pellet_interval(tick),brange_px,brange_min_px,shoot_slow,shoot_slow_dur(tick),cd_rmb,cd_space,cd_e,cd_r
-hitman1,Agent,Hitman 1,120,180,Pistol,25,30,12,0.3,2,700,,5,,,800,780,0.7,6,0,5,0,0
+hitman1,Agent,Hitman 1,120,180,Pistol,25,30,12,0.3,2,700,,5,,,800,780,0.7,6,0,5,8,0
 manBlue,Rambo,Man Blue,200,120,Shotgun,4,8,6,0.5,4,800,570,15,10,0.5,150,130,0.2,6,0,0,0,0
 manBrown,Bear,Man Brown,150,150,Machine,15,20,40,0.15,4,900,,8,,,1000,980,0.7,9,0,0,0,0
 manOld,Sniper,Man Old,80,210,Sniper,75,80,5,1,5,1400,,1,,,infinity,infinity,0.5,24,0,0,0,0

@@ -20,8 +20,8 @@ PKT_GAME_START  = 0x06   # server → clients: 雙方都選完，遊戲開始
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBffH")  # +H: speed_mult×1000
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffHHhBH")  # id x y hp max_hp aim_angle stance gold
-_BULLET_ENTRY  = struct.Struct("!BBffh")      # id owner x y angle_i16
+_PLAYER_ENTRY  = struct.Struct("!BffHHhBHB")  # id x y hp max_hp aim_angle stance gold flash_ticks
+_BULLET_ENTRY  = struct.Struct("!BBffhB")     # id owner x y angle_i16 bullet_type
 _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
 
 # stance 編碼表
@@ -43,9 +43,12 @@ def unpack_joined(data: bytes) -> int:
 
 
 def pack_command(cmd: PlayerCommand) -> bytes:
-    # bit 0 = shooting, bit 1 = running, bits 2-3 = stance
+    # bit 0=shooting  bit 1=running  bits 2-3=stance  bit 4=use_skill_e
     stance_bits = _STANCE_TO_INT.get(cmd.stance, 0) << 2
-    flags = int(cmd.shooting) | (int(cmd.running) << 1) | stance_bits
+    flags = (int(cmd.shooting)
+             | (int(cmd.running)      << 1)
+             | stance_bits
+             | (int(cmd.use_skill_e) << 4))
     speed_raw = max(0, min(65535, int(cmd.speed_mult * 1000)))
     return _CMD_STRUCT.pack(
         PKT_CMD, cmd.player_id,
@@ -62,7 +65,8 @@ def unpack_command(data: bytes) -> PlayerCommand:
     return PlayerCommand(player_id=pid, move_x=mx, move_y=my,
                          shooting=bool(flags & 0x01), aim_x=ax, aim_y=ay,
                          running=bool(flags & 0x02), stance=stance,
-                         speed_mult=speed_raw / 1000.0)
+                         speed_mult=speed_raw / 1000.0,
+                         use_skill_e=bool((flags >> 4) & 0x01))
 
 
 def pack_state(state: GameState) -> bytes:
@@ -75,6 +79,7 @@ def pack_state(state: GameState) -> bytes:
             int(p.aim_angle),
             _STANCE_TO_INT.get(p.stance, 0),
             state.gold_counts.get(p.id, 0),
+            min(255, max(0, p.flash_ticks)),
         )
         for p in players
     )
@@ -83,7 +88,8 @@ def pack_state(state: GameState) -> bytes:
     b_data  = bytes([len(bullets)]) + b"".join(
         _BULLET_ENTRY.pack(b.id, b.owner_id, b.x, b.y,
                            int(b.aim_angle) if -32768 <= int(b.aim_angle) <= 32767
-                           else 0)
+                           else 0,
+                           b.bullet_type)
         for b in bullets
     )
 
@@ -108,21 +114,22 @@ def unpack_state(data: bytes) -> GameState:
 
     p_count = data[offset]; offset += 1
     for _ in range(p_count):
-        pid, x, y, hp, max_hp, aim_i16, stance_u8, gold = _PLAYER_ENTRY.unpack(
+        pid, x, y, hp, max_hp, aim_i16, stance_u8, gold, flash = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
         p = Player(id=pid, x=x, y=y, hp=hp, max_hp=max_hp,
-                   aim_angle=float(aim_i16), stance=stance)
+                   aim_angle=float(aim_i16), stance=stance, flash_ticks=flash)
         state.players[pid] = p
         state.gold_counts[pid] = gold
         offset += _PLAYER_ENTRY.size
 
     b_count = data[offset]; offset += 1
     for _ in range(b_count):
-        bid, owner, bx, by, angle_i16 = _BULLET_ENTRY.unpack(
+        bid, owner, bx, by, angle_i16, btype = _BULLET_ENTRY.unpack(
             data[offset: offset + _BULLET_ENTRY.size])
         state.bullets[bid] = Bullet(id=bid, owner_id=owner, x=bx, y=by,
-                                    dx=0.0, dy=0.0, aim_angle=float(angle_i16))
+                                    dx=0.0, dy=0.0, aim_angle=float(angle_i16),
+                                    bullet_type=btype)
         offset += _BULLET_ENTRY.size
 
     d_count = data[offset]; offset += 1

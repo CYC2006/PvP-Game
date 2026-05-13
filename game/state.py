@@ -38,6 +38,8 @@ class Player:
     _shoot_slow_timer: int  = 0     # 當前剩餘減速 tick（>0 表示正在減速中）
     aim_angle: float        = 0.0   # 瞄準角度（度），0=上, 90=右；同步給對手
     stance: str             = "stand"  # "stand" | "machine" | "hold" | "reload"
+    flash_ticks: int        = 0     # >0：被閃光彈影響，倒數至 0
+    char_key: str           = ""    # 角色 key，由 apply_char_stats 設定，不同步至 client
 
     def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -80,6 +82,7 @@ class Bullet:
     dot_interval: int = 0              # >0：穿透玩家，每 N tick 傷害一次
     spawn_tick: int   = 0              # 建立時的 tick（DoT 半徑成長計算用）
     bubble_radius_max: float = 0.0     # DoT 泡泡最大碰撞半徑 px（由 server 亂數，client 同步）
+    bullet_type: int  = 0              # 0=一般子彈  1=閃光彈
 
     def step(self) -> None:
         self.x += self.dx
@@ -134,6 +137,7 @@ class GameState:
         if player_id not in self.players:
             return
         p = self.players[player_id]
+        p.char_key     = char_key
         p.max_hp       = get_stat(char_key, "hp")
         p.hp           = p.max_hp
         p.speed        = float(get_stat(char_key, "speed"))
@@ -279,6 +283,8 @@ class GameState:
             hit = False
             shooter = self.players.get(bullet.owner_id)
             does_damage = not (shooter and shooter.damage_min == 0 and shooter.damage_max == 0)
+            if bullet.bullet_type != 0:
+                does_damage = False   # 特殊投擲物（閃光彈等）不造成接觸傷害
 
             # DoT 子彈的動態碰撞半徑（隨泡泡成長）
             _BUBBLE_LIFE_TICKS = 120  # 2.0s × 60 fps
@@ -340,6 +346,11 @@ class GameState:
                 if not obs.solid:          # 非實體（樹/草叢）→ 子彈穿透
                     continue
                 if obs.collides_circle(bullet.x, bullet.y, coll_r):
+                    if bullet.bullet_type == 1:
+                        # 閃光彈：撞牆原地停止，繼續等待爆炸
+                        bullet.dx = 0.0
+                        bullet.dy = 0.0
+                        break
                     if bullet.dot_interval > 0:
                         # DoT 子彈（毒氣泡）：撞牆時停住，不消失，持續傷害障礙物
                         if bullet.dx != 0.0 or bullet.dy != 0.0:
@@ -392,8 +403,12 @@ class GameState:
                         break
 
         for bid in expired:
+            b = self.bullets.get(bid)
+            # 閃光彈 linger 結束時爆炸（已停止 + linger 耗盡）
+            if (b and b.bullet_type == 1
+                    and b.decel > 0 and b.dx == 0.0 and b.dy == 0.0):
+                self._trigger_flash_explosion(b.x, b.y, b.owner_id)
             self.bullets.pop(bid, None)
-            # 清除該子彈的 DoT 冷卻記錄
             for k in [k for k in self._dot_cooldown if k[0] == bid]:
                 del self._dot_cooldown[k]
 
@@ -435,6 +450,48 @@ class GameState:
                 x=x + math.cos(angle) * dist,
                 y=y + math.sin(angle) * dist,
             )
+
+    # ── 技能相關 ──────────────────────────────────────────────────────────────────
+
+    _FLASH_RADIUS = 120.0
+    _FLASH_TICKS  = 120   # 2 秒 × 60 fps
+
+    def _spawn_flash_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        player = self.players.get(owner_id)
+        if not player:
+            return
+        length = math.hypot(aim_x, aim_y)
+        if length == 0:
+            return
+        ux, uy = aim_x / length, aim_y / length
+        SPEED  = 8.0    # px/tick（480 px/s）
+        DECEL  = 0.2    # px/tick² → 停止距離 ≈ 160 px
+        LINGER = 60     # 停止後等待 1 秒
+        bid = self._next_bullet_id
+        self._next_bullet_id = (self._next_bullet_id + 1) % 256
+        self.bullets[bid] = Bullet(
+            id=bid, owner_id=owner_id,
+            x=player.x + ux * (PLAYER_RADIUS + 12),
+            y=player.y + uy * (PLAYER_RADIUS + 12),
+            dx=ux * SPEED, dy=uy * SPEED,
+            aim_angle=math.degrees(math.atan2(uy * SPEED, ux * SPEED)),
+            max_range=BULLET_MAX_RANGE * 999,
+            decel=DECEL,
+            linger_ticks=LINGER,
+            bullet_type=1,
+        )
+
+    def _trigger_flash_explosion(self, x: float, y: float, owner_id: int) -> None:
+        for pid, player in self.players.items():
+            if pid == owner_id:
+                continue
+            if math.hypot(player.x - x, player.y - y) <= self._FLASH_RADIUS:
+                player.flash_ticks = self._FLASH_TICKS
+
+    def step_status_effects(self) -> None:
+        for player in self.players.values():
+            if player.flash_ticks > 0:
+                player.flash_ticks -= 1
 
     def step_gold_collection(self) -> None:
         """任一玩家碰到金錠/血包就撿起。金錠累計計數；血包回復最大血量 30%（不超過滿血）。"""
