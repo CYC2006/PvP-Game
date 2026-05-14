@@ -3,6 +3,7 @@ import os
 import socket
 import sys
 import time
+import threading
 import pygame
 
 from game.input      import read_input
@@ -10,6 +11,7 @@ from game.renderer   import draw, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
 import game.charselect as charselect
+from game.lobby      import lobby_screen
 from network.protocol import (
     PKT_JOINED, PKT_STATE, PKT_GAME_START,
     pack_join, pack_command, pack_char_select,
@@ -20,111 +22,169 @@ from network.protocol import (
 PORT                = 5000
 BUF_SIZE            = 1024
 FPS                 = 60
-JOIN_RETRY_INTERVAL = 1.0
 MAP_PATH            = "maps/map_01.json"
 
+COL_BG   = (20, 24, 32)
+COL_TEXT = (220, 220, 220)
+COL_HINT = (110, 130, 160)
 
-def connect(sock: socket.socket, server_addr: tuple) -> int:
-    print(f"[Client] Connecting to {server_addr[0]}:{server_addr[1]} ...")
-    last_sent = 0.0
+
+# ── Server 背景執行緒 ─────────────────────────────────────────────────────
+
+def _start_server_thread() -> None:
+    """以 daemon thread 啟動 server，主程式結束時自動停止。"""
+    from server import run as server_run
+    t = threading.Thread(target=server_run, daemon=True)
+    t.start()
+    time.sleep(0.4)   # 給 server 時間 bind port
+
+
+# ── 連線中畫面 ───────────────────────────────────────────────────────────
+
+def connect_screen(sock: socket.socket, server_addr: tuple,
+                   screen: pygame.Surface,
+                   font_lg: pygame.font.Font,
+                   font_sm: pygame.font.Font,
+                   clock: pygame.time.Clock):
+    """
+    顯示「連線中…」畫面並持續嘗試連線。
+    成功回傳 player_id；使用者關閉則回傳 None。
+    """
+    last_sent  = 0.0
+    dot_count  = 0
+    dot_timer  = 0.0
+    CX, CY     = LOGICAL_W // 2, LOGICAL_H // 2
+
     while True:
-        now = time.perf_counter()
-        if now - last_sent >= JOIN_RETRY_INTERVAL:
-            sock.sendto(pack_join(), server_addr)
-            last_sent = now
+        dt       = clock.tick(FPS) / 1000.0
+        now_perf = time.perf_counter()
+        dot_timer += dt
+        if dot_timer >= 0.4:
+            dot_timer  = 0.0
+            dot_count  = (dot_count + 1) % 4
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return None
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return None
+
+        # 每秒發一次 JOIN
+        if now_perf - last_sent >= 1.0:
+            try:
+                sock.sendto(pack_join(), server_addr)
+            except Exception:
+                pass
+            last_sent = now_perf
+
+        # 看有沒有收到 JOINED
         try:
             data, _ = sock.recvfrom(BUF_SIZE)
             if packet_type(data) == PKT_JOINED:
-                pid = unpack_joined(data)
-                print(f"[Client] Joined as Player {pid}")
-                return pid
+                return unpack_joined(data)
         except (BlockingIOError, ConnectionResetError, OSError):
             pass
-        time.sleep(0.05)
+
+        # 繪製
+        screen.fill(COL_BG)
+        dots = "." * dot_count
+        t = font_lg.render(f"Connecting{dots}", True, COL_TEXT)
+        screen.blit(t, (CX - t.get_width() // 2, CY - 30))
+        s = font_sm.render(f"{server_addr[0]}:{server_addr[1]}", True, COL_HINT)
+        screen.blit(s, (CX - s.get_width() // 2, CY + 15))
+        e = font_sm.render("ESC to cancel", True, COL_HINT)
+        screen.blit(e, (CX - e.get_width() // 2, CY + 50))
+        pygame.display.flip()
 
 
-
+# ── 選角畫面 ──────────────────────────────────────────────────────────────
 
 def char_select_loop(sock, server_addr, screen,
                      font_lg, font_sm, clock) -> tuple:
-    """
-    選角畫面主迴圈（carousel 版）。
-    回傳 (player_chars_dict, my_char_key)，或 (None, None) 表示玩家關閉視窗。
-    player_chars_dict: {pid: char_key}  由 PKT_GAME_START 解析
-    """
     charselect.reset()
-    my_ready       = False
-    opponent_ready = False
-    last_time      = pygame.time.get_ticks()
+    my_ready  = False
+    last_time = pygame.time.get_ticks()
 
     while True:
         now = pygame.time.get_ticks()
         dt  = (now - last_time) / 1000.0
         last_time = now
 
-        # ── 事件 ──────────────────────────────────────────────────
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return None, None
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 return None, None
             if not my_ready:
-                confirmed = charselect.handle_event(event)
-                if confirmed:
+                if charselect.handle_event(event):
                     my_ready = True
                     idx = charselect.selected_idx()
                     sock.sendto(pack_char_select(idx), server_addr)
-                    print(f"[Client] Selected char {idx} ({charselect.selected_char()['name']})")
 
-        # ── 收封包 ────────────────────────────────────────────────
         while True:
             try:
                 data, _ = sock.recvfrom(BUF_SIZE)
-                ptype = packet_type(data)
-                if ptype == PKT_GAME_START:
-                    # 解析雙方角色 id → char_key
-                    raw_chars = unpack_game_start(data)   # {pid: char_id}
+                if packet_type(data) == PKT_GAME_START:
+                    raw_chars = unpack_game_start(data)
                     from game.charselect import CHARACTERS
                     player_chars = {pid: CHARACTERS[cid]["char_key"]
                                     for pid, cid in raw_chars.items()
                                     if 0 <= cid < len(CHARACTERS)}
-                    my_char_key = charselect.selected_char()["char_key"]
-                    return player_chars, my_char_key
+                    return player_chars, charselect.selected_char()["char_key"]
             except (BlockingIOError, ConnectionResetError, OSError):
                 break
 
-        # ── 更新 & 繪製 ───────────────────────────────────────────
         charselect.update(dt)
-        charselect.draw_char_select(screen, font_lg, font_sm,
-                                    my_ready, opponent_ready)
+        charselect.draw_char_select(screen, font_lg, font_sm, my_ready, False)
         pygame.display.flip()
         clock.tick(FPS)
 
 
-def run(server_ip: str) -> None:
-    server_addr = (server_ip, PORT)
+# ── 主流程 ────────────────────────────────────────────────────────────────
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setblocking(False)
-
-    player_id = connect(sock, server_addr)
-
-    # 載入地圖（與 server 相同的 JSON）
-    obstacles = load_map(MAP_PATH)
-
+def run() -> None:
     os.environ['SDL_WINDOW_ALLOW_HIGHDPI'] = '1'
     pygame.init()
-    pygame.mouse.set_visible(True)
     screen = pygame.display.set_mode(
         (LOGICAL_W, LOGICAL_H), pygame.SCALED | pygame.RESIZABLE)
-    pygame.display.set_caption(f"PvP Game — Player {player_id}")
+    pygame.display.set_caption("PvP Game")
+
     _font_bold = os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf")
     _font_reg  = os.path.join("assets", "fonts", "MapleMono-NF-Regular.ttf")
     font_lg = pygame.font.Font(_font_bold, 22)
     font_sm = pygame.font.Font(_font_reg,  15)
     clock   = pygame.time.Clock()
 
-    # ── 選角畫面 ──────────────────────────────────────────────────
+    # ── Lobby：Host / Join 選擇 ──────────────────────────────────────
+    mode, entered_ip = lobby_screen(screen, font_lg, font_sm, clock)
+    if mode is None:
+        pygame.quit()
+        return
+
+    if mode == "host":
+        _start_server_thread()
+        server_ip = "127.0.0.1"
+    else:
+        server_ip = entered_ip
+
+    server_addr = (server_ip, PORT)
+
+    # ── 連線 ────────────────────────────────────────────────────────
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setblocking(False)
+
+    player_id = connect_screen(sock, server_addr, screen, font_lg, font_sm, clock)
+    if player_id is None:
+        pygame.quit()
+        sock.close()
+        return
+
+    pygame.display.set_caption(f"PvP Game — Player {player_id}")
+
+    # ── 載入地圖 ────────────────────────────────────────────────────
+    obstacles = load_map(MAP_PATH)
+
+    # ── 選角 ────────────────────────────────────────────────────────
     player_chars, my_char_key = char_select_loop(
         sock, server_addr, screen, font_lg, font_sm, clock)
     if player_chars is None:
@@ -132,17 +192,15 @@ def run(server_ip: str) -> None:
         sock.close()
         return
 
-    print(f"[Client] Game start! My char: {my_char_key}  All chars: {player_chars}")
-
-    # 依選擇角色設定射速 / 彈夾 / 換彈
     from game.input import init_char
     init_char(my_char_key)
 
-    # ── 遊戲主迴圈 ────────────────────────────────────────────────
-    state      = GameState()
-    keys_held: set = set()
-    fullscreen = False
+    # ── 遊戲主迴圈 ──────────────────────────────────────────────────
+    state        = GameState()
+    keys_held    = set()
+    fullscreen   = False
     game_running = True
+
     while game_running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -162,12 +220,12 @@ def run(server_ip: str) -> None:
             elif event.type == pygame.KEYUP:
                 keys_held.discard(event.key)
 
-        logical_mouse = pygame.mouse.get_pos()  # SCALED 模式下自動對應邏輯座標
-
-        shift_held = (pygame.K_LSHIFT in keys_held or pygame.K_RSHIFT in keys_held)
+        logical_mouse = pygame.mouse.get_pos()
+        shift_held    = (pygame.K_LSHIFT in keys_held or pygame.K_RSHIFT in keys_held)
         cmd, effective_stance, ammo, is_reloading, skill_cooldowns = read_input(
             player_id, keys_held, logical_mouse, shift_held)
         aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
+
         try:
             sock.sendto(pack_command(cmd), server_addr)
         except Exception:
@@ -195,13 +253,8 @@ def run(server_ip: str) -> None:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        server_ip = input("Server IP: ").strip()
-    else:
-        server_ip = sys.argv[1]
-
     try:
-        run(server_ip)
+        run()
     except KeyboardInterrupt:
         print("\n[Client] Disconnected.")
         sys.exit(0)

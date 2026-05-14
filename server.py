@@ -29,6 +29,15 @@ def get_local_ip() -> str:
         s.close()
 
 
+def get_public_ip() -> str:
+    try:
+        import urllib.request
+        with urllib.request.urlopen("https://api.ipify.org", timeout=3) as r:
+            return r.read().decode().strip()
+    except Exception:
+        return "unavailable"
+
+
 def run():
     # 載入地圖
     obstacles   = load_map(MAP_PATH)
@@ -48,7 +57,14 @@ def run():
     paused: bool              = False
     TIMEOUT                   = 3.0   # 超過幾秒沒收到封包視為斷線
 
-    print(f"[Server] Listening on {get_local_ip()}:{PORT}")
+    import threading
+    _pub = ["fetching..."]
+    def _fetch():
+        _pub[0] = get_public_ip()
+        print(f"[Server] Public IP : {_pub[0]}:{PORT}")
+    threading.Thread(target=_fetch, daemon=True).start()
+
+    print(f"[Server] Local  IP : {get_local_ip()}:{PORT}")
     print(f"[Server] Waiting for {MAX_PLAYERS} players...")
 
     next_tick = time.perf_counter()
