@@ -18,10 +18,12 @@ _player_speed: float = 3.0
 
 _skill_cds_ms:  dict = {'space': -1, 'e': -1, 'r': -1, 'rmb': -1}
 _skill_last_ms: dict = {'space':  0, 'e':  0, 'r':  0, 'rmb':  0}
-_char_key:           str  = ""
-_rmb_prev:           bool = False
-_r_prev:             bool = False
-_speed_boost_end_ms: int  = 0   # 速度提升到期時間（ms），供 renderer 粒子使用
+_char_key:            str   = ""
+_rmb_prev:            bool  = False
+_r_prev:              bool  = False
+_speed_boost_end_ms:  int   = 0     # 速度提升到期時間（ms），供 renderer 粒子使用
+_r_skill_start_ms:    int   = 0     # R 大招啟動時間（ms），供 renderer 旋轉使用
+_r_skill_start_angle: float = 0.0   # R 大招啟動時的瞄準角度（度）
 
 # ── 衝刺常數 ──────────────────────────────────────────────────────
 # 9 ticks：15 + 14.1 + … + 7.8 ≈ 102 px，接近 100 px
@@ -48,7 +50,7 @@ def init_char(char_key: str) -> None:
     global _ammo, _reloading, _reload_start_ms, _last_shot_time
     global _player_speed, _skill_cds_ms, _skill_last_ms
     global _dash_active, _dash_speed, _space_prev
-    global _char_key, _rmb_prev, _r_prev, _speed_boost_end_ms
+    global _char_key, _rmb_prev, _r_prev, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
 
     from game.char_data import get_stat, CHAR_STATS
 
@@ -75,9 +77,11 @@ def init_char(char_key: str) -> None:
     }
     _skill_last_ms = {'space': 0, 'e': 0, 'r': 0, 'rmb': 0}
 
-    _char_key           = char_key
-    _speed_boost_end_ms = 0
-    _ammo               = MAGAZINE_SIZE
+    _char_key             = char_key
+    _speed_boost_end_ms   = 0
+    _r_skill_start_ms     = 0
+    _r_skill_start_angle  = 0.0
+    _ammo                 = MAGAZINE_SIZE
     _reloading       = False
     _reload_start_ms = 0
     _last_shot_time  = 0
@@ -101,7 +105,7 @@ def read_input(player_id: int, keys_held: set,
     global _last_shot_time, _ammo, _reloading, _reload_start_ms
     global _space_prev, _e_prev, _rmb_prev, _r_prev
     global _dash_active, _dash_dx, _dash_dy, _dash_speed
-    global _skill_last_ms, _speed_boost_end_ms
+    global _skill_last_ms, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
 
     now = pygame.time.get_ticks()
 
@@ -134,6 +138,9 @@ def read_input(player_id: int, keys_held: set,
     r_just_pressed     = r_held and not _r_prev
     _r_prev            = r_held
 
+    # ── R 技能啟動狀態（在所有技能判斷之前計算，確保完全隔離）────
+    _r_skill_active = (now - _r_skill_start_ms) < 500 and _r_skill_start_ms > 0
+
     # ── 位移 / WASD ───────────────────────────────────────────────
     dx, dy     = 0.0, 0.0
     speed_mult = 1.0
@@ -153,7 +160,8 @@ def read_input(player_id: int, keys_held: set,
         if pygame.K_d in keys_held or pygame.K_RIGHT in keys_held: dx += 1.0
 
         # ── 觸發衝刺（非 survivor1）或速度技能（survivor1）──────
-        if (space_just_pressed
+        if (not _r_skill_active
+                and space_just_pressed
                 and _skill_cds_ms.get('space', -1) >= 0):
             cd_remaining = _skill_cds_ms['space'] - (now - _skill_last_ms['space'])
             if cd_remaining <= 0:
@@ -174,7 +182,7 @@ def read_input(player_id: int, keys_held: set,
 
     # ── E 技能（閃光彈等）────────────────────────────────────────
     use_skill_e = False
-    if (e_just_pressed and _skill_cds_ms.get('e', -1) >= 0):
+    if (not _r_skill_active and e_just_pressed and _skill_cds_ms.get('e', -1) >= 0):
         cd_remaining = _skill_cds_ms['e'] - (now - _skill_last_ms['e'])
         if cd_remaining <= 0:
             use_skill_e = True
@@ -182,7 +190,7 @@ def read_input(player_id: int, keys_held: set,
 
     # ── RMB 技能（手裡劍等）──────────────────────────────────────
     use_skill_rmb = False
-    if (rmb_just_pressed and _skill_cds_ms.get('rmb', -1) >= 0):
+    if (not _r_skill_active and rmb_just_pressed and _skill_cds_ms.get('rmb', -1) >= 0):
         cd_remaining = _skill_cds_ms['rmb'] - (now - _skill_last_ms['rmb'])
         if cd_remaining <= 0:
             use_skill_rmb = True
@@ -190,7 +198,8 @@ def read_input(player_id: int, keys_held: set,
 
     # ── Space 技能（survivor1：速度提升）─────────────────────────
     use_skill_space = False
-    if (_char_key == 'survivor1'
+    if (not _r_skill_active
+            and _char_key == 'survivor1'
             and space_just_pressed
             and _skill_cds_ms.get('space', -1) >= 0):
         cd_elapsed = now - _skill_last_ms['space']
@@ -199,17 +208,19 @@ def read_input(player_id: int, keys_held: set,
             _skill_last_ms['space'] = now
             _speed_boost_end_ms = now + 3000   # 3 秒提升
 
-    # ── R 技能（月刀弧等）────────────────────────────────────────
+    # ── R 技能（衝刺旋轉等）─────────────────────────────────────
     use_skill_r = False
-    if (r_just_pressed and _skill_cds_ms.get('r', -1) >= 0):
+    if (not _r_skill_active and r_just_pressed and _skill_cds_ms.get('r', -1) >= 0):
         cd_remaining = _skill_cds_ms['r'] - (now - _skill_last_ms['r'])
         if cd_remaining <= 0:
             use_skill_r = True
-            _skill_last_ms['r'] = now
+            _skill_last_ms['r']   = now
+            _r_skill_start_ms     = now
+            _r_skill_start_angle  = math.degrees(math.atan2(aim_x, -aim_y))
 
-    # ── 射擊（換彈中禁止）────────────────────────────────────────
+    # ── 射擊（換彈中禁止 / R 技能期間禁止）──────────────────────
     shooting = False
-    if (not _reloading
+    if (not _reloading and not _r_skill_active
             and pygame.mouse.get_pressed()[0]
             and (now - _last_shot_time) >= SHOOT_COOLDOWN_MS):
         shooting        = True

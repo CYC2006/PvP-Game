@@ -42,6 +42,13 @@ class Player:
     speed_boost_ticks: int  = 0     # >0：速度提升中，倒數至 0（survivor1 space）
     speed_boost_mult: float = 1.0   # 速度提升倍率
     char_key: str           = ""    # 角色 key，由 apply_char_stats 設定，不同步至 client
+    # ── survivor1 R 技能狀態 ──────────────────────────────────────
+    r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
+    r_skill_tick: int         = 0    # 當前階段已過 ticks
+    r_skill_dx: float         = 0.0  # 第一段滑動方向 x（單位向量）
+    r_skill_dy: float         = 0.0  # 第一段滑動方向 y
+    r_skill_start_angle: float = 0.0 # 技能啟動時的 aim_angle
+    r_skill_dmg_done: int     = 0    # bitmask: 1=phase1 已傷害, 2=phase2 已傷害
 
     def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -201,6 +208,11 @@ class GameState:
         if player_id not in self.players:
             return
         player = self.players[player_id]
+        # R 技能進行中：禁止所有輸入，由 step_r_skill 驅動
+        if player.r_skill_phase > 0:
+            if player._shoot_slow_timer > 0:
+                player._shoot_slow_timer -= 1
+            return
         # 射擊觸發計時器；計時器倒數中套用移動懲罰（shoot_slow 優先於 run）
         if shooting:
             player._shoot_slow_timer = player._shoot_slow_ticks
@@ -564,6 +576,68 @@ class GameState:
         if player:
             player.speed_boost_ticks = 180   # 3 秒 × 60 fps
             player.speed_boost_mult  = 1.5
+
+    # survivor1 R 技能 ─────────────────────────────────────────────
+    # 每段距離 400px / 0.25s；速度從 v0 等減速至 v0/2（不減到 0）
+    # 連續積分：distance = v0*T - (v0/2T)*T²/2 = 3*v0*T/4 = 400 → v0 = 1600/45
+    _R_PHASE_TICKS = 15                  # 0.25s × 60 fps
+    _R_V0          = 1600.0 / 45.0      # ≈ 35.56 px/tick
+    _R_DAMAGE      = 30                  # 每段碰撞傷害
+
+    def _activate_r_skill(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        player = self.players.get(owner_id)
+        if not player or player.r_skill_phase > 0:
+            return
+        length = math.hypot(aim_x, aim_y)
+        if length == 0:
+            return
+        player.r_skill_phase       = 1
+        player.r_skill_tick        = 0
+        player.r_skill_dx          = aim_x / length
+        player.r_skill_dy          = aim_y / length
+        player.r_skill_start_angle = player.aim_angle
+        player.r_skill_dmg_done    = 0
+
+    def step_r_skill(self) -> None:
+        for player in self.players.values():
+            if player.r_skill_phase == 0:
+                continue
+            tick  = player.r_skill_tick
+            phase = player.r_skill_phase
+
+            # 等減速滑行（v0 → v0/2，不減到 0）
+            progress  = tick / self._R_PHASE_TICKS
+            speed     = self._R_V0 * (1.0 - 0.5 * progress)
+            direction = 1.0 if phase == 1 else -1.0
+            player.x  = max(PLAYER_RADIUS, min(MAP_WIDTH  - PLAYER_RADIUS,
+                                               player.x + player.r_skill_dx * speed * direction))
+            player.y  = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS,
+                                               player.y + player.r_skill_dy * speed * direction))
+
+            # 順時針旋轉 180° per phase
+            base_offset = 180.0 if phase == 2 else 0.0
+            player.aim_angle = player.r_skill_start_angle + base_offset + 180.0 * progress
+
+            # 碰撞傷害（每段只傷害一次）
+            dmg_flag    = 1 if phase == 1 else 2
+            opponent_id = 3 - player.id
+            opponent    = self.players.get(opponent_id)
+            if opponent and not (player.r_skill_dmg_done & dmg_flag):
+                if math.hypot(player.x - opponent.x, player.y - opponent.y) < PLAYER_RADIUS * 2 + 4:
+                    opponent.hp -= self._R_DAMAGE
+                    player.r_skill_dmg_done |= dmg_flag
+                    if opponent.hp <= 0:
+                        opponent.respawn()
+
+            # 推進 tick / 切換階段
+            player.r_skill_tick += 1
+            if player.r_skill_tick >= self._R_PHASE_TICKS:
+                if phase == 1:
+                    player.r_skill_phase = 2
+                    player.r_skill_tick  = 0
+                else:
+                    player.r_skill_phase = 0
+                    player.r_skill_tick  = 0
 
     _SMOKE_DURATION = 360   # 6s 全不透明
     _SMOKE_FADE     = 60    # 1s 淡出
