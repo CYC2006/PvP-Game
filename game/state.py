@@ -39,6 +39,8 @@ class Player:
     aim_angle: float        = 0.0   # 瞄準角度（度），0=上, 90=右；同步給對手
     stance: str             = "stand"  # "stand" | "machine" | "hold" | "reload"
     flash_ticks: int        = 0     # >0：被閃光彈影響，倒數至 0
+    speed_boost_ticks: int  = 0     # >0：速度提升中，倒數至 0（survivor1 space）
+    speed_boost_mult: float = 1.0   # 速度提升倍率
     char_key: str           = ""    # 角色 key，由 apply_char_stats 設定，不同步至 client
 
     def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
@@ -178,13 +180,16 @@ class GameState:
         elif player._shoot_slow_timer > 0:
             player._shoot_slow_timer -= 1
         if speed_mult != 1.0:
-            mult = speed_mult          # 技能位移（衝刺等）：最高優先
+            mult = speed_mult          # 技能位移（衝刺等）：最高優先，不疊加 boost
         elif player._shoot_slow_timer > 0:
             mult = player.shoot_slow   # 射擊僵直：速度下降
         elif running:
             mult = 1.2                 # 跑步：速度 ×1.2
         else:
             mult = 1.0
+        # 速度提升技能（survivor1 space）：與 shoot_slow 疊加
+        if player.speed_boost_ticks > 0 and speed_mult == 1.0:
+            mult *= player.speed_boost_mult
         player.move(dx, dy, speed_mult=mult)
         player.stance = stance
         if math.hypot(aim_x, aim_y) > 0:
@@ -283,13 +288,17 @@ class GameState:
             hit = False
             shooter = self.players.get(bullet.owner_id)
             does_damage = not (shooter and shooter.damage_min == 0 and shooter.damage_max == 0)
-            if bullet.bullet_type != 0:
-                does_damage = False   # 特殊投擲物（閃光彈等）不造成接觸傷害
+            if bullet.bullet_type in (1, 2):
+                does_damage = False   # 閃光彈/手榴彈不造成接觸傷害（type=3 手裡劍仍可傷人）
 
+            # 手裡劍：碰撞半徑隨時間線性成長
+            if bullet.bullet_type == 3:
+                age    = self.tick - bullet.spawn_tick
+                coll_r = BULLET_RADIUS + age * self._SHURIKEN_GROW_RATE
             # DoT 子彈的動態碰撞半徑（隨泡泡成長）
-            _BUBBLE_LIFE_TICKS = 120  # 2.0s × 60 fps
-            if bullet.dot_interval > 0 and bullet.bubble_radius_max > 0:
-                age   = self.tick - bullet.spawn_tick
+            elif bullet.dot_interval > 0 and bullet.bubble_radius_max > 0:
+                _BUBBLE_LIFE_TICKS = 120  # 2.0s × 60 fps
+                age    = self.tick - bullet.spawn_tick
                 t_grow = min(1.0, age / _BUBBLE_LIFE_TICKS)
                 coll_r = (BULLET_RADIUS * 2
                           + (bullet.bubble_radius_max - BULLET_RADIUS * 2) * t_grow)
@@ -323,7 +332,12 @@ class GameState:
                         continue
                     if math.hypot(bullet.x - player.x,
                                   bullet.y - player.y) < PLAYER_RADIUS + coll_r:
-                        if shooter and shooter.damage_min < shooter.damage_max:
+                        if bullet.bullet_type == 3:
+                            # 手裡劍：傷害隨碰撞半徑線性成長
+                            damage = int(self._SHURIKEN_BASE_DMG
+                                         + self._SHURIKEN_DMG_SCALE
+                                         * (coll_r - BULLET_RADIUS))
+                        elif shooter and shooter.damage_min < shooter.damage_max:
                             damage = random.randint(shooter.damage_min, shooter.damage_max)
                         elif shooter:
                             damage = shooter.damage_min
@@ -346,8 +360,8 @@ class GameState:
                 if not obs.solid:          # 非實體（樹/草叢）→ 子彈穿透
                     continue
                 if obs.collides_circle(bullet.x, bullet.y, coll_r):
-                    if bullet.bullet_type in (1, 2):
-                        continue   # 投擲物無視障礙物，繼續飛行
+                    if bullet.bullet_type in (1, 2, 3):
+                        continue   # 投擲物 / 手裡劍無視障礙物，繼續飛行
                     if bullet.dot_interval > 0:
                         # DoT 子彈（毒氣泡）：撞牆時停住，不消失，持續傷害障礙物
                         if bullet.dx != 0.0 or bullet.dy != 0.0:
@@ -487,6 +501,38 @@ class GameState:
             if math.hypot(player.x - x, player.y - y) <= self._FLASH_RADIUS:
                 player.flash_ticks = self._FLASH_TICKS
 
+    _SHURIKEN_GROW_RATE = 0.3   # px/tick，碰撞半徑每 tick 增加量
+    _SHURIKEN_BASE_DMG  = 15    # 初始傷害
+    _SHURIKEN_DMG_SCALE = 1.5   # 每 px 碰撞半徑增加的傷害
+
+    def _spawn_shuriken(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        player = self.players.get(owner_id)
+        if not player:
+            return
+        length = math.hypot(aim_x, aim_y)
+        if length == 0:
+            return
+        ux, uy = aim_x / length, aim_y / length
+        SPEED = 800 / 60   # 800 px/s → px/tick
+        bid = self._next_bullet_id
+        self._next_bullet_id = (self._next_bullet_id + 1) % 256
+        self.bullets[bid] = Bullet(
+            id=bid, owner_id=owner_id,
+            x=player.x + ux * (PLAYER_RADIUS + 12),
+            y=player.y + uy * (PLAYER_RADIUS + 12),
+            dx=ux * SPEED, dy=uy * SPEED,
+            aim_angle=math.degrees(math.atan2(uy, ux)),
+            max_range=float('inf'),
+            spawn_tick=self.tick,
+            bullet_type=3,
+        )
+
+    def _activate_speed_boost(self, owner_id: int) -> None:
+        player = self.players.get(owner_id)
+        if player:
+            player.speed_boost_ticks = 180   # 3 秒 × 60 fps
+            player.speed_boost_mult  = 1.5
+
     _GRENADE_RADIUS  = 120.0
     _GRENADE_DMG_MAX = 50    # 中心傷害
     _GRENADE_DMG_MIN = 10    # 邊緣傷害
@@ -505,8 +551,8 @@ class GameState:
         spawn_x = player.x + ux * (PLAYER_RADIUS + 12)
         spawn_y = player.y + uy * (PLAYER_RADIUS + 12)
         for delay in DELAYS:
-            spd = round(random.uniform(8.5, 9.5), 1)
-            dev = math.radians(random.uniform(-10.0, 10.0))
+            spd = round(random.uniform(8.0, 11.0), 1)
+            dev = math.radians(random.uniform(-12.0, 12.0))
             cos_d, sin_d = math.cos(dev), math.sin(dev)
             gux = ux * cos_d - uy * sin_d
             guy = ux * sin_d + uy * cos_d
@@ -544,6 +590,8 @@ class GameState:
         for player in self.players.values():
             if player.flash_ticks > 0:
                 player.flash_ticks -= 1
+            if player.speed_boost_ticks > 0:
+                player.speed_boost_ticks -= 1
 
     def step_gold_collection(self) -> None:
         """任一玩家碰到金錠/血包就撿起。金錠累計計數；血包回復最大血量 30%（不超過滿血）。"""

@@ -81,6 +81,12 @@ _grenade_spin_angle: dict = {}
 _grenade_sprites:    dict = {}
 # 手榴彈爆炸特效佇列：[(world_x, world_y, spawn_time, owner_id)]
 _grenade_explosions: list = []
+# 手裡劍（bullet_type=3）：bid → 第一次出現時的 state.tick（推算成長大小用）
+_shuriken_first_tick: dict = {}
+_SHURIKEN_GROW_RATE = 0.3   # px/tick，與 state.py 保持一致
+# 速度提升殘影：[rotated_surface, world_x, world_y, spawn_tick]
+_afterimages: list = []
+_last_afterimage_tick: int = 0
 
 SHAKE_AMP  = 5    # 最大位移像素
 SHAKE_FREQ = 40   # 振盪頻率 Hz
@@ -172,7 +178,7 @@ def _process_hits(state: GameState, obstacles: dict) -> None:
 
     _prev_bullet_pos.clear()
     for bid, b in state.bullets.items():
-        if getattr(b, 'bullet_type', 0) == 0:   # 閃光彈不參與震動偵測
+        if getattr(b, 'bullet_type', 0) == 0:   # 投擲物/手裡劍不參與震動偵測
             _prev_bullet_pos[bid] = (b.x, b.y)
 
 
@@ -377,6 +383,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     _draw_particles(screen, cx, cy)
     _draw_gold_ingots(screen, state, cx, cy)
     _draw_bullets(screen, state, cx, cy, player_chars or {})
+    _draw_boost_afterimages(screen, cx, cy, state.tick)
     _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg,
                   player_chars or {})
 
@@ -558,6 +565,9 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
         if bid not in current_bids:
             _bubble_spawn_time.pop(bid, None)
             _bubble_max_radius.pop(bid, None)
+    for bid in list(_shuriken_first_tick.keys()):
+        if bid not in current_bids:
+            _shuriken_first_tick.pop(bid, None)
 
     # ── 閃光彈消失偵測 → 觸發爆炸特效 ───────────────────────────
     current_flash = {bid for bid, b in state.bullets.items()
@@ -565,10 +575,8 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
     for bid in set(_flash_bullet_pos) - current_flash:
         if bid in _flash_bullet_pos:
             _flash_explosions.append((*_flash_bullet_pos[bid], now))
-    for bid in list(_flash_bullet_pos):
-        if bid not in current_flash:
-            del _flash_bullet_pos[bid]
-            _flash_spin_angle.pop(bid, None)
+        _flash_bullet_pos.pop(bid, None)
+        _flash_spin_angle.pop(bid, None)
 
     # ── 手榴彈消失偵測 → 觸發爆炸特效 ───────────────────────────
     current_grenade = {bid for bid, b in state.bullets.items()
@@ -577,19 +585,42 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
         if bid in _grenade_bullet_pos:
             bx, by, bowner = _grenade_bullet_pos[bid]
             _grenade_explosions.append((bx, by, now, bowner))
-    for bid in list(_grenade_bullet_pos):
-        if bid not in current_grenade:
-            del _grenade_bullet_pos[bid]
-            _grenade_spin_angle.pop(bid, None)
+        _grenade_bullet_pos.pop(bid, None)
+        _grenade_spin_angle.pop(bid, None)
 
     for bullet in state.bullets.values():
         sx, sy = _ws(bullet.x, bullet.y, cx, cy)
+        btype  = getattr(bullet, 'bullet_type', 0)
         if -60 <= sx <= SCREEN_W + 60 and -60 <= sy <= SCREEN_H + 60:
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
+            # ── 手裡劍（RMB）：等速旋轉，隨時間成長 ─────────────
+            if btype == 3:
+                if bullet.id not in _shuriken_first_tick:
+                    _shuriken_first_tick[bullet.id] = state.tick
+                age  = state.tick - _shuriken_first_tick[bullet.id]
+                grow = age * _SHURIKEN_GROW_RATE
+                r_outer = max(BULLET_RADIUS, BULLET_RADIUS + grow)
+                r_inner = r_outer * 0.45
+                spin = time.perf_counter() * 6.0   # 約 1 轉/秒（rad/s）
+                pts = []
+                for i in range(8):
+                    r = r_outer if i % 2 == 0 else r_inner
+                    ang = spin + i * math.pi / 4
+                    pts.append((sx + r * math.cos(ang), sy + r * math.sin(ang)))
+                # 發光外圈
+                glow_r = int(r_outer + 3)
+                glow_surf = pygame.Surface((glow_r * 2 + 2, glow_r * 2 + 2), pygame.SRCALPHA)
+                pygame.draw.circle(glow_surf, (*color, 60),
+                                   (glow_r + 1, glow_r + 1), glow_r)
+                screen.blit(glow_surf, (sx - glow_r - 1, sy - glow_r - 1))
+                if len(pts) >= 3:
+                    pygame.draw.polygon(screen, color, pts)
+                continue
+
             # ── 閃光彈：等減速旋轉圖片 ───────────────────────────
-            if getattr(bullet, 'bullet_type', 0) == 1:
+            if btype == 1:
                 prev_pos = _flash_bullet_pos.get(bullet.id)
                 speed = (math.hypot(bullet.x - prev_pos[0], bullet.y - prev_pos[1])
                          if prev_pos else 0.0)
@@ -616,7 +647,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
                 continue
 
             # ── 手榴彈：等減速旋轉圖片 ───────────────────────────
-            if getattr(bullet, 'bullet_type', 0) == 2:
+            if btype == 2:
                 prev_pos = _grenade_bullet_pos.get(bullet.id)
                 speed = (math.hypot(bullet.x - prev_pos[0], bullet.y - prev_pos[1])
                          if prev_pos else 0.0)
@@ -719,6 +750,36 @@ def _draw_flash_screen(screen, state, my_id: int) -> None:
     screen.blit(overlay, (0, 0))
 
 
+def _maybe_spawn_afterimage(px: float, py: float,
+                             rotated_surf: pygame.Surface,
+                             state_tick: int) -> None:
+    """每 6 ticks 在本地玩家位置留下一個殘影。"""
+    global _last_afterimage_tick
+    import game.input as _inp
+    if pygame.time.get_ticks() >= _inp._speed_boost_end_ms:
+        return
+    if state_tick - _last_afterimage_tick < 6:
+        return
+    _last_afterimage_tick = state_tick
+    _afterimages.append([rotated_surf.copy(), px, py, state_tick])
+
+
+def _draw_boost_afterimages(screen, cx: float, cy: float, state_tick: int) -> None:
+    """繪製速度提升殘影（18 tick 內線性淡出），須在玩家之前呼叫使其出現在底層。"""
+    alive = []
+    for img, wx, wy, spawn_tick in _afterimages:
+        age = state_tick - spawn_tick
+        if age >= 24:
+            continue
+        alive.append([img, wx, wy, spawn_tick])
+        alpha = int(170 * (1.0 - age / 24))
+        tmp = img.copy()
+        tmp.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
+        sx, sy = _ws(wx, wy, cx, cy)
+        screen.blit(tmp, (sx - img.get_width() // 2, sy - img.get_height() // 2))
+    _afterimages[:] = alive
+
+
 def _spawn_dash_dust(px: float, py: float) -> None:
     """衝刺時在玩家後方噴出灰塵粒子（每幀 3 顆）。"""
     import game.input as _inp
@@ -757,18 +818,19 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         if pid == my_id:
             stance = my_stance
             angle  = aim_angle_deg
-            _spawn_dash_dust(player.x, player.y)   # 衝刺灰塵
+            _spawn_dash_dust(player.x, player.y)
         else:
             stance = player.stance
             angle  = player.aim_angle
 
         char_key = player_chars.get(pid, "hitman1")
         sprite   = _get_player_sprite(char_key, stance)
-        # sprite 預設朝右（+x 方向），pygame rotate 逆時針為正
-        # 90 - angle 讓 angle=0（瞄準正上方）時轉 +90°（逆時針），sprite 正確朝上
         rotated = pygame.transform.rotate(sprite, 90 - angle)
         screen.blit(rotated, (sx - rotated.get_width()  // 2,
                                sy - rotated.get_height() // 2))
+
+        if pid == my_id:
+            _maybe_spawn_afterimage(player.x, player.y, rotated, state.tick)
 
         # 對方頭上顯示 HP bar（依真實血量百分比）
         if pid != my_id:

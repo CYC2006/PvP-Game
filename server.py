@@ -109,14 +109,21 @@ def run():
                 if addr in addr_to_id and game_started:
                     cmd = unpack_command(data)
                     # 技能觸發（依角色 char_key 判斷）
+                    p = state.players.get(cmd.player_id)
                     if cmd.use_skill_e:
-                        p = state.players.get(cmd.player_id)
                         if p and p.char_key == 'hitman1':
                             state._spawn_flash_grenade(
                                 cmd.player_id, cmd.aim_x, cmd.aim_y)
                         elif p and p.char_key == 'manBlue':
                             state._spawn_grenade(
                                 cmd.player_id, cmd.aim_x, cmd.aim_y)
+                    if cmd.use_skill_rmb:
+                        if p and p.char_key == 'survivor1':
+                            state._spawn_shuriken(
+                                cmd.player_id, cmd.aim_x, cmd.aim_y)
+                    if cmd.use_skill_space:
+                        if p and p.char_key == 'survivor1':
+                            state._activate_speed_boost(cmd.player_id)
                     state.apply_command(
                         cmd.player_id,
                         cmd.move_x, cmd.move_y,

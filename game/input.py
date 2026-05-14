@@ -18,6 +18,9 @@ _player_speed: float = 3.0
 
 _skill_cds_ms:  dict = {'space': -1, 'e': -1, 'r': -1, 'rmb': -1}
 _skill_last_ms: dict = {'space':  0, 'e':  0, 'r':  0, 'rmb':  0}
+_char_key:           str  = ""
+_rmb_prev:           bool = False
+_speed_boost_end_ms: int  = 0   # 速度提升到期時間（ms），供 renderer 粒子使用
 
 # ── 衝刺常數 ──────────────────────────────────────────────────────
 # 9 ticks：15 + 14.1 + … + 7.8 ≈ 102 px，接近 100 px
@@ -44,6 +47,7 @@ def init_char(char_key: str) -> None:
     global _ammo, _reloading, _reload_start_ms, _last_shot_time
     global _player_speed, _skill_cds_ms, _skill_last_ms
     global _dash_active, _dash_speed, _space_prev
+    global _char_key, _rmb_prev, _speed_boost_end_ms
 
     from game.char_data import get_stat, CHAR_STATS
 
@@ -70,7 +74,9 @@ def init_char(char_key: str) -> None:
     }
     _skill_last_ms = {'space': 0, 'e': 0, 'r': 0, 'rmb': 0}
 
-    _ammo            = MAGAZINE_SIZE
+    _char_key           = char_key
+    _speed_boost_end_ms = 0
+    _ammo               = MAGAZINE_SIZE
     _reloading       = False
     _reload_start_ms = 0
     _last_shot_time  = 0
@@ -78,6 +84,7 @@ def init_char(char_key: str) -> None:
     _dash_speed      = 0.0
     _space_prev      = False
     _e_prev          = False
+    _rmb_prev        = False
 
 
 def read_input(player_id: int, keys_held: set,
@@ -90,9 +97,9 @@ def read_input(player_id: int, keys_held: set,
                       remaining_ms == -1  → 技能尚未實作
     """
     global _last_shot_time, _ammo, _reloading, _reload_start_ms
-    global _space_prev, _e_prev
+    global _space_prev, _e_prev, _rmb_prev
     global _dash_active, _dash_dx, _dash_dy, _dash_speed
-    global _skill_last_ms
+    global _skill_last_ms, _speed_boost_end_ms
 
     now = pygame.time.get_ticks()
 
@@ -117,6 +124,10 @@ def read_input(player_id: int, keys_held: set,
     e_just_pressed     = e_held and not _e_prev
     _e_prev            = e_held
 
+    rmb_held           = pygame.mouse.get_pressed()[2]
+    rmb_just_pressed   = rmb_held and not _rmb_prev
+    _rmb_prev          = rmb_held
+
     # ── 位移 / WASD ───────────────────────────────────────────────
     dx, dy     = 0.0, 0.0
     speed_mult = 1.0
@@ -135,20 +146,23 @@ def read_input(player_id: int, keys_held: set,
         if pygame.K_a in keys_held or pygame.K_LEFT  in keys_held: dx -= 1.0
         if pygame.K_d in keys_held or pygame.K_RIGHT in keys_held: dx += 1.0
 
-        # ── 觸發衝刺 ──────────────────────────────────────────────
+        # ── 觸發衝刺（非 survivor1）或速度技能（survivor1）──────
         if (space_just_pressed
                 and _skill_cds_ms.get('space', -1) >= 0):
             cd_remaining = _skill_cds_ms['space'] - (now - _skill_last_ms['space'])
             if cd_remaining <= 0:
-                length = math.hypot(dx, dy)
-                if length > 0:
-                    _dash_active     = True
-                    _dash_dx         = dx / length
-                    _dash_dy         = dy / length
-                    speed_mult       = _DASH_V0 / max(_player_speed, 0.001)
-                    dx, dy           = _dash_dx, _dash_dy
-                    _dash_speed      = _DASH_V0 - _DASH_DECEL  # 下一 tick 用
-                    _skill_last_ms['space'] = now
+                if _char_key == 'survivor1':
+                    pass   # 冷卻由下方 use_skill_space 區塊統一記錄
+                else:
+                    length = math.hypot(dx, dy)
+                    if length > 0:
+                        _dash_active     = True
+                        _dash_dx         = dx / length
+                        _dash_dy         = dy / length
+                        speed_mult       = _DASH_V0 / max(_player_speed, 0.001)
+                        dx, dy           = _dash_dx, _dash_dy
+                        _dash_speed      = _DASH_V0 - _DASH_DECEL
+                        _skill_last_ms['space'] = now
 
     running = shift_held and not _dash_active
 
@@ -159,6 +173,25 @@ def read_input(player_id: int, keys_held: set,
         if cd_remaining <= 0:
             use_skill_e = True
             _skill_last_ms['e'] = now
+
+    # ── RMB 技能（手裡劍等）──────────────────────────────────────
+    use_skill_rmb = False
+    if (rmb_just_pressed and _skill_cds_ms.get('rmb', -1) >= 0):
+        cd_remaining = _skill_cds_ms['rmb'] - (now - _skill_last_ms['rmb'])
+        if cd_remaining <= 0:
+            use_skill_rmb = True
+            _skill_last_ms['rmb'] = now
+
+    # ── Space 技能（survivor1：速度提升）─────────────────────────
+    use_skill_space = False
+    if (_char_key == 'survivor1'
+            and space_just_pressed
+            and _skill_cds_ms.get('space', -1) >= 0):
+        cd_elapsed = now - _skill_last_ms['space']
+        if cd_elapsed >= _skill_cds_ms['space']:
+            use_skill_space = True
+            _skill_last_ms['space'] = now
+            _speed_boost_end_ms = now + 3000   # 3 秒提升
 
     # ── 射擊（換彈中禁止）────────────────────────────────────────
     shooting = False
@@ -193,5 +226,7 @@ def read_input(player_id: int, keys_held: set,
         stance=effective_stance,
         speed_mult=speed_mult,
         use_skill_e=use_skill_e,
+        use_skill_rmb=use_skill_rmb,
+        use_skill_space=use_skill_space,
     )
     return cmd, effective_stance, _ammo, _reloading, skill_cooldowns

@@ -1,10 +1,10 @@
 char_key,name,folder,hp,speed_pxs,gun,dmg_min,dmg_max,mag,fire_interval,reload_time,bspeed_pxs,bspeed_min_pxs,spread,pellet_count,pellet_interval(tick),brange_px,brange_min_px,shoot_slow,shoot_slow_dur(tick),cd_rmb,cd_space,cd_e,cd_r
-hitman1,Agent,Hitman 1,120,180,Pistol,25,30,12,0.3,2,700,,5,,,800,780,0.7,6,0,5,8,0
+hitman1,Agent,Hitman 1,120,180,Pistol,25,30,12,0.3,2,700,,5,,,800,780,0.7,6,0,5,7,0
 manBlue,Rambo,Man Blue,200,120,Shotgun,4,8,6,0.5,4,800,570,15,10,0.5,150,130,0.2,6,0,0,8,0
 manBrown,Bear,Man Brown,150,150,Machine,15,20,40,0.15,4,900,,8,,,1000,980,0.7,9,0,0,0,0
 manOld,Sniper,Man Old,80,210,Sniper,75,80,5,1,5,1400,,1,,,infinity,infinity,0.5,24,0,0,0,0
-robot1,Robot,Robot 1,120,240,Laser,,,,,,,,,,,,,1.0,,0,0,0,0
+robot1,Robot,Robot 1,,,Laser,,,,,,,,,,,,,1.0,,0,0,0,0
 soldier1,Soldier,Soldier 1,180,210,Rifle,10,15,25,0.08,3,800,,12,,,500,480,0.8,6,0,0,0,0
-survivor1,Assassin,Survivor 1,100,280,Shuriken,15,20,infinity,1,0,700,,4,5,3,400,380,0.2,12,0,0,0,0
+survivor1,Assassin,Survivor 1,100,250,Shuriken,10,15,infinity,1,0,700,,4,5,3,400,380,0.2,12,5,10,0,0
 womanGreen,Dancer,Woman Green,140,180,Poison,2,3,100,0.05,5,300,260,15,,,,,0.7,6,0,0,0,0
-zoimbie1,Zombie,Zombie 1,300,270,Hand,,,,,,,,,,,,,1.0,,0,0,0,0
+zoimbie1,Zombie,Zombie 1,,,Hand,,,,,,,,,,,,,1.0,,0,0,0,0
