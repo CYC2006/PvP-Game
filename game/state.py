@@ -159,6 +159,7 @@ class GameState:
     _pending_pellets: list   = field(default_factory=list)   # [(fire_tick, Bullet)]
     smoke_patches: dict      = field(default_factory=dict)   # sid → SmokePatch
     blade_arcs: dict         = field(default_factory=dict)   # bid → BladeArc
+    _blade_spawn_queue: list = field(default_factory=list)   # [(spawn_tick, owner_id, x, y, radius, orbit_angle, direction, damage)]
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -710,43 +711,52 @@ class GameState:
             return
         theta = math.atan2(aim_y, aim_x)   # 瞄準方向（弧度）
 
-        # 左側 3 刀：以 theta-45° 為基準，順時針（angle 遞增）
-        left_base = theta - math.pi / 4
-        for i in range(3):
-            offset = math.radians((i - 1) * 4.0)  # -4°, 0°, +4°
-            start  = left_base + offset
-            radius = random.uniform(40.0, 60.0)
-            bid    = self._next_blade_id
-            self._next_blade_id = (self._next_blade_id + 1) % 256
-            self.blade_arcs[bid] = BladeArc(
-                id=bid, owner_id=owner_id,
-                x=player.x + math.cos(start) * radius,
-                y=player.y + math.sin(start) * radius,
-                orbit_radius=radius,
-                orbit_angle=start,
-                direction=+1,
-                damage=random.randint(player.damage_min, max(player.damage_min, player.damage_max)),
-            )
-
-        # 右側 3 刀：以 theta+45° 為基準，逆時針（angle 遞減）
+        # 準備左右各 3 刀的參數，每 2 tick 交替生成一把（共 10 tick）
+        left_base  = theta - math.pi / 4
         right_base = theta + math.pi / 4
+        left_blades  = []
+        right_blades = []
         for i in range(3):
             offset = math.radians((i - 1) * 4.0)
-            start  = right_base + offset
-            radius = random.uniform(40.0, 60.0)
-            bid    = self._next_blade_id
-            self._next_blade_id = (self._next_blade_id + 1) % 256
-            self.blade_arcs[bid] = BladeArc(
-                id=bid, owner_id=owner_id,
-                x=player.x + math.cos(start) * radius,
-                y=player.y + math.sin(start) * radius,
-                orbit_radius=radius,
-                orbit_angle=start,
-                direction=-1,
-                damage=random.randint(player.damage_min, max(player.damage_min, player.damage_max)),
-            )
+            for blades, base, direction in (
+                    (left_blades,  left_base,  +1),
+                    (right_blades, right_base, -1)):
+                start  = base + offset
+                radius = random.uniform(40.0, 60.0)
+                damage = random.randint(player.damage_min, max(player.damage_min, player.damage_max))
+                blades.append((player.x + math.cos(start) * radius,
+                               player.y + math.sin(start) * radius,
+                               radius, start, direction, damage))
+
+        # 交替入佇列：L0 R0 L1 R1 L2 R2，每 2 tick 一把
+        for i in range(3):
+            for j, (side_list, _) in enumerate(((left_blades, +1), (right_blades, -1))):
+                x, y, radius, orbit_angle, direction, damage = side_list[i]
+                self._blade_spawn_queue.append((
+                    self.tick + (i * 2 + j) * 2,
+                    owner_id, x, y, radius, orbit_angle, direction, damage,
+                ))
 
     def step_blade_arcs(self) -> None:
+        # 處理延遲生成佇列
+        remaining = []
+        for entry in self._blade_spawn_queue:
+            spawn_tick, owner_id, x, y, radius, orbit_angle, direction, damage = entry
+            if self.tick >= spawn_tick:
+                bid = self._next_blade_id
+                self._next_blade_id = (self._next_blade_id + 1) % 256
+                self.blade_arcs[bid] = BladeArc(
+                    id=bid, owner_id=owner_id,
+                    x=x, y=y,
+                    orbit_radius=radius,
+                    orbit_angle=orbit_angle,
+                    direction=direction,
+                    damage=damage,
+                )
+            else:
+                remaining.append(entry)
+        self._blade_spawn_queue[:] = remaining
+
         to_remove = []
         for blade in self.blade_arcs.values():
             player = self.players.get(blade.owner_id)

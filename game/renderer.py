@@ -733,9 +733,10 @@ def _draw_blade_arcs(screen, state, cx: float, cy: float) -> None:
         # 公轉角（刀片位置相對玩家的方向角）
         orbit_angle = (math.atan2(blade.y - owner.y, blade.x - owner.x)
                        if owner else 0.0)
-        # 行進切線方向 + 時間自轉
-        travel_dir = orbit_angle + blade.direction * math.pi / 2
-        spin = travel_dir + now * 4.0
+        # 行進切線方向 + 時間自轉 + 每把刀固定隨機初始偏角
+        travel_dir   = orbit_angle + blade.direction * math.pi / 2
+        spin_offset  = (blade.id * 1.0472) % (math.pi * 2)   # 各刀 ~60° 差距散開
+        spin = travel_dir + now * 4.0 + spin_offset
 
         # 淡入前 5 tick、淡出後 5 tick
         age   = blade.age
