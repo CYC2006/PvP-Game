@@ -346,8 +346,8 @@ class GameState:
                 if not obs.solid:          # 非實體（樹/草叢）→ 子彈穿透
                     continue
                 if obs.collides_circle(bullet.x, bullet.y, coll_r):
-                    if bullet.bullet_type == 1:
-                        continue   # 閃光彈無視障礙物，繼續飛行
+                    if bullet.bullet_type in (1, 2):
+                        continue   # 投擲物無視障礙物，繼續飛行
                     if bullet.dot_interval > 0:
                         # DoT 子彈（毒氣泡）：撞牆時停住，不消失，持續傷害障礙物
                         if bullet.dx != 0.0 or bullet.dy != 0.0:
@@ -401,10 +401,12 @@ class GameState:
 
         for bid in expired:
             b = self.bullets.get(bid)
-            # 閃光彈 linger 結束時爆炸（已停止 + linger 耗盡）
-            if (b and b.bullet_type == 1
-                    and b.decel > 0 and b.dx == 0.0 and b.dy == 0.0):
-                self._trigger_flash_explosion(b.x, b.y, b.owner_id)
+            # 投擲物 linger 結束時爆炸
+            if b and b.decel > 0 and b.dx == 0.0 and b.dy == 0.0:
+                if b.bullet_type == 1:
+                    self._trigger_flash_explosion(b.x, b.y, b.owner_id)
+                elif b.bullet_type == 2:
+                    self._trigger_grenade_explosion(b.x, b.y, b.owner_id)
             self.bullets.pop(bid, None)
             for k in [k for k in self._dot_cooldown if k[0] == bid]:
                 del self._dot_cooldown[k]
@@ -484,6 +486,48 @@ class GameState:
                 continue
             if math.hypot(player.x - x, player.y - y) <= self._FLASH_RADIUS:
                 player.flash_ticks = self._FLASH_TICKS
+
+    _GRENADE_RADIUS  = 120.0
+    _GRENADE_DMG_MAX = 80    # 中心傷害
+    _GRENADE_DMG_MIN = 20    # 邊緣傷害
+
+    def _spawn_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        player = self.players.get(owner_id)
+        if not player:
+            return
+        length = math.hypot(aim_x, aim_y)
+        if length == 0:
+            return
+        ux, uy = aim_x / length, aim_y / length
+        SPEED  = 8.8
+        DECEL  = 0.2
+        LINGER = 12
+        bid = self._next_bullet_id
+        self._next_bullet_id = (self._next_bullet_id + 1) % 256
+        self.bullets[bid] = Bullet(
+            id=bid, owner_id=owner_id,
+            x=player.x + ux * (PLAYER_RADIUS + 12),
+            y=player.y + uy * (PLAYER_RADIUS + 12),
+            dx=ux * SPEED, dy=uy * SPEED,
+            aim_angle=math.degrees(math.atan2(uy * SPEED, ux * SPEED)),
+            max_range=BULLET_MAX_RANGE * 999,
+            decel=DECEL,
+            linger_ticks=LINGER,
+            bullet_type=2,
+        )
+
+    def _trigger_grenade_explosion(self, x: float, y: float, owner_id: int) -> None:
+        for pid, player in self.players.items():
+            if pid == owner_id:
+                continue
+            dist = math.hypot(player.x - x, player.y - y)
+            if dist <= self._GRENADE_RADIUS:
+                t      = dist / self._GRENADE_RADIUS                      # 0=中心 1=邊緣
+                damage = int(self._GRENADE_DMG_MIN
+                             + (self._GRENADE_DMG_MAX - self._GRENADE_DMG_MIN) * (1-t) * (1-t))
+                player.hp -= damage
+                if player.hp <= 0:
+                    player.respawn()
 
     def step_status_effects(self) -> None:
         for player in self.players.values():

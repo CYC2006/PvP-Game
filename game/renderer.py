@@ -73,6 +73,14 @@ _flash_bullet_pos: dict = {}
 _flash_explosions: list = []
 # 閃光彈旋轉角度累積：bid → 累積 radians
 _flash_spin_angle: dict = {}
+# 閃光彈圖片快取：owner_id → Surface
+_flashbang_sprites: dict = {}
+# 手榴彈追蹤
+_grenade_bullet_pos: dict = {}
+_grenade_spin_angle: dict = {}
+_grenade_sprites:    dict = {}
+# 手榴彈爆炸特效佇列：[(world_x, world_y, spawn_time, owner_id)]
+_grenade_explosions: list = []
 
 SHAKE_AMP  = 5    # 最大位移像素
 SHAKE_FREQ = 40   # 振盪頻率 Hz
@@ -378,6 +386,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
                     cx, cy, me.x, me.y)
 
     _draw_flash_explosions(screen, cx, cy)
+    _draw_grenade_explosions(screen, cx, cy)
     _draw_flash_screen(screen, state, my_id)  # 白色太陽眼鏡疊加層
 
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns)
@@ -561,28 +570,76 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             del _flash_bullet_pos[bid]
             _flash_spin_angle.pop(bid, None)
 
+    # ── 手榴彈消失偵測 → 觸發爆炸特效 ───────────────────────────
+    current_grenade = {bid for bid, b in state.bullets.items()
+                       if getattr(b, 'bullet_type', 0) == 2}
+    for bid in set(_grenade_bullet_pos) - current_grenade:
+        if bid in _grenade_bullet_pos:
+            bx, by, bowner = _grenade_bullet_pos[bid]
+            _grenade_explosions.append((bx, by, now, bowner))
+    for bid in list(_grenade_bullet_pos):
+        if bid not in current_grenade:
+            del _grenade_bullet_pos[bid]
+            _grenade_spin_angle.pop(bid, None)
+
     for bullet in state.bullets.values():
         sx, sy = _ws(bullet.x, bullet.y, cx, cy)
         if -60 <= sx <= SCREEN_W + 60 and -60 <= sy <= SCREEN_H + 60:
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
-            # ── 閃光彈：等減速旋轉長方形 ─────────────────────────
+            # ── 閃光彈：等減速旋轉圖片 ───────────────────────────
             if getattr(bullet, 'bullet_type', 0) == 1:
                 prev_pos = _flash_bullet_pos.get(bullet.id)
                 speed = (math.hypot(bullet.x - prev_pos[0], bullet.y - prev_pos[1])
-                         if prev_pos else 0.0)     # 從位置差推算速度
+                         if prev_pos else 0.0)
                 _flash_bullet_pos[bullet.id] = (bullet.x, bullet.y)
                 prev  = _flash_spin_angle.get(bullet.id, 0.0)
-                angle = prev + speed * 0.06        # 速度比例旋轉；停止後角度鎖定
+                angle = prev + speed * 0.06
                 _flash_spin_angle[bullet.id] = angle
-                a    = angle
-                hw, hh = 8, 4
-                pts  = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
-                rpts = [(sx + x*math.cos(a) - y*math.sin(a),
-                         sy + x*math.sin(a) + y*math.cos(a)) for x, y in pts]
-                pygame.draw.polygon(screen, color, rpts)
-                pygame.draw.polygon(screen, (255, 255, 255), rpts, 1)
+                owner = bullet.owner_id
+                if owner not in _flashbang_sprites:
+                    path = os.path.join("assets", "objects", f"flashbang_P{owner}.png")
+                    try:
+                        img = pygame.image.load(path).convert_alpha()
+                        img = pygame.transform.smoothscale(img, (48, 36))
+                    except Exception:
+                        img = None
+                    _flashbang_sprites[owner] = img
+                sprite = _flashbang_sprites.get(owner)
+                if sprite:
+                    rotated = pygame.transform.rotate(sprite, -math.degrees(angle))
+                    screen.blit(rotated, (sx - rotated.get_width()  // 2,
+                                         sy - rotated.get_height() // 2))
+                else:
+                    pygame.draw.circle(screen, color, (sx, sy), 7)
+                continue
+
+            # ── 手榴彈：等減速旋轉圖片 ───────────────────────────
+            if getattr(bullet, 'bullet_type', 0) == 2:
+                prev_pos = _grenade_bullet_pos.get(bullet.id)
+                speed = (math.hypot(bullet.x - prev_pos[0], bullet.y - prev_pos[1])
+                         if prev_pos else 0.0)
+                _grenade_bullet_pos[bullet.id] = (bullet.x, bullet.y, bullet.owner_id)
+                prev  = _grenade_spin_angle.get(bullet.id, 0.0)
+                angle = prev + speed * 0.06
+                _grenade_spin_angle[bullet.id] = angle
+                owner = bullet.owner_id
+                if owner not in _grenade_sprites:
+                    path = os.path.join("assets", "objects", f"grenade_P{owner}.png")
+                    try:
+                        img = pygame.image.load(path).convert_alpha()
+                        img = pygame.transform.smoothscale(img, (48, 48))
+                    except Exception:
+                        img = None
+                    _grenade_sprites[owner] = img
+                sprite = _grenade_sprites.get(owner)
+                if sprite:
+                    rotated = pygame.transform.rotate(sprite, -math.degrees(angle))
+                    screen.blit(rotated, (sx - rotated.get_width()  // 2,
+                                         sy - rotated.get_height() // 2))
+                else:
+                    pygame.draw.circle(screen, color, (sx, sy), 8)
                 continue
 
             if char_key == "womanGreen":
@@ -624,6 +681,29 @@ def _draw_flash_explosions(screen, cx: float, cy: float) -> None:
             pygame.draw.circle(surf, (255, 255, 220, alpha), (r, r), r)
             screen.blit(surf, (sx - r, sy - r))
     _flash_explosions[:] = alive
+
+
+def _draw_grenade_explosions(screen, cx: float, cy: float) -> None:
+    """繪製手榴彈爆炸擴散圈（投擲者所屬顏色）。"""
+    now      = time.perf_counter()
+    alive    = []
+    DURATION = 0.5
+    MAX_R    = 130
+    for wx, wy, t, owner in _grenade_explosions:
+        elapsed = now - t
+        if elapsed >= DURATION:
+            continue
+        alive.append((wx, wy, t, owner))
+        progress = elapsed / DURATION
+        r     = max(1, int(MAX_R * progress))
+        alpha = int(200 * (1.0 - progress))
+        col   = COL_BULLET.get(owner, (255, 200, 100))
+        sx, sy = _ws(wx, wy, cx, cy)
+        if -MAX_R <= sx <= SCREEN_W + MAX_R and -MAX_R <= sy <= SCREEN_H + MAX_R:
+            surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (*col, alpha), (r, r), r)
+            screen.blit(surf, (sx - r, sy - r))
+    _grenade_explosions[:] = alive
 
 
 def _draw_flash_screen(screen, state, my_id: int) -> None:

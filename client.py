@@ -43,21 +43,9 @@ def connect(sock: socket.socket, server_addr: tuple) -> int:
         time.sleep(0.05)
 
 
-def get_viewport(screen_w: int, screen_h: int) -> tuple:
-    scale    = min(screen_w / LOGICAL_W, screen_h / LOGICAL_H)
-    scaled_w = int(LOGICAL_W * scale)
-    scaled_h = int(LOGICAL_H * scale)
-    off_x    = (screen_w - scaled_w) // 2
-    off_y    = (screen_h - scaled_h) // 2
-    return scaled_w, scaled_h, off_x, off_y, scale
 
 
-def screen_to_logical(sx: int, sy: int,
-                       off_x: int, off_y: int, scale: float) -> tuple:
-    return int((sx - off_x) / scale), int((sy - off_y) / scale)
-
-
-def char_select_loop(sock, server_addr, screen, logical_surf,
+def char_select_loop(sock, server_addr, screen,
                      font_lg, font_sm, clock) -> tuple:
     """
     選角畫面主迴圈（carousel 版）。
@@ -107,15 +95,8 @@ def char_select_loop(sock, server_addr, screen, logical_surf,
 
         # ── 更新 & 繪製 ───────────────────────────────────────────
         charselect.update(dt)
-
-        sw, sh = screen.get_size()
-        scaled_w, scaled_h, off_x, off_y, _ = get_viewport(sw, sh)
-
-        charselect.draw_char_select(logical_surf, font_lg, font_sm,
+        charselect.draw_char_select(screen, font_lg, font_sm,
                                     my_ready, opponent_ready)
-        screen.fill((0, 0, 0))
-        scaled = pygame.transform.scale(logical_surf, (scaled_w, scaled_h))
-        screen.blit(scaled, (off_x, off_y))
         pygame.display.flip()
         clock.tick(FPS)
 
@@ -131,20 +112,21 @@ def run(server_ip: str) -> None:
     # 載入地圖（與 server 相同的 JSON）
     obstacles = load_map(MAP_PATH)
 
+    os.environ['SDL_WINDOW_ALLOW_HIGHDPI'] = '1'
     pygame.init()
     pygame.mouse.set_visible(True)
-    screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
+    screen = pygame.display.set_mode(
+        (LOGICAL_W, LOGICAL_H), pygame.SCALED | pygame.RESIZABLE)
     pygame.display.set_caption(f"PvP Game — Player {player_id}")
     _font_bold = os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf")
     _font_reg  = os.path.join("assets", "fonts", "MapleMono-NF-Regular.ttf")
     font_lg = pygame.font.Font(_font_bold, 22)
     font_sm = pygame.font.Font(_font_reg,  15)
-    clock        = pygame.time.Clock()
-    logical_surf = pygame.Surface((LOGICAL_W, LOGICAL_H))
+    clock   = pygame.time.Clock()
 
     # ── 選角畫面 ──────────────────────────────────────────────────
     player_chars, my_char_key = char_select_loop(
-        sock, server_addr, screen, logical_surf, font_lg, font_sm, clock)
+        sock, server_addr, screen, font_lg, font_sm, clock)
     if player_chars is None:
         pygame.quit()
         sock.close()
@@ -171,17 +153,16 @@ def run(server_ip: str) -> None:
                 elif event.key == pygame.K_F11:
                     fullscreen = not fullscreen
                     if fullscreen:
-                        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                        screen = pygame.display.set_mode(
+                            (LOGICAL_W, LOGICAL_H), pygame.SCALED | pygame.FULLSCREEN)
                     else:
-                        screen = pygame.display.set_mode((LOGICAL_W, LOGICAL_H), pygame.RESIZABLE)
+                        screen = pygame.display.set_mode(
+                            (LOGICAL_W, LOGICAL_H), pygame.SCALED | pygame.RESIZABLE)
                 keys_held.add(event.key)
             elif event.type == pygame.KEYUP:
                 keys_held.discard(event.key)
 
-        sw, sh = screen.get_size()
-        scaled_w, scaled_h, off_x, off_y, scale = get_viewport(sw, sh)
-        raw_mx, raw_my = pygame.mouse.get_pos()
-        logical_mouse  = screen_to_logical(raw_mx, raw_my, off_x, off_y, scale)
+        logical_mouse = pygame.mouse.get_pos()  # SCALED 模式下自動對應邏輯座標
 
         shift_held = (pygame.K_LSHIFT in keys_held or pygame.K_RSHIFT in keys_held)
         cmd, effective_stance, ammo, is_reloading, skill_cooldowns = read_input(
@@ -203,13 +184,9 @@ def run(server_ip: str) -> None:
         if latest:
             state = unpack_state(latest)
 
-        draw(logical_surf, state, player_id, font_sm, obstacles,
+        draw(screen, state, player_id, font_sm, obstacles,
              effective_stance, aim_angle_deg, ammo, is_reloading,
              player_chars, skill_cooldowns)
-
-        screen.fill((0, 0, 0))
-        scaled = pygame.transform.scale(logical_surf, (scaled_w, scaled_h))
-        screen.blit(scaled, (off_x, off_y))
         pygame.display.flip()
         clock.tick(FPS)
 

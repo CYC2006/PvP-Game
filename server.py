@@ -114,6 +114,9 @@ def run():
                         if p and p.char_key == 'hitman1':
                             state._spawn_flash_grenade(
                                 cmd.player_id, cmd.aim_x, cmd.aim_y)
+                        elif p and p.char_key == 'manBlue':
+                            state._spawn_grenade(
+                                cmd.player_id, cmd.aim_x, cmd.aim_y)
                     state.apply_command(
                         cmd.player_id,
                         cmd.move_x, cmd.move_y,
