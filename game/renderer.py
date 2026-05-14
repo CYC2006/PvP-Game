@@ -3,7 +3,8 @@ import math
 import time
 import random
 import pygame
-from game.state import GameState, MAP_WIDTH, MAP_HEIGHT, PLAYER_RADIUS, BULLET_RADIUS
+from game.state import (GameState, MAP_WIDTH, MAP_HEIGHT,
+                        PLAYER_RADIUS, BULLET_RADIUS)
 from game.input import MAGAZINE_SIZE, RELOAD_TIME_MS
 
 LOGICAL_W = 1280
@@ -392,6 +393,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _draw_trees(screen, obstacles, state.destroyed_obstacles,
                     cx, cy, me.x, me.y)
 
+    _draw_smoke_patches(screen, state, cx, cy, my_id)
     _draw_flash_explosions(screen, cx, cy)
     _draw_grenade_explosions(screen, cx, cy)
     _draw_flash_screen(screen, state, my_id)  # 白色太陽眼鏡疊加層
@@ -595,6 +597,11 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
+            # ── 煙霧彈：小灰綠色圓點 ──────────────────────────────
+            if btype == 4:
+                pygame.draw.circle(screen, (90, 120, 70), (sx, sy), 6)
+                continue
+
             # ── 手裡劍（RMB）：等速旋轉，隨時間成長 ─────────────
             if btype == 3:
                 if bullet.id not in _shuriken_first_tick:
@@ -691,6 +698,51 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
 
 
 # ── 玩家 ──────────────────────────────────────────────────────────────────────
+
+_SMOKE_FULL  = 360   # 6s × 60 fps（與 state._SMOKE_DURATION 一致）
+_SMOKE_FADE  = 60    # 1s fade
+
+
+def _is_hidden_by_smoke(opponent, local_player, state) -> bool:
+    """對手在煙霧中且本地玩家不在同一煙霧區域時回傳 True（對手不可見）。"""
+    for patch in state.smoke_patches.values():
+        if state.tick - patch.spawn_tick >= _SMOKE_FULL:
+            continue   # 淡出期間不再遮蔽視線，只剩薄紗視覺
+        if math.hypot(opponent.x - patch.x, opponent.y - patch.y) > patch.radius:
+            continue
+        # 對手在煙霧內：再看本地玩家是否也在同一個煙霧
+        if math.hypot(local_player.x - patch.x, local_player.y - patch.y) <= patch.radius:
+            continue   # 雙方都在 → 可見
+        return True
+    return False
+
+
+def _draw_smoke_patches(screen, state, cx: float, cy: float, my_id: int) -> None:
+    """繪製煙霧區域（對本地玩家呈半透明；對外部玩家呈不透明遮蔽）。"""
+    me = state.players.get(my_id)
+    for patch in state.smoke_patches.values():
+        age = state.tick - patch.spawn_tick
+        if age >= _SMOKE_FULL + _SMOKE_FADE:
+            continue
+        # alpha：全期 220，最後 1 秒線性淡出
+        if age < _SMOKE_FULL:
+            base_alpha = 220
+        else:
+            base_alpha = int(220 * (1.0 - (age - _SMOKE_FULL) / _SMOKE_FADE))
+        if base_alpha <= 0:
+            continue
+        # 本地玩家在煙霧內 → 半透明（仍可見場景）
+        my_inside = (me and
+                     math.hypot(me.x - patch.x, me.y - patch.y) <= patch.radius)
+        alpha = 70 if my_inside else base_alpha
+        r  = int(patch.radius)
+        sx, sy = _ws(patch.x, patch.y, cx, cy)
+        if sx < -r or sx > SCREEN_W + r or sy < -r or sy > SCREEN_H + r:
+            continue
+        surf = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
+        pygame.draw.circle(surf, (255, 255, 255, alpha), (r + 1, r + 1), r)
+        screen.blit(surf, (sx - r - 1, sy - r - 1))
+
 
 def _draw_flash_explosions(screen, cx: float, cy: float) -> None:
     """繪製閃光彈爆炸擴散白圈（投擲者螢幕可見）。"""
@@ -814,6 +866,12 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         if not (-cull <= sx <= SCREEN_W + cull
                 and -cull <= sy <= SCREEN_H + cull):
             continue
+
+        # 煙霧遮蔽：對手在煙霧中且本地玩家不在同一煙霧 → 不渲染
+        if pid != my_id:
+            me = state.players.get(my_id)
+            if me and _is_hidden_by_smoke(player, me, state):
+                continue
 
         if pid == my_id:
             stance = my_stance

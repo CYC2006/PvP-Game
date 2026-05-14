@@ -69,6 +69,15 @@ class GoldIngot:
 
 
 @dataclass
+class SmokePatch:
+    id: int
+    x: float
+    y: float
+    radius: float
+    spawn_tick: int
+
+
+@dataclass
 class Bullet:
     id: int
     owner_id: int
@@ -123,8 +132,10 @@ class GameState:
     tick: int                = 0
     _next_bullet_id: int     = 0
     _next_gold_id: int       = 0
+    _next_smoke_id: int      = 0
     _dot_cooldown: dict      = field(default_factory=dict)   # {(bid, pid): next_hit_tick}
     _pending_pellets: list   = field(default_factory=list)   # [(fire_tick, Bullet)]
+    smoke_patches: dict      = field(default_factory=dict)   # sid → SmokePatch
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -360,7 +371,7 @@ class GameState:
                 if not obs.solid:          # 非實體（樹/草叢）→ 子彈穿透
                     continue
                 if obs.collides_circle(bullet.x, bullet.y, coll_r):
-                    if bullet.bullet_type in (1, 2, 3):
+                    if bullet.bullet_type in (1, 2, 3, 4):
                         continue   # 投擲物 / 手裡劍無視障礙物，繼續飛行
                     if bullet.dot_interval > 0:
                         # DoT 子彈（毒氣泡）：撞牆時停住，不消失，持續傷害障礙物
@@ -421,6 +432,8 @@ class GameState:
                     self._trigger_flash_explosion(b.x, b.y, b.owner_id)
                 elif b.bullet_type == 2:
                     self._trigger_grenade_explosion(b.x, b.y, b.owner_id)
+                elif b.bullet_type == 4:
+                    self._trigger_smoke_explosion(b.x, b.y)
             self.bullets.pop(bid, None)
             for k in [k for k in self._dot_cooldown if k[0] == bid]:
                 del self._dot_cooldown[k]
@@ -532,6 +545,65 @@ class GameState:
         if player:
             player.speed_boost_ticks = 180   # 3 秒 × 60 fps
             player.speed_boost_mult  = 1.5
+
+    _SMOKE_DURATION = 360   # 6s 全不透明
+    _SMOKE_FADE     = 60    # 1s 淡出
+
+    def _spawn_smoke_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        player = self.players.get(owner_id)
+        if not player:
+            return
+        length = math.hypot(aim_x, aim_y)
+        if length == 0:
+            return
+        ux, uy = aim_x / length, aim_y / length
+        DECEL  = 0.2
+        LINGER = 12
+        DELAYS = (0, 4, 8, 12, 16)
+        # 速度分 5 個等寬 bucket（6~12 每格 1.2），打亂後每顆各取一格
+        # → 距離保證分散，但各格內仍隨機
+        SPD_MIN, SPD_MAX, N = 6.0, 12.0, 5
+        bucket_w = (SPD_MAX - SPD_MIN) / N
+        buckets  = random.sample(range(N), N)   # 隨機排列
+        spawn_x = player.x + ux * (PLAYER_RADIUS + 12)
+        spawn_y = player.y + uy * (PLAYER_RADIUS + 12)
+        for delay, bucket in zip(DELAYS, buckets):
+            lo  = SPD_MIN + bucket * bucket_w
+            spd = random.uniform(lo, lo + bucket_w)
+            dev = math.radians(random.uniform(-30.0, 30.0))
+            cos_d, sin_d = math.cos(dev), math.sin(dev)
+            gux = ux * cos_d - uy * sin_d
+            guy = ux * sin_d + uy * cos_d
+            bid = self._next_bullet_id
+            self._next_bullet_id = (self._next_bullet_id + 1) % 256
+            b = Bullet(
+                id=bid, owner_id=owner_id,
+                x=spawn_x, y=spawn_y,
+                dx=gux * spd, dy=guy * spd,
+                aim_angle=math.degrees(math.atan2(guy, gux)),
+                max_range=BULLET_MAX_RANGE * 999,
+                decel=DECEL,
+                linger_ticks=LINGER,
+                bullet_type=4,
+                spawn_tick=self.tick,
+            )
+            if delay == 0:
+                self.bullets[bid] = b
+            else:
+                self._pending_pellets.append((self.tick + delay, b))
+
+    def _trigger_smoke_explosion(self, x: float, y: float) -> None:
+        radius = 130 * random.uniform(0.8, 1.2)
+        sid = self._next_smoke_id
+        self._next_smoke_id = (self._next_smoke_id + 1) % 256
+        self.smoke_patches[sid] = SmokePatch(
+            id=sid, x=x, y=y, radius=radius, spawn_tick=self.tick)
+
+    def step_smoke_patches(self) -> None:
+        expired = [sid for sid, s in self.smoke_patches.items()
+                   if self.tick - s.spawn_tick >= self._SMOKE_DURATION + self._SMOKE_FADE]
+        for sid in expired:
+            del self.smoke_patches[sid]
 
     _GRENADE_RADIUS  = 120.0
     _GRENADE_DMG_MAX = 50    # 中心傷害

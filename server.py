@@ -117,6 +117,9 @@ def run():
                         elif p and p.char_key == 'manBlue':
                             state._spawn_grenade(
                                 cmd.player_id, cmd.aim_x, cmd.aim_y)
+                        elif p and p.char_key == 'survivor1':
+                            state._spawn_smoke_grenade(
+                                cmd.player_id, cmd.aim_x, cmd.aim_y)
                     if cmd.use_skill_rmb:
                         if p and p.char_key == 'survivor1':
                             state._spawn_shuriken(
@@ -161,6 +164,7 @@ def run():
                 state.resolve_player_collisions(obstacles)
                 state.step_gold_collection()
                 state.step_status_effects()
+                state.step_smoke_patches()
 
                 payload = pack_state(state)
                 for addr in clients.values():
