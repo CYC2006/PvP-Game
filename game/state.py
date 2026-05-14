@@ -488,8 +488,8 @@ class GameState:
                 player.flash_ticks = self._FLASH_TICKS
 
     _GRENADE_RADIUS  = 120.0
-    _GRENADE_DMG_MAX = 80    # 中心傷害
-    _GRENADE_DMG_MIN = 20    # 邊緣傷害
+    _GRENADE_DMG_MAX = 50    # 中心傷害
+    _GRENADE_DMG_MIN = 10    # 邊緣傷害
 
     def _spawn_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         player = self.players.get(owner_id)
@@ -499,22 +499,33 @@ class GameState:
         if length == 0:
             return
         ux, uy = aim_x / length, aim_y / length
-        SPEED  = 8.8
-        DECEL  = 0.2
-        LINGER = 12
-        bid = self._next_bullet_id
-        self._next_bullet_id = (self._next_bullet_id + 1) % 256
-        self.bullets[bid] = Bullet(
-            id=bid, owner_id=owner_id,
-            x=player.x + ux * (PLAYER_RADIUS + 12),
-            y=player.y + uy * (PLAYER_RADIUS + 12),
-            dx=ux * SPEED, dy=uy * SPEED,
-            aim_angle=math.degrees(math.atan2(uy * SPEED, ux * SPEED)),
-            max_range=BULLET_MAX_RANGE * 999,
-            decel=DECEL,
-            linger_ticks=LINGER,
-            bullet_type=2,
-        )
+        DECEL   = 0.2
+        LINGER  = 12
+        DELAYS  = (0, 4, 8)
+        spawn_x = player.x + ux * (PLAYER_RADIUS + 12)
+        spawn_y = player.y + uy * (PLAYER_RADIUS + 12)
+        for delay in DELAYS:
+            spd = round(random.uniform(8.5, 9.5), 1)
+            dev = math.radians(random.uniform(-10.0, 10.0))
+            cos_d, sin_d = math.cos(dev), math.sin(dev)
+            gux = ux * cos_d - uy * sin_d
+            guy = ux * sin_d + uy * cos_d
+            bid = self._next_bullet_id
+            self._next_bullet_id = (self._next_bullet_id + 1) % 256
+            b = Bullet(
+                id=bid, owner_id=owner_id,
+                x=spawn_x, y=spawn_y,
+                dx=gux * spd, dy=guy * spd,
+                aim_angle=math.degrees(math.atan2(guy * spd, gux * spd)),
+                max_range=BULLET_MAX_RANGE * 999,
+                decel=DECEL,
+                linger_ticks=LINGER,
+                bullet_type=2,
+            )
+            if delay == 0:
+                self.bullets[bid] = b
+            else:
+                self._pending_pellets.append((self.tick + delay, b))
 
     def _trigger_grenade_explosion(self, x: float, y: float, owner_id: int) -> None:
         for pid, player in self.players.items():
