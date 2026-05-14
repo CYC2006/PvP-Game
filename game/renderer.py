@@ -745,14 +745,6 @@ def _draw_blade_arcs(screen, state, cx: float, cy: float) -> None:
         draw_col = (int(r * alpha), int(g * alpha), int(b * alpha))
         pygame.draw.polygon(screen, draw_col, pts)
 
-        # 發光外圈
-        glow_r = 17
-        ga = int(55 * alpha)
-        if ga > 0:
-            gs = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
-            pygame.draw.circle(gs, (r, g, b, ga), (glow_r, glow_r), glow_r)
-            screen.blit(gs, (sx - glow_r, sy - glow_r))
-
 
 # ── 玩家 ──────────────────────────────────────────────────────────────────────
 

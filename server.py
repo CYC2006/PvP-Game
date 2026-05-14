@@ -127,10 +127,6 @@ def run():
                     if cmd.use_skill_space:
                         if p and p.char_key == 'survivor1':
                             state._activate_speed_boost(cmd.player_id)
-                    if cmd.use_skill_r:
-                        if p and p.char_key == 'survivor1':
-                            state._activate_blade_arc(
-                                cmd.player_id, cmd.aim_x, cmd.aim_y)
                     state.apply_command(
                         cmd.player_id,
                         cmd.move_x, cmd.move_y,

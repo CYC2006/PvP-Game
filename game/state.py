@@ -222,7 +222,10 @@ class GameState:
         if math.hypot(aim_x, aim_y) > 0:
             player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
         if shooting:
-            self._spawn_bullet(player_id, aim_x, aim_y)
+            if player.char_key == 'zoimbie1':
+                self._activate_blade_arc(player_id, aim_x, aim_y)
+            else:
+                self._spawn_bullet(player_id, aim_x, aim_y)
 
     def _spawn_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         player = self.players[owner_id]
@@ -622,7 +625,6 @@ class GameState:
             del self.smoke_patches[sid]
 
     _BLADE_LIFESPAN     = 30            # 0.5s × 60 fps
-    _BLADE_ANGULAR_VEL  = math.pi / 2 / 30   # rad/tick：30 tick 內公轉 90°
     _BLADE_HIT_RADIUS   = 12            # px，刀片碰撞半徑
 
     def _activate_blade_arc(self, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -639,7 +641,7 @@ class GameState:
         for i in range(3):
             offset = math.radians((i - 1) * 4.0)  # -4°, 0°, +4°
             start  = left_base + offset
-            radius = random.uniform(30.0, 50.0)
+            radius = random.uniform(40.0, 60.0)
             bid    = self._next_blade_id
             self._next_blade_id = (self._next_blade_id + 1) % 256
             self.blade_arcs[bid] = BladeArc(
@@ -649,7 +651,7 @@ class GameState:
                 orbit_radius=radius,
                 orbit_angle=start,
                 direction=+1,
-                damage=random.randint(10, 15),
+                damage=random.randint(player.damage_min, max(player.damage_min, player.damage_max)),
             )
 
         # 右側 3 刀：以 theta+45° 為基準，逆時針（angle 遞減）
@@ -657,7 +659,7 @@ class GameState:
         for i in range(3):
             offset = math.radians((i - 1) * 4.0)
             start  = right_base + offset
-            radius = random.uniform(30.0, 50.0)
+            radius = random.uniform(40.0, 60.0)
             bid    = self._next_blade_id
             self._next_blade_id = (self._next_blade_id + 1) % 256
             self.blade_arcs[bid] = BladeArc(
@@ -667,7 +669,7 @@ class GameState:
                 orbit_radius=radius,
                 orbit_angle=start,
                 direction=-1,
-                damage=random.randint(10, 15),
+                damage=random.randint(player.damage_min, max(player.damage_min, player.damage_max)),
             )
 
     def step_blade_arcs(self) -> None:
@@ -677,10 +679,13 @@ class GameState:
             if player is None:
                 to_remove.append(blade.id)
                 continue
-            blade.orbit_angle += blade.direction * self._BLADE_ANGULAR_VEL
             blade.age += 1
-            blade.x = player.x + math.cos(blade.orbit_angle) * blade.orbit_radius
-            blade.y = player.y + math.sin(blade.orbit_angle) * blade.orbit_radius
+            # 二次方緩出：開始快、結束慢
+            progress = blade.age / self._BLADE_LIFESPAN
+            ease = 1.0 - (1.0 - progress) ** 2
+            current_angle = blade.orbit_angle + blade.direction * (math.pi / 2) * ease
+            blade.x = player.x + math.cos(current_angle) * blade.orbit_radius
+            blade.y = player.y + math.sin(current_angle) * blade.orbit_radius
             if not blade.hit:
                 opponent_id = 3 - blade.owner_id
                 opponent    = self.players.get(opponent_id)
