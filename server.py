@@ -6,7 +6,7 @@ from game.state    import GameState
 from game.obstacle import load_map
 from network.protocol import (
     PKT_JOIN, PKT_CMD, PKT_CHAR_SELECT,
-    pack_joined, pack_state, pack_game_start,
+    pack_joined, pack_all_joined, pack_state, pack_game_start,
     unpack_command, packet_type,
 )
 
@@ -94,6 +94,10 @@ def run():
                         sock.sendto(pack_joined(pid), addr)
                         last_seen[pid] = time.perf_counter()
                         print(f"[Server] Player {pid} joined from {addr}")
+                        if len(clients) == MAX_PLAYERS:
+                            for a in clients.values():
+                                sock.sendto(pack_all_joined(), a)
+                            print("[Server] All players joined — sending PKT_ALL_JOINED")
 
             # ── 選角 ──────────────────────────────────────────────
             elif ptype == PKT_CHAR_SELECT:

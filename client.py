@@ -13,7 +13,7 @@ from game.obstacle   import load_map
 import game.charselect as charselect
 from game.lobby      import lobby_screen
 from network.protocol import (
-    PKT_JOINED, PKT_STATE, PKT_GAME_START,
+    PKT_JOINED, PKT_STATE, PKT_GAME_START, PKT_ALL_JOINED,
     pack_join, pack_command, pack_char_select,
     unpack_joined, unpack_state, unpack_game_start,
     packet_type,
@@ -94,6 +94,48 @@ def connect_screen(sock: socket.socket, server_addr: tuple,
         screen.blit(s, (CX - s.get_width() // 2, CY + 15))
         e = font_sm.render("ESC to cancel", True, COL_HINT)
         screen.blit(e, (CX - e.get_width() // 2, CY + 50))
+        pygame.display.flip()
+
+
+# ── 等待第二位玩家 ────────────────────────────────────────────────────────
+
+def wait_for_all_players(sock: socket.socket,
+                         screen: pygame.Surface,
+                         font_lg: pygame.font.Font,
+                         font_sm: pygame.font.Font,
+                         clock: pygame.time.Clock) -> bool:
+    """
+    顯示「等待玩家加入…」畫面，收到 PKT_ALL_JOINED 後回傳 True；
+    玩家關閉視窗則回傳 False。
+    """
+    dot_count = 0
+    dot_timer = 0.0
+    CX, CY    = LOGICAL_W // 2, LOGICAL_H // 2
+
+    while True:
+        dt = clock.tick(FPS) / 1000.0
+        dot_timer += dt
+        if dot_timer >= 0.4:
+            dot_timer  = 0.0
+            dot_count  = (dot_count + 1) % 4
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return False
+
+        try:
+            data, _ = sock.recvfrom(BUF_SIZE)
+            if packet_type(data) == PKT_ALL_JOINED:
+                return True
+        except (BlockingIOError, ConnectionResetError, OSError):
+            pass
+
+        screen.fill(COL_BG)
+        dots = "." * dot_count
+        t = font_lg.render(f"Waiting for player{dots}", True, COL_TEXT)
+        screen.blit(t, (CX - t.get_width() // 2, CY - 20))
         pygame.display.flip()
 
 
@@ -181,6 +223,12 @@ def run() -> None:
         return
 
     pygame.display.set_caption(f"PvP Game — Player {player_id}")
+
+    # ── 等待所有玩家連線 ─────────────────────────────────────────────
+    if not wait_for_all_players(sock, screen, font_lg, font_sm, clock):
+        pygame.quit()
+        sock.close()
+        return
 
     # ── 載入地圖 ────────────────────────────────────────────────────
     obstacles = load_map(MAP_PATH)

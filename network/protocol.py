@@ -9,6 +9,7 @@ PKT_CMD         = 0x03
 PKT_STATE       = 0x04
 PKT_CHAR_SELECT = 0x05   # client → server: 選好角色（2 bytes: type + char_id）
 PKT_GAME_START  = 0x06   # server → clients: 雙方都選完，遊戲開始
+PKT_ALL_JOINED  = 0x07   # server → clients: 所有玩家都已連線，可進入選角
 
 # PKT_STATE 格式:
 #   | type(1) | tick(I) |
@@ -31,6 +32,10 @@ _BLADE_ENTRY   = struct.Struct("!BhhBbB")   # id x_i16 y_i16 age dir owner_id
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
 _INT_TO_STANCE = {0: "stand", 1: "machine", 2: "hold"}
+
+
+def pack_all_joined() -> bytes:
+    return bytes([PKT_ALL_JOINED])
 
 
 def pack_join() -> bytes:
