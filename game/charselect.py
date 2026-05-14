@@ -1,9 +1,9 @@
 """
 Character selection screen — horizontal carousel.
 Scroll wheel / ← → to browse; centre card is the selected character.
-Click or Enter/Space to confirm.
-
-All character stats are imported from game.char_data (single source of truth).
+Click arrows or press ← → to navigate.
+Click CONFIRM button or press Enter to confirm / unconfirm.
+When confirmed: navigation (arrows, scroll, keys) is locked.
 """
 import os
 import time
@@ -36,7 +36,7 @@ CARD_W       = 190
 CARD_H       = 265
 CARD_SPACING = 225
 CENTER_X     = LOGICAL_W // 2
-CARD_Y       = 300          # 卡片中心 y（稍微往上移以騰出下方空間）
+CARD_Y       = 300          # 卡片中心 y
 
 # ── 顏色 ──────────────────────────────────────────────────────────────────
 COL_BG          = (20,  24,  32)
@@ -50,6 +50,7 @@ COL_NAME_CTR    = (255, 255, 255)
 COL_NAME        = (150, 155, 168)
 COL_ARROW       = (170, 180, 200)
 COL_ARROW_HOV   = (255, 230, 100)
+COL_ARROW_DIS   = (60,  66,  85)   # disabled (confirmed)
 COL_READY       = ( 80, 220, 130)
 COL_WAIT        = (140, 200, 255)
 COL_STATUS      = (190, 195, 210)
@@ -62,9 +63,24 @@ COL_STAT_LABEL  = (110, 130, 160)
 COL_STAT_VAL    = (230, 235, 245)
 COL_STAT_EMPTY  = (70,  78, 100)
 
+# Confirm button
+COL_BTN_ACTIVE  = (42, 130, 80)
+COL_BTN_HOV     = (55, 165, 100)
+COL_BTN_BD      = (80, 220, 130)
+COL_BTN_DIM     = (45,  50,  68)
+COL_BTN_DIM_BD  = (70,  78, 105)
+COL_BTN_TXT     = (220, 235, 220)
+COL_BTN_TXT_DIM = (90,  98, 120)
+
 # ── Carousel 狀態（模組全域）────────────────────────────────────────────
 _target_idx:  int   = 0
 _anim_offset: float = 0.0
+_confirmed:   bool  = False
+
+# ── 點擊區域（每幀在 draw 裡更新）────────────────────────────────────────
+_left_arr_rect:    pygame.Rect = pygame.Rect(0, 0, 0, 0)
+_right_arr_rect:   pygame.Rect = pygame.Rect(0, 0, 0, 0)
+_confirm_btn_rect: pygame.Rect = pygame.Rect(0, 0, 0, 0)
 
 # ── Sprite 快取 ───────────────────────────────────────────────────────────
 _sprite_cache: dict = {}
@@ -93,23 +109,51 @@ def _load_sprite(char: dict) -> pygame.Surface:
 # ── 公開 API ──────────────────────────────────────────────────────────────
 
 def reset() -> None:
-    global _target_idx, _anim_offset
+    global _target_idx, _anim_offset, _confirmed
     _target_idx  = 0
     _anim_offset = 0.0
+    _confirmed   = False
+
+
+def is_confirmed() -> bool:
+    return _confirmed
 
 
 def handle_event(event: pygame.event.Event) -> bool:
-    """回傳 True 表示玩家確認選擇。"""
-    global _target_idx
+    """
+    回傳 True 表示玩家剛剛確認選擇（confirmed 變為 True）。
+    確認狀態中：← → 與滾輪失效；再次點擊按鈕或 Enter 可取消確認。
+    """
+    global _target_idx, _confirmed
+
     if event.type == pygame.MOUSEWHEEL:
-        _target_idx = max(0, min(N - 1, _target_idx - event.y))
+        if not _confirmed:
+            _target_idx = max(0, min(N - 1, _target_idx - event.y))
+
     elif event.type == pygame.KEYDOWN:
-        if event.key in (pygame.K_LEFT,  pygame.K_a):
-            _target_idx = max(0, _target_idx - 1)
+        if event.key in (pygame.K_LEFT, pygame.K_a):
+            if not _confirmed:
+                _target_idx = max(0, _target_idx - 1)
         elif event.key in (pygame.K_RIGHT, pygame.K_d):
-            _target_idx = min(N - 1, _target_idx + 1)
-        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-            return True
+            if not _confirmed:
+                _target_idx = min(N - 1, _target_idx + 1)
+        elif event.key == pygame.K_RETURN:
+            _confirmed = not _confirmed
+            return _confirmed   # True = 剛確認；False = 剛取消確認
+
+    elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        mx, my = event.pos
+        # 左右箭頭（僅未確認時有效）
+        if not _confirmed:
+            if _left_arr_rect.collidepoint(mx, my) and _target_idx > 0:
+                _target_idx -= 1
+            elif _right_arr_rect.collidepoint(mx, my) and _target_idx < N - 1:
+                _target_idx += 1
+        # 確認按鈕（永遠可點）
+        if _confirm_btn_rect.collidepoint(mx, my):
+            _confirmed = not _confirmed
+            return _confirmed
+
     return False
 
 
@@ -133,6 +177,8 @@ def draw_char_select(screen: pygame.Surface,
                      font_sm: pygame.font.Font,
                      my_ready: bool,
                      opponent_ready: bool) -> None:
+    global _left_arr_rect, _right_arr_rect
+
     screen.fill(COL_BG)
 
     # ── 標題 ──────────────────────────────────────────────────────
@@ -170,7 +216,7 @@ def draw_char_select(screen: pygame.Surface,
         sprite.set_alpha(alpha)
         card_surf.blit(sprite, (w // 2 - sp_w // 2, int(h * 0.08)))
 
-        # 名稱（放大字體）
+        # 名稱
         name_col  = COL_NAME_CTR if is_center else COL_NAME
         name_surf = font_lg.render(char["name"], True, (*name_col, alpha))
         card_surf.blit(name_surf,
@@ -189,31 +235,46 @@ def draw_char_select(screen: pygame.Surface,
                  (CENTER_X + CARD_SPACING * 1.7 - 26, arrow_y - 16),
                  (CENTER_X + CARD_SPACING * 1.7 - 26, arrow_y + 16)]
 
-    def _arrow_col(pts):
+    def _make_rect(pts):
         xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
-        r = pygame.Rect(min(xs)-6, min(ys)-6,
-                        max(xs)-min(xs)+12, max(ys)-min(ys)+12)
-        return COL_ARROW_HOV if r.collidepoint(mx, my_pos) else COL_ARROW
+        return pygame.Rect(min(xs) - 8, min(ys) - 8,
+                           max(xs) - min(xs) + 16, max(ys) - min(ys) + 16)
 
-    if _target_idx > 0:
-        pygame.draw.polygon(screen, _arrow_col(left_pts),  left_pts)
-    if _target_idx < N - 1:
-        pygame.draw.polygon(screen, _arrow_col(right_pts), right_pts)
+    # 更新全域點擊矩形
+    _left_arr_rect  = _make_rect(left_pts)
+    _right_arr_rect = _make_rect(right_pts)
 
-    # ── 提示文字（未確認時顯示）──────────────────────────────────
+    def _arrow_col(pts, arr_rect, visible):
+        if not visible:
+            return None
+        if _confirmed:
+            return COL_ARROW_DIS
+        return COL_ARROW_HOV if arr_rect.collidepoint(mx, my_pos) else COL_ARROW
+
+    left_col  = _arrow_col(left_pts,  _left_arr_rect,  _target_idx > 0)
+    right_col = _arrow_col(right_pts, _right_arr_rect, _target_idx < N - 1)
+
+    if left_col:
+        pygame.draw.polygon(screen, left_col,  left_pts)
+    if right_col:
+        pygame.draw.polygon(screen, right_col, right_pts)
+
+    # ── 提示文字（未確認時）──────────────────────────────────────
     hint_y = CARD_Y + CARD_H // 2 + 22
     if not my_ready:
-        hint_surf = font_sm.render("← → scroll  /  Enter to confirm",
-                                   True, COL_HINT)
+        hint_surf = font_sm.render(
+            "← → / click arrows to browse   |   Enter or CONFIRM to lock in",
+            True, COL_HINT)
         screen.blit(hint_surf, (CENTER_X - hint_surf.get_width() // 2, hint_y))
 
-    # ── 數值面板 ──────────────────────────────────────────────────
+    # ── 數值面板 + 確認按鈕 ────────────────────────────────────────
     _draw_stats_panel(screen, font_lg, font_sm, hint_y + 34, my_ready)
 
 
 def _draw_stats_panel(screen, font_lg, font_sm, top_y: int,
                       my_ready: bool = False) -> None:
-    """顯示中央角色的數值：HP | GUN | DAMAGE | AMMO | RELOAD | RATE。"""
+    global _confirm_btn_rect
+
     char = CHARACTERS[_target_idx]
 
     reload = char["reload_time"]
@@ -229,19 +290,19 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int,
     spd_str = f"{spd} px/s"
 
     fields = [
-        ("HP",     str(char["hp"])),
-        ("SPEED",  spd_str),
-        ("GUN",    char["gun"]),
-        ("DAMAGE", char["damage"]),
-        ("AMMO",   char["ammo"]),
-        ("RELOAD",    reload_str),
-        ("INTERVAL",  interval_str),
+        ("HP",       str(char["hp"])),
+        ("SPEED",    spd_str),
+        ("GUN",      char["gun"]),
+        ("DAMAGE",   char["damage"]),
+        ("AMMO",     char["ammo"]),
+        ("RELOAD",   reload_str),
+        ("INTERVAL", interval_str),
     ]
 
-    panel_w  = 1100
-    panel_h  = 72
-    panel_x  = CENTER_X - panel_w // 2
-    panel_y  = top_y
+    panel_w = 1100
+    panel_h = 72
+    panel_x = CENTER_X - panel_w // 2
+    panel_y = top_y
 
     # 背景
     pygame.draw.rect(screen, COL_PANEL_BG,
@@ -249,31 +310,55 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int,
     pygame.draw.rect(screen, COL_PANEL_BD,
                      (panel_x, panel_y, panel_w, panel_h), 2, border_radius=10)
 
-    col_w = panel_w // len(fields)   # 欄寬隨欄數自動計算
+    col_w = panel_w // len(fields)
     for i, (label, value) in enumerate(fields):
         cx = panel_x + col_w * i + col_w // 2
 
-        # 分隔線
         if i > 0:
             line_x = panel_x + col_w * i
             pygame.draw.line(screen, COL_PANEL_BD,
                              (line_x, panel_y + 8), (line_x, panel_y + panel_h - 8))
 
-        # Label
         lbl = font_sm.render(label, True, COL_STAT_LABEL)
         screen.blit(lbl, (cx - lbl.get_width() // 2, panel_y + 10))
 
-        # Value
         if value:
             val_surf = font_lg.render(value, True, COL_STAT_VAL)
         else:
             val_surf = font_sm.render("—", True, COL_STAT_EMPTY)
         screen.blit(val_surf, (cx - val_surf.get_width() // 2, panel_y + 32))
 
-    # "Waiting for opponent" 文字（已確認後顯示在 panel 下方）
+    # ── 確認按鈕（panel 下方靠右）────────────────────────────────
+    btn_w, btn_h = 164, 38
+    btn_x = panel_x + panel_w - btn_w          # 與 panel 右緣對齊
+    btn_y = panel_y + panel_h + 10
+
+    _confirm_btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
+
+    mx, my_pos = pygame.mouse.get_pos()
+    hovering   = _confirm_btn_rect.collidepoint(mx, my_pos)
+
+    if _confirmed:
+        bg_col  = COL_BTN_DIM
+        bd_col  = COL_BTN_DIM_BD
+        txt_col = COL_BTN_TXT_DIM
+        label   = "CONFIRMED"
+    else:
+        bg_col  = COL_BTN_HOV if hovering else COL_BTN_ACTIVE
+        bd_col  = COL_BTN_BD
+        txt_col = COL_BTN_TXT
+        label   = "CONFIRM"
+
+    pygame.draw.rect(screen, bg_col, _confirm_btn_rect, border_radius=8)
+    pygame.draw.rect(screen, bd_col, _confirm_btn_rect, 2, border_radius=8)
+
+    btn_surf = font_lg.render(label, True, txt_col)
+    screen.blit(btn_surf, (btn_x + btn_w // 2 - btn_surf.get_width() // 2,
+                            btn_y + btn_h // 2 - btn_surf.get_height() // 2))
+
+    # ── Waiting for opponent（已確認時，與按鈕同一行，靠左對齊 panel）
     if my_ready:
         dots   = "." * (int(time.perf_counter() * 2) % 4)
         w_surf = font_lg.render(f"Waiting for opponent{dots}", True, COL_WAIT)
-        screen.blit(w_surf,
-                    (CENTER_X - w_surf.get_width() // 2,
-                     panel_y + panel_h + 16))
+        screen.blit(w_surf, (panel_x,
+                             btn_y + btn_h // 2 - w_surf.get_height() // 2))

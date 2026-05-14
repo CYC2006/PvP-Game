@@ -115,11 +115,12 @@ def char_select_loop(sock, server_addr, screen,
                 return None, None
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 return None, None
-            if not my_ready:
-                if charselect.handle_event(event):
-                    my_ready = True
-                    idx = charselect.selected_idx()
-                    sock.sendto(pack_char_select(idx), server_addr)
+            just_confirmed = charselect.handle_event(event)
+            if just_confirmed:
+                # 每次確認（含重新確認）都送一次選角封包
+                idx = charselect.selected_idx()
+                sock.sendto(pack_char_select(idx), server_addr)
+            my_ready = charselect.is_confirmed()
 
         while True:
             try:
