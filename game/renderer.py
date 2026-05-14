@@ -89,6 +89,21 @@ _SHURIKEN_GROW_RATE = 0.3   # px/tick，與 state.py 保持一致
 _afterimages: list = []
 _last_afterimage_tick: int = 0
 
+# 月刀弧形（blade arc）：預計算月牙形多邊形頂點（朝右，凹側朝右）
+def _build_crescent_pts():
+    n = 14
+    outer_r, inner_r, offset = 13, 10, 8
+    pts = []
+    for i in range(n + 1):
+        a = math.pi / 2 - math.pi * i / n
+        pts.append((outer_r * math.cos(a), outer_r * math.sin(a)))
+    for i in range(n + 1):
+        a = -math.pi / 2 + math.pi * i / n
+        pts.append((offset + inner_r * math.cos(a), inner_r * math.sin(a)))
+    return pts
+
+_crescent_pts = _build_crescent_pts()
+
 SHAKE_AMP  = 5    # 最大位移像素
 SHAKE_FREQ = 40   # 振盪頻率 Hz
 
@@ -387,6 +402,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     _draw_boost_afterimages(screen, cx, cy, state.tick)
     _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg,
                   player_chars or {})
+    _draw_blade_arcs(screen, state, cx, cy)
 
     # 樹/草叢繪製在玩家之上（最頂層），本地玩家在樹下時半透明
     if obstacles:
@@ -695,6 +711,47 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
                 screen.blit(surf, (sx - r, sy - r))
             else:
                 _draw_bullet_shape(screen, char_key, color, sx, sy, bullet.aim_angle)
+
+
+def _draw_blade_arcs(screen, state, cx: float, cy: float) -> None:
+    """繪製 Assassin R 技能的月牙形刀片（隨公轉旋轉，玩家所屬顏色）。"""
+    now = time.perf_counter()
+    for blade in state.blade_arcs.values():
+        owner = state.players.get(blade.owner_id)
+        sx, sy = _ws(blade.x, blade.y, cx, cy)
+        if sx < -40 or sx > SCREEN_W + 40 or sy < -40 or sy > SCREEN_H + 40:
+            continue
+        color = COL_BULLET.get(blade.owner_id, (255, 255, 200))
+
+        # 公轉角（刀片位置相對玩家的方向角）
+        orbit_angle = (math.atan2(blade.y - owner.y, blade.x - owner.x)
+                       if owner else 0.0)
+        # 行進切線方向 + 時間自轉
+        travel_dir = orbit_angle + blade.direction * math.pi / 2
+        spin = travel_dir + now * 4.0
+
+        # 淡入前 5 tick、淡出後 5 tick
+        age   = blade.age
+        alpha = min(1.0, min(age / 5.0, (30 - age) / 5.0))
+        if alpha <= 0:
+            continue
+
+        # 旋轉月牙形頂點
+        cos_s, sin_s = math.cos(spin), math.sin(spin)
+        pts = [(sx + x * cos_s - y * sin_s, sy + x * sin_s + y * cos_s)
+               for x, y in _crescent_pts]
+
+        r, g, b = color
+        draw_col = (int(r * alpha), int(g * alpha), int(b * alpha))
+        pygame.draw.polygon(screen, draw_col, pts)
+
+        # 發光外圈
+        glow_r = 17
+        ga = int(55 * alpha)
+        if ga > 0:
+            gs = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(gs, (r, g, b, ga), (glow_r, glow_r), glow_r)
+            screen.blit(gs, (sx - glow_r, sy - glow_r))
 
 
 # ── 玩家 ──────────────────────────────────────────────────────────────────────

@@ -15,3 +15,4 @@ class PlayerCommand:
     use_skill_e: bool = False
     use_skill_rmb: bool = False
     use_skill_space: bool = False
+    use_skill_r: bool = False

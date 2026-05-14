@@ -1,6 +1,6 @@
 import struct
 from game.command import PlayerCommand
-from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch
+from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc
 
 # --- Packet types ---
 PKT_JOIN        = 0x01
@@ -17,6 +17,7 @@ PKT_GAME_START  = 0x06   # server → clients: 雙方都選完，遊戲開始
 #   | d_count(B) | [obstacle_id(B)] * d_count |
 #   | g_count(B) | [id(B) x(f) y(f)] * g_count |
 #   | s_count(B) | [id(B) x(f) y(f) radius_u16(H) spawn_tick(I)] * s_count |
+#   | ba_count(B) | [id(B) x(h) y(h) age(B) dir(b) owner(B)] * ba_count |
 
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBffH")  # +H: speed_mult×1000
@@ -25,6 +26,7 @@ _PLAYER_ENTRY  = struct.Struct("!BffHHhBHB")  # id x y hp max_hp aim_angle stanc
 _BULLET_ENTRY  = struct.Struct("!BBffhB")     # id owner x y angle_i16 bullet_type
 _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
 _SMOKE_ENTRY   = struct.Struct("!BffHI")     # id x y radius*10 spawn_tick
+_BLADE_ENTRY   = struct.Struct("!BhhBbB")   # id x_i16 y_i16 age dir owner_id
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -46,14 +48,15 @@ def unpack_joined(data: bytes) -> int:
 
 def pack_command(cmd: PlayerCommand) -> bytes:
     # bit 0=shooting  bit 1=running  bits 2-3=stance  bit 4=use_skill_e
-    # bit 5=use_skill_rmb  bit 6=use_skill_space
+    # bit 5=use_skill_rmb  bit 6=use_skill_space  bit 7=use_skill_r
     stance_bits = _STANCE_TO_INT.get(cmd.stance, 0) << 2
     flags = (int(cmd.shooting)
              | (int(cmd.running)          << 1)
              | stance_bits
              | (int(cmd.use_skill_e)     << 4)
              | (int(cmd.use_skill_rmb)   << 5)
-             | (int(cmd.use_skill_space) << 6))
+             | (int(cmd.use_skill_space) << 6)
+             | (int(cmd.use_skill_r)     << 7))
     speed_raw = max(0, min(65535, int(cmd.speed_mult * 1000)))
     return _CMD_STRUCT.pack(
         PKT_CMD, cmd.player_id,
@@ -73,7 +76,8 @@ def unpack_command(data: bytes) -> PlayerCommand:
                          speed_mult=speed_raw / 1000.0,
                          use_skill_e=bool((flags >> 4) & 0x01),
                          use_skill_rmb=bool((flags >> 5) & 0x01),
-                         use_skill_space=bool((flags >> 6) & 0x01))
+                         use_skill_space=bool((flags >> 6) & 0x01),
+                         use_skill_r=bool((flags >> 7) & 0x01))
 
 
 def pack_state(state: GameState) -> bytes:
@@ -117,7 +121,14 @@ def pack_state(state: GameState) -> bytes:
         for s in smokes
     )
 
-    return header + p_data + b_data + d_data + g_data + s_data
+    blades = list(state.blade_arcs.values())
+    ba_data = bytes([len(blades)]) + b"".join(
+        _BLADE_ENTRY.pack(b.id, int(b.x), int(b.y),
+                          min(255, b.age), b.direction, b.owner_id)
+        for b in blades
+    )
+
+    return header + p_data + b_data + d_data + g_data + s_data + ba_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -164,6 +175,19 @@ def unpack_state(data: bytes) -> GameState:
             state.smoke_patches[sid] = SmokePatch(
                 id=sid, x=sx, y=sy, radius=r_u16 / 10.0, spawn_tick=stick)
             offset += _SMOKE_ENTRY.size
+
+    if offset < len(data):
+        ba_count = data[offset]; offset += 1
+        for _ in range(ba_count):
+            bid, bx, by, age, direction, owner = _BLADE_ENTRY.unpack(
+                data[offset: offset + _BLADE_ENTRY.size])
+            state.blade_arcs[bid] = BladeArc(
+                id=bid, owner_id=owner,
+                x=float(bx), y=float(by),
+                orbit_radius=0.0, orbit_angle=0.0,
+                direction=direction, damage=0, age=age,
+            )
+            offset += _BLADE_ENTRY.size
 
     return state
 

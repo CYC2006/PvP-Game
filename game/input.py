@@ -20,6 +20,7 @@ _skill_cds_ms:  dict = {'space': -1, 'e': -1, 'r': -1, 'rmb': -1}
 _skill_last_ms: dict = {'space':  0, 'e':  0, 'r':  0, 'rmb':  0}
 _char_key:           str  = ""
 _rmb_prev:           bool = False
+_r_prev:             bool = False
 _speed_boost_end_ms: int  = 0   # 速度提升到期時間（ms），供 renderer 粒子使用
 
 # ── 衝刺常數 ──────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ def init_char(char_key: str) -> None:
     global _ammo, _reloading, _reload_start_ms, _last_shot_time
     global _player_speed, _skill_cds_ms, _skill_last_ms
     global _dash_active, _dash_speed, _space_prev
-    global _char_key, _rmb_prev, _speed_boost_end_ms
+    global _char_key, _rmb_prev, _r_prev, _speed_boost_end_ms
 
     from game.char_data import get_stat, CHAR_STATS
 
@@ -85,6 +86,7 @@ def init_char(char_key: str) -> None:
     _space_prev      = False
     _e_prev          = False
     _rmb_prev        = False
+    _r_prev          = False
 
 
 def read_input(player_id: int, keys_held: set,
@@ -97,7 +99,7 @@ def read_input(player_id: int, keys_held: set,
                       remaining_ms == -1  → 技能尚未實作
     """
     global _last_shot_time, _ammo, _reloading, _reload_start_ms
-    global _space_prev, _e_prev, _rmb_prev
+    global _space_prev, _e_prev, _rmb_prev, _r_prev
     global _dash_active, _dash_dx, _dash_dy, _dash_speed
     global _skill_last_ms, _speed_boost_end_ms
 
@@ -127,6 +129,10 @@ def read_input(player_id: int, keys_held: set,
     rmb_held           = pygame.mouse.get_pressed()[2]
     rmb_just_pressed   = rmb_held and not _rmb_prev
     _rmb_prev          = rmb_held
+
+    r_held             = pygame.K_r in keys_held
+    r_just_pressed     = r_held and not _r_prev
+    _r_prev            = r_held
 
     # ── 位移 / WASD ───────────────────────────────────────────────
     dx, dy     = 0.0, 0.0
@@ -193,6 +199,14 @@ def read_input(player_id: int, keys_held: set,
             _skill_last_ms['space'] = now
             _speed_boost_end_ms = now + 3000   # 3 秒提升
 
+    # ── R 技能（月刀弧等）────────────────────────────────────────
+    use_skill_r = False
+    if (r_just_pressed and _skill_cds_ms.get('r', -1) >= 0):
+        cd_remaining = _skill_cds_ms['r'] - (now - _skill_last_ms['r'])
+        if cd_remaining <= 0:
+            use_skill_r = True
+            _skill_last_ms['r'] = now
+
     # ── 射擊（換彈中禁止）────────────────────────────────────────
     shooting = False
     if (not _reloading
@@ -228,5 +242,6 @@ def read_input(player_id: int, keys_held: set,
         use_skill_e=use_skill_e,
         use_skill_rmb=use_skill_rmb,
         use_skill_space=use_skill_space,
+        use_skill_r=use_skill_r,
     )
     return cmd, effective_stance, _ammo, _reloading, skill_cooldowns

@@ -78,6 +78,20 @@ class SmokePatch:
 
 
 @dataclass
+class BladeArc:
+    id: int
+    owner_id: int
+    x: float           # current world position (updated each tick by server)
+    y: float
+    orbit_radius: float
+    orbit_angle: float  # current orbit angle (radians)
+    direction: int      # +1 = CW on screen (angle++), -1 = CCW
+    damage: int         # pre-rolled 10~15
+    age: int = 0
+    hit: bool = False
+
+
+@dataclass
 class Bullet:
     id: int
     owner_id: int
@@ -133,9 +147,11 @@ class GameState:
     _next_bullet_id: int     = 0
     _next_gold_id: int       = 0
     _next_smoke_id: int      = 0
+    _next_blade_id: int      = 0
     _dot_cooldown: dict      = field(default_factory=dict)   # {(bid, pid): next_hit_tick}
     _pending_pellets: list   = field(default_factory=list)   # [(fire_tick, Bullet)]
     smoke_patches: dict      = field(default_factory=dict)   # sid → SmokePatch
+    blade_arcs: dict         = field(default_factory=dict)   # bid → BladeArc
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -604,6 +620,81 @@ class GameState:
                    if self.tick - s.spawn_tick >= self._SMOKE_DURATION + self._SMOKE_FADE]
         for sid in expired:
             del self.smoke_patches[sid]
+
+    _BLADE_LIFESPAN     = 30            # 0.5s × 60 fps
+    _BLADE_ANGULAR_VEL  = math.pi / 2 / 30   # rad/tick：30 tick 內公轉 90°
+    _BLADE_HIT_RADIUS   = 12            # px，刀片碰撞半徑
+
+    def _activate_blade_arc(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        player = self.players.get(owner_id)
+        if not player:
+            return
+        length = math.hypot(aim_x, aim_y)
+        if length == 0:
+            return
+        theta = math.atan2(aim_y, aim_x)   # 瞄準方向（弧度）
+
+        # 左側 3 刀：以 theta-45° 為基準，順時針（angle 遞增）
+        left_base = theta - math.pi / 4
+        for i in range(3):
+            offset = math.radians((i - 1) * 4.0)  # -4°, 0°, +4°
+            start  = left_base + offset
+            radius = random.uniform(30.0, 50.0)
+            bid    = self._next_blade_id
+            self._next_blade_id = (self._next_blade_id + 1) % 256
+            self.blade_arcs[bid] = BladeArc(
+                id=bid, owner_id=owner_id,
+                x=player.x + math.cos(start) * radius,
+                y=player.y + math.sin(start) * radius,
+                orbit_radius=radius,
+                orbit_angle=start,
+                direction=+1,
+                damage=random.randint(10, 15),
+            )
+
+        # 右側 3 刀：以 theta+45° 為基準，逆時針（angle 遞減）
+        right_base = theta + math.pi / 4
+        for i in range(3):
+            offset = math.radians((i - 1) * 4.0)
+            start  = right_base + offset
+            radius = random.uniform(30.0, 50.0)
+            bid    = self._next_blade_id
+            self._next_blade_id = (self._next_blade_id + 1) % 256
+            self.blade_arcs[bid] = BladeArc(
+                id=bid, owner_id=owner_id,
+                x=player.x + math.cos(start) * radius,
+                y=player.y + math.sin(start) * radius,
+                orbit_radius=radius,
+                orbit_angle=start,
+                direction=-1,
+                damage=random.randint(10, 15),
+            )
+
+    def step_blade_arcs(self) -> None:
+        to_remove = []
+        for blade in self.blade_arcs.values():
+            player = self.players.get(blade.owner_id)
+            if player is None:
+                to_remove.append(blade.id)
+                continue
+            blade.orbit_angle += blade.direction * self._BLADE_ANGULAR_VEL
+            blade.age += 1
+            blade.x = player.x + math.cos(blade.orbit_angle) * blade.orbit_radius
+            blade.y = player.y + math.sin(blade.orbit_angle) * blade.orbit_radius
+            if not blade.hit:
+                opponent_id = 3 - blade.owner_id
+                opponent    = self.players.get(opponent_id)
+                if opponent:
+                    dist = math.hypot(blade.x - opponent.x, blade.y - opponent.y)
+                    if dist < PLAYER_RADIUS + self._BLADE_HIT_RADIUS:
+                        opponent.hp -= blade.damage
+                        blade.hit = True
+                        if opponent.hp <= 0:
+                            opponent.respawn()
+            if blade.age >= self._BLADE_LIFESPAN:
+                to_remove.append(blade.id)
+        for bid in to_remove:
+            self.blade_arcs.pop(bid, None)
 
     _GRENADE_RADIUS  = 120.0
     _GRENADE_DMG_MAX = 50    # 中心傷害
