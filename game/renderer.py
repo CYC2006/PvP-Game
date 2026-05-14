@@ -6,11 +6,13 @@ import pygame
 from game.state import (GameState, MAP_WIDTH, MAP_HEIGHT,
                         PLAYER_RADIUS, BULLET_RADIUS)
 from game.input import MAGAZINE_SIZE, RELOAD_TIME_MS
+from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _ws, COL_BULLET as _COL_BULLET_UTILS
 
-LOGICAL_W = 1280
-LOGICAL_H = 720
-SCREEN_W  = LOGICAL_W
-SCREEN_H  = LOGICAL_H
+from game.chars.agent    import flash_fx
+from game.chars.rambo    import grenade_fx
+from game.chars.zombie   import blade_fx
+from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
+from game.chars.dancer   import bubble_fx
 
 # colours
 COL_BG         = (30,  30,  30)
@@ -21,7 +23,7 @@ COL_TEXT       = (220, 220, 220)
 COL_SELF_RIM   = (255, 255, 255)
 COL_OTHER_RIM  = (200, 200, 200)
 COL_PLAYERS    = {1: (100, 180, 255), 2: (255, 120, 100)}
-COL_BULLET     = {1: (160, 220, 255), 2: (255, 180, 140)}
+COL_BULLET     = _COL_BULLET_UTILS   # 來自 render_utils，保持名稱相容
 COL_HP_BG      = (60,  20,  20)
 COL_HP_FILL    = (220, 60,  60)
 COL_HP_BORDER  = (180, 180, 180)
@@ -64,51 +66,6 @@ _shake_timers: dict = {}
 # 上一幀子彈位置 {bid: (x, y)}，用來偵測消失的子彈
 _prev_bullet_pos: dict = {}
 
-# 毒氣泡動畫追蹤：bid → spawn_time, bid → max_radius（5~7× agent bullet）
-_bubble_spawn_time: dict = {}
-_bubble_max_radius: dict = {}
-
-# 閃光彈追蹤：bid → 最後世界座標；消失時觸發爆炸特效
-_flash_bullet_pos: dict = {}
-# 爆炸特效佇列：[(world_x, world_y, spawn_perf_time)]
-_flash_explosions: list = []
-# 閃光彈旋轉角度累積：bid → 累積 radians
-_flash_spin_angle: dict = {}
-# 閃光彈圖片快取：owner_id → Surface
-_flashbang_sprites: dict = {}
-# 手榴彈追蹤
-_grenade_bullet_pos: dict = {}
-_grenade_spin_angle: dict = {}
-_grenade_sprites:    dict = {}
-# 手榴彈爆炸特效佇列：[(world_x, world_y, spawn_time, owner_id)]
-_grenade_explosions: list = []
-# 手裡劍（bullet_type=3）：bid → 第一次出現時的 state.tick（推算成長大小用）
-_shuriken_first_tick: dict = {}
-_SHURIKEN_GROW_RATE = 0.3   # px/tick，與 state.py 保持一致
-# 速度提升 / R 技能殘影：[rotated_surface, world_x, world_y, spawn_tick, max_age]
-_afterimages: list = []
-_last_afterimage_tick:   int = 0   # 速度提升殘影節拍追蹤
-_last_r_afterimage_tick: int = 0   # R 技能殘影節拍追蹤
-
-# R 技能地板刮痕三角形碎片：[(wx, wy, angle_rad, base, height, color), ...]
-_r_trail_triangles:    list = []
-_r_trail_end_ms:       int  = 0    # 技能結束時間戳 ms（0 = 未結束）
-_r_trail_was_active:   bool = False
-
-# 月刀弧形（blade arc）：預計算月牙形多邊形頂點（朝右，凹側朝右）
-def _build_crescent_pts():
-    n = 14
-    outer_r, inner_r, offset = 13, 10, 8
-    pts = []
-    for i in range(n + 1):
-        a = math.pi / 2 - math.pi * i / n
-        pts.append((outer_r * math.cos(a), outer_r * math.sin(a)))
-    for i in range(n + 1):
-        a = -math.pi / 2 + math.pi * i / n
-        pts.append((offset + inner_r * math.cos(a), inner_r * math.sin(a)))
-    return pts
-
-_crescent_pts = _build_crescent_pts()
 
 SHAKE_AMP  = 5    # 最大位移像素
 SHAKE_FREQ = 40   # 振盪頻率 Hz
@@ -396,7 +353,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     cx, cy = _camera(me)
 
     _draw_map(screen, cx, cy)
-    _draw_r_skill_trail(screen, cx, cy)
+    r_dash_fx.draw_r_trail(screen, cx, cy)
 
     if obstacles:
         _process_hits(state, obstacles)
@@ -406,20 +363,20 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     _draw_particles(screen, cx, cy)
     _draw_gold_ingots(screen, state, cx, cy)
     _draw_bullets(screen, state, cx, cy, player_chars or {})
-    _draw_boost_afterimages(screen, cx, cy, state.tick)
+    r_dash_fx.draw_afterimages(screen, cx, cy, state.tick)
     _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg,
                   player_chars or {})
-    _draw_blade_arcs(screen, state, cx, cy)
+    blade_fx.draw(screen, state, cx, cy)
 
     # 樹/草叢繪製在玩家之上（最頂層），本地玩家在樹下時半透明
     if obstacles:
         _draw_trees(screen, obstacles, state.destroyed_obstacles,
                     cx, cy, me.x, me.y)
 
-    _draw_smoke_patches(screen, state, cx, cy, my_id)
-    _draw_flash_explosions(screen, cx, cy)
-    _draw_grenade_explosions(screen, cx, cy)
-    _draw_flash_screen(screen, state, my_id)  # 白色太陽眼鏡疊加層
+    smoke_fx.draw_patches(screen, state, cx, cy, my_id)
+    flash_fx.draw_explosions(screen, cx, cy)
+    grenade_fx.draw_explosions(screen, cx, cy)
+    flash_fx.draw_screen_flash(screen, state, my_id)
 
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns)
 
@@ -577,41 +534,15 @@ def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float):
         pygame.draw.circle(screen, color, (sx, sy), BULLET_RADIUS)
 
 
-_BUBBLE_INIT_R  = BULLET_RADIUS * 2        # 初始半徑：2× agent 子彈（10px）
-_BUBBLE_LIFE    = 2.0                       # 氣泡總壽命（秒）：1s 飛行 + 1s 停留
-
-
 def _draw_bullets(screen, state, cx, cy, player_chars: dict):
     now = time.perf_counter()
     current_bids = set(state.bullets.keys())
 
-    # 清除已消失子彈的動畫快取
-    for bid in list(_bubble_spawn_time.keys()):
-        if bid not in current_bids:
-            _bubble_spawn_time.pop(bid, None)
-            _bubble_max_radius.pop(bid, None)
-    for bid in list(_shuriken_first_tick.keys()):
-        if bid not in current_bids:
-            _shuriken_first_tick.pop(bid, None)
-
-    # ── 閃光彈消失偵測 → 觸發爆炸特效 ───────────────────────────
-    current_flash = {bid for bid, b in state.bullets.items()
-                     if getattr(b, 'bullet_type', 0) == 1}
-    for bid in set(_flash_bullet_pos) - current_flash:
-        if bid in _flash_bullet_pos:
-            _flash_explosions.append((*_flash_bullet_pos[bid], now))
-        _flash_bullet_pos.pop(bid, None)
-        _flash_spin_angle.pop(bid, None)
-
-    # ── 手榴彈消失偵測 → 觸發爆炸特效 ───────────────────────────
-    current_grenade = {bid for bid, b in state.bullets.items()
-                       if getattr(b, 'bullet_type', 0) == 2}
-    for bid in set(_grenade_bullet_pos) - current_grenade:
-        if bid in _grenade_bullet_pos:
-            bx, by, bowner = _grenade_bullet_pos[bid]
-            _grenade_explosions.append((bx, by, now, bowner))
-        _grenade_bullet_pos.pop(bid, None)
-        _grenade_spin_angle.pop(bid, None)
+    # 各 fx 模組清除已消失子彈的追蹤狀態
+    shuriken_fx.cleanup(current_bids)
+    bubble_fx.cleanup(current_bids)
+    flash_fx.detect_disappeared(state, now)
+    grenade_fx.detect_disappeared(state, now)
 
     for bullet in state.bullets.values():
         sx, sy = _ws(bullet.x, bullet.y, cx, cy)
@@ -620,378 +551,28 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
-            # ── 煙霧彈：小灰綠色圓點 ──────────────────────────────
-            if btype == 4:
+            if btype == 4:   # 煙霧彈：小灰綠色圓點
                 pygame.draw.circle(screen, (90, 120, 70), (sx, sy), 6)
-                continue
-
-            # ── 手裡劍（RMB）：等速旋轉，隨時間成長 ─────────────
-            if btype == 3:
-                if bullet.id not in _shuriken_first_tick:
-                    _shuriken_first_tick[bullet.id] = state.tick
-                age  = state.tick - _shuriken_first_tick[bullet.id]
-                grow = age * _SHURIKEN_GROW_RATE
-                r_outer = max(BULLET_RADIUS, BULLET_RADIUS + grow)
-                r_inner = r_outer * 0.45
-                spin = time.perf_counter() * 6.0   # 約 1 轉/秒（rad/s）
-                pts = []
-                for i in range(8):
-                    r = r_outer if i % 2 == 0 else r_inner
-                    ang = spin + i * math.pi / 4
-                    pts.append((sx + r * math.cos(ang), sy + r * math.sin(ang)))
-                # 發光外圈
-                glow_r = int(r_outer + 3)
-                glow_surf = pygame.Surface((glow_r * 2 + 2, glow_r * 2 + 2), pygame.SRCALPHA)
-                pygame.draw.circle(glow_surf, (*color, 60),
-                                   (glow_r + 1, glow_r + 1), glow_r)
-                screen.blit(glow_surf, (sx - glow_r - 1, sy - glow_r - 1))
-                if len(pts) >= 3:
-                    pygame.draw.polygon(screen, color, pts)
-                continue
-
-            # ── 閃光彈：等減速旋轉圖片 ───────────────────────────
-            if btype == 1:
-                prev_pos = _flash_bullet_pos.get(bullet.id)
-                speed = (math.hypot(bullet.x - prev_pos[0], bullet.y - prev_pos[1])
-                         if prev_pos else 0.0)
-                _flash_bullet_pos[bullet.id] = (bullet.x, bullet.y)
-                prev  = _flash_spin_angle.get(bullet.id, 0.0)
-                angle = prev + speed * 0.06
-                _flash_spin_angle[bullet.id] = angle
-                owner = bullet.owner_id
-                if owner not in _flashbang_sprites:
-                    path = os.path.join("assets", "objects", f"flashbang_P{owner}.png")
-                    try:
-                        img = pygame.image.load(path).convert_alpha()
-                        img = pygame.transform.smoothscale(img, (48, 36))
-                    except Exception:
-                        img = None
-                    _flashbang_sprites[owner] = img
-                sprite = _flashbang_sprites.get(owner)
-                if sprite:
-                    rotated = pygame.transform.rotate(sprite, -math.degrees(angle))
-                    screen.blit(rotated, (sx - rotated.get_width()  // 2,
-                                         sy - rotated.get_height() // 2))
-                else:
-                    pygame.draw.circle(screen, color, (sx, sy), 7)
-                continue
-
-            # ── 手榴彈：等減速旋轉圖片 ───────────────────────────
-            if btype == 2:
-                prev_pos = _grenade_bullet_pos.get(bullet.id)
-                speed = (math.hypot(bullet.x - prev_pos[0], bullet.y - prev_pos[1])
-                         if prev_pos else 0.0)
-                _grenade_bullet_pos[bullet.id] = (bullet.x, bullet.y, bullet.owner_id)
-                prev  = _grenade_spin_angle.get(bullet.id, 0.0)
-                angle = prev + speed * 0.06
-                _grenade_spin_angle[bullet.id] = angle
-                owner = bullet.owner_id
-                if owner not in _grenade_sprites:
-                    path = os.path.join("assets", "objects", f"grenade_P{owner}.png")
-                    try:
-                        img = pygame.image.load(path).convert_alpha()
-                        img = pygame.transform.smoothscale(img, (48, 48))
-                    except Exception:
-                        img = None
-                    _grenade_sprites[owner] = img
-                sprite = _grenade_sprites.get(owner)
-                if sprite:
-                    rotated = pygame.transform.rotate(sprite, -math.degrees(angle))
-                    screen.blit(rotated, (sx - rotated.get_width()  // 2,
-                                         sy - rotated.get_height() // 2))
-                else:
-                    pygame.draw.circle(screen, color, (sx, sy), 8)
-                continue
-
-            if char_key == "womanGreen":
-                if bullet.id not in _bubble_spawn_time:
-                    _bubble_spawn_time[bullet.id] = now
-                    rmax = getattr(bullet, "bubble_radius_max", 0.0)
-                    _bubble_max_radius[bullet.id] = (
-                        rmax if rmax > 0 else BULLET_RADIUS * 6)
-                age = now - _bubble_spawn_time[bullet.id]
-                t   = min(1.0, age / _BUBBLE_LIFE)
-                r   = max(1, int(_BUBBLE_INIT_R + (_bubble_max_radius[bullet.id]
-                                                    - _BUBBLE_INIT_R) * t))
-                surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-                pygame.draw.circle(surf, (*color, 120), (r, r), r)
-                screen.blit(surf, (sx - r, sy - r))
+            elif btype == 3:
+                shuriken_fx.draw_bullet(screen, bullet, sx, sy, color, state)
+            elif btype == 1:
+                flash_fx.draw_bullet(screen, bullet, sx, sy, color)
+            elif btype == 2:
+                grenade_fx.draw_bullet(screen, bullet, sx, sy, color)
+            elif char_key == "womanGreen":
+                bubble_fx.draw_bullet(screen, bullet, sx, sy, color, now)
             else:
                 _draw_bullet_shape(screen, char_key, color, sx, sy, bullet.aim_angle)
 
 
-def _draw_blade_arcs(screen, state, cx: float, cy: float) -> None:
-    """繪製 Assassin R 技能的月牙形刀片（隨公轉旋轉，玩家所屬顏色）。"""
-    now = time.perf_counter()
-    for blade in state.blade_arcs.values():
-        owner = state.players.get(blade.owner_id)
-        sx, sy = _ws(blade.x, blade.y, cx, cy)
-        if sx < -40 or sx > SCREEN_W + 40 or sy < -40 or sy > SCREEN_H + 40:
-            continue
-        color = COL_BULLET.get(blade.owner_id, (255, 255, 200))
-
-        # 公轉角（刀片位置相對玩家的方向角）
-        orbit_angle = (math.atan2(blade.y - owner.y, blade.x - owner.x)
-                       if owner else 0.0)
-        # 行進切線方向 + 時間自轉 + 每把刀固定隨機初始偏角
-        travel_dir   = orbit_angle + blade.direction * math.pi / 2
-        spin_offset  = (blade.id * 1.0472) % (math.pi * 2)   # 各刀 ~60° 差距散開
-        spin = travel_dir + now * 4.0 + spin_offset
-
-        # 淡入前 5 tick、淡出後 5 tick
-        age   = blade.age
-        alpha = min(1.0, min(age / 5.0, (30 - age) / 5.0))
-        if alpha <= 0:
-            continue
-
-        # 旋轉月牙形頂點
-        cos_s, sin_s = math.cos(spin), math.sin(spin)
-        pts = [(sx + x * cos_s - y * sin_s, sy + x * sin_s + y * cos_s)
-               for x, y in _crescent_pts]
-
-        r, g, b = color
-        draw_col = (int(r * alpha), int(g * alpha), int(b * alpha))
-        pygame.draw.polygon(screen, draw_col, pts)
 
 
 # ── 玩家 ──────────────────────────────────────────────────────────────────────
 
-_SMOKE_FULL  = 360   # 6s × 60 fps（與 state._SMOKE_DURATION 一致）
-_SMOKE_FADE  = 60    # 1s fade
 
 
-def _is_hidden_by_smoke(opponent, local_player, state) -> bool:
-    """對手在煙霧中且本地玩家不在同一煙霧區域時回傳 True（對手不可見）。"""
-    for patch in state.smoke_patches.values():
-        if state.tick - patch.spawn_tick >= _SMOKE_FULL:
-            continue   # 淡出期間不再遮蔽視線，只剩薄紗視覺
-        if math.hypot(opponent.x - patch.x, opponent.y - patch.y) > patch.radius:
-            continue
-        # 對手在煙霧內：再看本地玩家是否也在同一個煙霧
-        if math.hypot(local_player.x - patch.x, local_player.y - patch.y) <= patch.radius:
-            continue   # 雙方都在 → 可見
-        return True
-    return False
 
 
-def _draw_smoke_patches(screen, state, cx: float, cy: float, my_id: int) -> None:
-    """繪製煙霧區域（對本地玩家呈半透明；對外部玩家呈不透明遮蔽）。"""
-    me = state.players.get(my_id)
-    for patch in state.smoke_patches.values():
-        age = state.tick - patch.spawn_tick
-        if age >= _SMOKE_FULL + _SMOKE_FADE:
-            continue
-        # alpha：全期 220，最後 1 秒線性淡出
-        if age < _SMOKE_FULL:
-            base_alpha = 220
-        else:
-            base_alpha = int(220 * (1.0 - (age - _SMOKE_FULL) / _SMOKE_FADE))
-        if base_alpha <= 0:
-            continue
-        # 本地玩家在煙霧內 → 半透明（仍可見場景）
-        my_inside = (me and
-                     math.hypot(me.x - patch.x, me.y - patch.y) <= patch.radius)
-        alpha = 70 if my_inside else base_alpha
-        r  = int(patch.radius)
-        sx, sy = _ws(patch.x, patch.y, cx, cy)
-        if sx < -r or sx > SCREEN_W + r or sy < -r or sy > SCREEN_H + r:
-            continue
-        surf = pygame.Surface((r * 2 + 2, r * 2 + 2), pygame.SRCALPHA)
-        pygame.draw.circle(surf, (255, 255, 255, alpha), (r + 1, r + 1), r)
-        screen.blit(surf, (sx - r - 1, sy - r - 1))
-
-
-def _draw_flash_explosions(screen, cx: float, cy: float) -> None:
-    """繪製閃光彈爆炸擴散白圈（投擲者螢幕可見）。"""
-    now   = time.perf_counter()
-    alive = []
-    DURATION = 0.5
-    MAX_R    = 130
-    for wx, wy, t in _flash_explosions:
-        elapsed = now - t
-        if elapsed >= DURATION:
-            continue
-        alive.append((wx, wy, t))
-        progress = elapsed / DURATION
-        r     = max(1, int(MAX_R * progress))
-        alpha = int(230 * (1.0 - progress))
-        sx, sy = _ws(wx, wy, cx, cy)
-        if -MAX_R <= sx <= SCREEN_W + MAX_R and -MAX_R <= sy <= SCREEN_H + MAX_R:
-            surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-            pygame.draw.circle(surf, (255, 255, 220, alpha), (r, r), r)
-            screen.blit(surf, (sx - r, sy - r))
-    _flash_explosions[:] = alive
-
-
-def _draw_grenade_explosions(screen, cx: float, cy: float) -> None:
-    """繪製手榴彈爆炸擴散圈（投擲者所屬顏色）。"""
-    now      = time.perf_counter()
-    alive    = []
-    DURATION = 0.5
-    MAX_R    = 130
-    for wx, wy, t, owner in _grenade_explosions:
-        elapsed = now - t
-        if elapsed >= DURATION:
-            continue
-        alive.append((wx, wy, t, owner))
-        progress = elapsed / DURATION
-        r     = max(1, int(MAX_R * progress))
-        alpha = int(200 * (1.0 - progress))
-        col   = COL_BULLET.get(owner, (255, 200, 100))
-        sx, sy = _ws(wx, wy, cx, cy)
-        if -MAX_R <= sx <= SCREEN_W + MAX_R and -MAX_R <= sy <= SCREEN_H + MAX_R:
-            surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-            pygame.draw.circle(surf, (*col, alpha), (r, r), r)
-            screen.blit(surf, (sx - r, sy - r))
-    _grenade_explosions[:] = alive
-
-
-def _draw_flash_screen(screen, state, my_id: int) -> None:
-    """被閃光彈命中時全螢幕白色太陽眼鏡疊加層（HUD 在其上方）。"""
-    if my_id not in state.players:
-        return
-    ft = getattr(state.players[my_id], 'flash_ticks', 0)
-    if ft <= 0:
-        return
-    alpha = 255 if ft > 120 else int(255 * ft / 120)  # >120: 全白; 1~120: 2秒漸退
-    overlay = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
-    overlay.fill((255, 255, 255, alpha))
-    screen.blit(overlay, (0, 0))
-
-
-def _maybe_spawn_afterimage(px: float, py: float,
-                             rotated_surf: pygame.Surface,
-                             state_tick: int) -> None:
-    """R 技能期間每 3 ticks、速度提升期間每 6 ticks 留下殘影。"""
-    global _last_afterimage_tick, _last_r_afterimage_tick
-    import game.input as _inp
-    now_ms = pygame.time.get_ticks()
-    r_active = (now_ms - _inp._r_skill_start_ms < 500 and _inp._r_skill_start_ms > 0)
-    if r_active:
-        if state_tick - _last_r_afterimage_tick < 3:
-            return
-        _last_r_afterimage_tick = state_tick
-        _afterimages.append([rotated_surf.copy(), px, py, state_tick, 18])
-    elif now_ms < _inp._speed_boost_end_ms:
-        if state_tick - _last_afterimage_tick < 6:
-            return
-        _last_afterimage_tick = state_tick
-        _afterimages.append([rotated_surf.copy(), px, py, state_tick, 24])
-
-
-def _draw_boost_afterimages(screen, cx: float, cy: float, state_tick: int) -> None:
-    """繪製速度提升 / R 技能殘影，須在玩家之前呼叫使其出現在底層。"""
-    alive = []
-    for item in _afterimages:
-        img, wx, wy, spawn_tick = item[0], item[1], item[2], item[3]
-        max_age = item[4] if len(item) > 4 else 24
-        age = state_tick - spawn_tick
-        if age >= max_age:
-            continue
-        alive.append(item)
-        alpha = int(170 * (1.0 - age / max_age))
-        tmp = img.copy()
-        tmp.fill((255, 255, 255, alpha), special_flags=pygame.BLEND_RGBA_MULT)
-        sx, sy = _ws(wx, wy, cx, cy)
-        screen.blit(tmp, (sx - img.get_width() // 2, sy - img.get_height() // 2))
-    _afterimages[:] = alive
-
-
-def _spawn_dash_dust(px: float, py: float) -> None:
-    """衝刺時在玩家後方噴出灰塵粒子（每幀 3 顆）。"""
-    import game.input as _inp
-    if not _inp._dash_active:
-        return
-    now  = time.perf_counter()
-    ddx, ddy = _inp._dash_dx, _inp._dash_dy
-    base = math.atan2(-ddy, -ddx)          # 衝刺反方向
-    dust_cols = [(190, 180, 165), (168, 160, 148), (210, 202, 188)]
-    for _ in range(3):
-        angle = base + random.uniform(-0.65, 0.65)
-        speed = random.uniform(25, 70)
-        _particles.append([
-            px + random.uniform(-7, 7),
-            py + random.uniform(-7, 7),
-            math.cos(angle) * speed,
-            math.sin(angle) * speed,
-            now,
-            random.uniform(0.12, 0.28),
-            random.choice(dust_cols),
-            random.uniform(2.0, 4.5),
-        ])
-
-
-def _update_r_trail(px: float, py: float) -> None:
-    """每幀在本地玩家位置生成一個黑色三角形碎片，偵測 R 技能結束以驅動淡出。"""
-    global _r_trail_triangles, _r_trail_end_ms, _r_trail_was_active
-    import game.input as _inp
-    now_ms   = pygame.time.get_ticks()
-    r_active = (now_ms - _inp._r_skill_start_ms < 500 and _inp._r_skill_start_ms > 0)
-    if r_active:
-        if not _r_trail_was_active:
-            _r_trail_triangles.clear()
-            _r_trail_end_ms = 0
-        ox = random.uniform(-10, 10)
-        oy = random.uniform(-10, 10)
-        angle  = random.uniform(0, math.pi * 2)
-        base   = random.uniform(4, 9)
-        height = random.uniform(9, 18)
-        color  = random.choice([(0, 0, 0), (55, 55, 55), (35, 35, 35), (75, 75, 75)])
-        _r_trail_triangles.append((px + ox, py + oy, angle, base, height, color))
-        _r_trail_was_active = True
-    elif _r_trail_was_active:
-        _r_trail_end_ms     = now_ms
-        _r_trail_was_active = False
-
-
-def _draw_r_skill_trail(screen, cx: float, cy: float) -> None:
-    """繪製 R 技能地板刮痕三角形碎片：技能結束後等待 0.5s，再於 0.5s 內淡出。"""
-    global _r_trail_triangles, _r_trail_end_ms
-    if not _r_trail_triangles:
-        return
-    now_ms = pygame.time.get_ticks()
-    if _r_trail_end_ms == 0:
-        alpha = 200
-    else:
-        elapsed = now_ms - _r_trail_end_ms
-        wait_ms, fade_ms = 500, 500
-        if elapsed < wait_ms:
-            alpha = 200
-        elif elapsed < wait_ms + fade_ms:
-            alpha = int(200 * (1.0 - (elapsed - wait_ms) / fade_ms))
-        else:
-            _r_trail_triangles.clear()
-            _r_trail_end_ms = 0
-            return
-
-    surf = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
-    for entry in _r_trail_triangles:
-        wx, wy, angle, base, height = entry[0], entry[1], entry[2], entry[3], entry[4]
-        color = entry[5] if len(entry) > 5 else (0, 0, 0)
-        sx, sy = _ws(wx, wy, cx, cy)
-        ca, sa = math.cos(angle), math.sin(angle)
-        def _rot(lx, ly, _sx=sx, _sy=sy, _ca=ca, _sa=sa):
-            return (_sx + lx * _ca - ly * _sa, _sy + lx * _sa + ly * _ca)
-        p1 = _rot(0,           -height * 2 / 3)
-        p2 = _rot(-base / 2,    height / 3)
-        p3 = _rot( base / 2,    height / 3)
-        pygame.draw.polygon(surf, (*color, alpha), [p1, p2, p3])
-    screen.blit(surf, (0, 0))
-
-
-def _r_skill_angle(aim_angle_deg: float) -> float:
-    """R 技能期間覆蓋本地玩家角度為順時針旋轉動畫；技能結束後恢復滑鼠瞄準。"""
-    import game.input as _inp
-    elapsed = pygame.time.get_ticks() - _inp._r_skill_start_ms
-    if elapsed < 0 or elapsed >= 500 or _inp._r_skill_start_ms == 0:
-        return aim_angle_deg
-    phase_ms = 250
-    if elapsed < phase_ms:
-        progress = elapsed / phase_ms
-        return _inp._r_skill_start_angle + 180.0 * progress
-    else:
-        progress = (elapsed - phase_ms) / phase_ms
-        return _inp._r_skill_start_angle + 180.0 + 180.0 * progress
 
 
 def _draw_players(screen, state, my_id, cx, cy, font,
@@ -1008,14 +589,14 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         # 煙霧遮蔽：對手在煙霧中且本地玩家不在同一煙霧 → 不渲染
         if pid != my_id:
             me = state.players.get(my_id)
-            if me and _is_hidden_by_smoke(player, me, state):
+            if me and smoke_fx.is_hidden_by_smoke(player, me, state):
                 continue
 
         if pid == my_id:
             stance = my_stance
-            angle  = _r_skill_angle(aim_angle_deg)
-            _spawn_dash_dust(player.x, player.y)
-            _update_r_trail(player.x, player.y)
+            angle  = r_dash_fx.r_skill_angle(aim_angle_deg)
+            r_dash_fx.spawn_dash_dust(player.x, player.y, _particles)
+            r_dash_fx.update_r_trail(player.x, player.y)
         else:
             stance = player.stance
             angle  = player.aim_angle
@@ -1027,7 +608,7 @@ def _draw_players(screen, state, my_id, cx, cy, font,
                                sy - rotated.get_height() // 2))
 
         if pid == my_id:
-            _maybe_spawn_afterimage(player.x, player.y, rotated, state.tick)
+            r_dash_fx.maybe_spawn_afterimage(player.x, player.y, rotated, state.tick)
 
         # 對方頭上顯示 HP bar（依真實血量百分比）
         if pid != my_id:

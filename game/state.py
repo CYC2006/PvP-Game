@@ -318,6 +318,11 @@ class GameState:
 
     def step_bullets(self, obstacles: dict = None,
                      obstacle_hp: dict = None) -> None:
+        from game.chars.assassin.shuriken_state import (
+            SHURIKEN_GROW_RATE as _SHURIKEN_GROW_RATE,
+            SHURIKEN_BASE_DMG  as _SHURIKEN_BASE_DMG,
+            SHURIKEN_DMG_SCALE as _SHURIKEN_DMG_SCALE,
+        )
         if obstacles is None:
             obstacles = {}
 
@@ -337,7 +342,7 @@ class GameState:
             # 手裡劍：碰撞半徑隨時間線性成長
             if bullet.bullet_type == 3:
                 age    = self.tick - bullet.spawn_tick
-                coll_r = BULLET_RADIUS + age * self._SHURIKEN_GROW_RATE
+                coll_r = BULLET_RADIUS + age * _SHURIKEN_GROW_RATE
             # DoT 子彈的動態碰撞半徑（隨泡泡成長）
             elif bullet.dot_interval > 0 and bullet.bubble_radius_max > 0:
                 _BUBBLE_LIFE_TICKS = 120  # 2.0s × 60 fps
@@ -377,8 +382,8 @@ class GameState:
                                   bullet.y - player.y) < PLAYER_RADIUS + coll_r:
                         if bullet.bullet_type == 3:
                             # 手裡劍：傷害隨碰撞半徑線性成長
-                            damage = int(self._SHURIKEN_BASE_DMG
-                                         + self._SHURIKEN_DMG_SCALE
+                            damage = int(_SHURIKEN_BASE_DMG
+                                         + _SHURIKEN_DMG_SCALE
                                          * (coll_r - BULLET_RADIUS))
                         elif shooter and shooter.damage_min < shooter.damage_max:
                             damage = random.randint(shooter.damage_min, shooter.damage_max)
@@ -509,334 +514,59 @@ class GameState:
                 y=y + math.sin(angle) * dist,
             )
 
-    # ── 技能相關 ──────────────────────────────────────────────────────────────────
-
-    _FLASH_RADIUS = 120.0
-    _FLASH_TICKS  = 180   # 1s 全白 + 2s 恢復 × 60 fps
+    # ── 技能相關（實作移至 game/chars/*/）────────────────────────────────────────
 
     def _spawn_flash_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        player = self.players.get(owner_id)
-        if not player:
-            return
-        length = math.hypot(aim_x, aim_y)
-        if length == 0:
-            return
-        ux, uy = aim_x / length, aim_y / length
-        SPEED  = 8.8    # px/tick → 停止距離 ≈ 198 px（原 160 px 的 1.2 倍）
-        DECEL  = 0.2    # px/tick²
-        LINGER = 12     # 停止後等待 0.2 秒
-        bid = self._next_bullet_id
-        self._next_bullet_id = (self._next_bullet_id + 1) % 256
-        self.bullets[bid] = Bullet(
-            id=bid, owner_id=owner_id,
-            x=player.x + ux * (PLAYER_RADIUS + 12),
-            y=player.y + uy * (PLAYER_RADIUS + 12),
-            dx=ux * SPEED, dy=uy * SPEED,
-            aim_angle=math.degrees(math.atan2(uy * SPEED, ux * SPEED)),
-            max_range=BULLET_MAX_RANGE * 999,
-            decel=DECEL,
-            linger_ticks=LINGER,
-            bullet_type=1,
-        )
+        from game.chars.agent.flash_state import spawn_flash_grenade
+        spawn_flash_grenade(self, owner_id, aim_x, aim_y)
 
     def _trigger_flash_explosion(self, x: float, y: float, owner_id: int) -> None:
-        for pid, player in self.players.items():
-            if pid == owner_id:
-                continue
-            if math.hypot(player.x - x, player.y - y) <= self._FLASH_RADIUS:
-                player.flash_ticks = self._FLASH_TICKS
-
-    _SHURIKEN_GROW_RATE = 0.3   # px/tick，碰撞半徑每 tick 增加量
-    _SHURIKEN_BASE_DMG  = 15    # 初始傷害
-    _SHURIKEN_DMG_SCALE = 1.5   # 每 px 碰撞半徑增加的傷害
+        from game.chars.agent.flash_state import trigger_flash_explosion
+        trigger_flash_explosion(self, x, y, owner_id)
 
     def _spawn_shuriken(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        player = self.players.get(owner_id)
-        if not player:
-            return
-        length = math.hypot(aim_x, aim_y)
-        if length == 0:
-            return
-        ux, uy = aim_x / length, aim_y / length
-        SPEED = 800 / 60   # 800 px/s → px/tick
-        bid = self._next_bullet_id
-        self._next_bullet_id = (self._next_bullet_id + 1) % 256
-        self.bullets[bid] = Bullet(
-            id=bid, owner_id=owner_id,
-            x=player.x + ux * (PLAYER_RADIUS + 12),
-            y=player.y + uy * (PLAYER_RADIUS + 12),
-            dx=ux * SPEED, dy=uy * SPEED,
-            aim_angle=math.degrees(math.atan2(uy, ux)),
-            max_range=float('inf'),
-            spawn_tick=self.tick,
-            bullet_type=3,
-        )
+        from game.chars.assassin.shuriken_state import spawn_shuriken
+        spawn_shuriken(self, owner_id, aim_x, aim_y)
 
     def _activate_speed_boost(self, owner_id: int) -> None:
-        player = self.players.get(owner_id)
-        if player:
-            player.speed_boost_ticks = 180   # 3 秒 × 60 fps
-            player.speed_boost_mult  = 1.5
-
-    # survivor1 R 技能 ─────────────────────────────────────────────
-    # 每段距離 400px / 0.25s；速度從 v0 等減速至 v0/2（不減到 0）
-    # 連續積分：distance = v0*T - (v0/2T)*T²/2 = 3*v0*T/4 = 400 → v0 = 1600/45
-    _R_PHASE_TICKS = 15                  # 0.25s × 60 fps
-    _R_V0          = 1600.0 / 45.0      # ≈ 35.56 px/tick
-    _R_DAMAGE      = 30                  # 每段碰撞傷害
+        from game.chars.assassin.speed_state import activate_speed_boost
+        activate_speed_boost(self, owner_id)
 
     def _activate_r_skill(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        player = self.players.get(owner_id)
-        if not player or player.r_skill_phase > 0:
-            return
-        length = math.hypot(aim_x, aim_y)
-        if length == 0:
-            return
-        player.r_skill_phase       = 1
-        player.r_skill_tick        = 0
-        player.r_skill_dx          = aim_x / length
-        player.r_skill_dy          = aim_y / length
-        player.r_skill_start_angle = player.aim_angle
-        player.r_skill_dmg_done    = 0
+        from game.chars.assassin.r_dash_state import activate_r_skill
+        activate_r_skill(self, owner_id, aim_x, aim_y)
 
     def step_r_skill(self) -> None:
-        for player in self.players.values():
-            if player.r_skill_phase == 0:
-                continue
-            tick  = player.r_skill_tick
-            phase = player.r_skill_phase
-
-            # 等減速滑行（v0 → v0/2，不減到 0）
-            progress  = tick / self._R_PHASE_TICKS
-            speed     = self._R_V0 * (1.0 - 0.5 * progress)
-            direction = 1.0 if phase == 1 else -1.0
-            player.x  = max(PLAYER_RADIUS, min(MAP_WIDTH  - PLAYER_RADIUS,
-                                               player.x + player.r_skill_dx * speed * direction))
-            player.y  = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS,
-                                               player.y + player.r_skill_dy * speed * direction))
-
-            # 順時針旋轉 180° per phase
-            base_offset = 180.0 if phase == 2 else 0.0
-            player.aim_angle = player.r_skill_start_angle + base_offset + 180.0 * progress
-
-            # 碰撞傷害（每段只傷害一次）
-            dmg_flag    = 1 if phase == 1 else 2
-            opponent_id = 3 - player.id
-            opponent    = self.players.get(opponent_id)
-            if opponent and not (player.r_skill_dmg_done & dmg_flag):
-                if math.hypot(player.x - opponent.x, player.y - opponent.y) < PLAYER_RADIUS * 2 + 4:
-                    opponent.hp -= self._R_DAMAGE
-                    player.r_skill_dmg_done |= dmg_flag
-                    if opponent.hp <= 0:
-                        opponent.respawn()
-
-            # 推進 tick / 切換階段
-            player.r_skill_tick += 1
-            if player.r_skill_tick >= self._R_PHASE_TICKS:
-                if phase == 1:
-                    player.r_skill_phase = 2
-                    player.r_skill_tick  = 0
-                else:
-                    player.r_skill_phase = 0
-                    player.r_skill_tick  = 0
-
-    _SMOKE_DURATION = 360   # 6s 全不透明
-    _SMOKE_FADE     = 60    # 1s 淡出
+        from game.chars.assassin.r_dash_state import step_r_skill
+        step_r_skill(self)
 
     def _spawn_smoke_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        player = self.players.get(owner_id)
-        if not player:
-            return
-        length = math.hypot(aim_x, aim_y)
-        if length == 0:
-            return
-        ux, uy = aim_x / length, aim_y / length
-        DECEL  = 0.2
-        LINGER = 12
-        DELAYS = (0, 4, 8, 12, 16)
-        # 速度分 5 個等寬 bucket（6~12 每格 1.2），打亂後每顆各取一格
-        # → 距離保證分散，但各格內仍隨機
-        SPD_MIN, SPD_MAX, N = 6.0, 12.0, 5
-        bucket_w = (SPD_MAX - SPD_MIN) / N
-        buckets  = random.sample(range(N), N)   # 隨機排列
-        spawn_x = player.x + ux * (PLAYER_RADIUS + 12)
-        spawn_y = player.y + uy * (PLAYER_RADIUS + 12)
-        for delay, bucket in zip(DELAYS, buckets):
-            lo  = SPD_MIN + bucket * bucket_w
-            spd = random.uniform(lo, lo + bucket_w)
-            dev = math.radians(random.uniform(-30.0, 30.0))
-            cos_d, sin_d = math.cos(dev), math.sin(dev)
-            gux = ux * cos_d - uy * sin_d
-            guy = ux * sin_d + uy * cos_d
-            bid = self._next_bullet_id
-            self._next_bullet_id = (self._next_bullet_id + 1) % 256
-            b = Bullet(
-                id=bid, owner_id=owner_id,
-                x=spawn_x, y=spawn_y,
-                dx=gux * spd, dy=guy * spd,
-                aim_angle=math.degrees(math.atan2(guy, gux)),
-                max_range=BULLET_MAX_RANGE * 999,
-                decel=DECEL,
-                linger_ticks=LINGER,
-                bullet_type=4,
-                spawn_tick=self.tick,
-            )
-            if delay == 0:
-                self.bullets[bid] = b
-            else:
-                self._pending_pellets.append((self.tick + delay, b))
+        from game.chars.assassin.smoke_state import spawn_smoke_grenade
+        spawn_smoke_grenade(self, owner_id, aim_x, aim_y)
 
     def _trigger_smoke_explosion(self, x: float, y: float) -> None:
-        radius = 130 * random.uniform(0.8, 1.2)
-        sid = self._next_smoke_id
-        self._next_smoke_id = (self._next_smoke_id + 1) % 256
-        self.smoke_patches[sid] = SmokePatch(
-            id=sid, x=x, y=y, radius=radius, spawn_tick=self.tick)
+        from game.chars.assassin.smoke_state import trigger_smoke_explosion
+        trigger_smoke_explosion(self, x, y)
 
     def step_smoke_patches(self) -> None:
-        expired = [sid for sid, s in self.smoke_patches.items()
-                   if self.tick - s.spawn_tick >= self._SMOKE_DURATION + self._SMOKE_FADE]
-        for sid in expired:
-            del self.smoke_patches[sid]
-
-    _BLADE_LIFESPAN     = 30            # 0.5s × 60 fps
-    _BLADE_HIT_RADIUS   = 12            # px，刀片碰撞半徑
+        from game.chars.assassin.smoke_state import step_smoke_patches
+        step_smoke_patches(self)
 
     def _activate_blade_arc(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        player = self.players.get(owner_id)
-        if not player:
-            return
-        length = math.hypot(aim_x, aim_y)
-        if length == 0:
-            return
-        theta = math.atan2(aim_y, aim_x)   # 瞄準方向（弧度）
-
-        # 準備左右各 3 刀的參數，每 2 tick 交替生成一把（共 10 tick）
-        left_base  = theta - math.pi / 4
-        right_base = theta + math.pi / 4
-        left_blades  = []
-        right_blades = []
-        for i in range(3):
-            offset = math.radians((i - 1) * 4.0)
-            for blades, base, direction in (
-                    (left_blades,  left_base,  +1),
-                    (right_blades, right_base, -1)):
-                start  = base + offset
-                radius = random.uniform(40.0, 60.0)
-                damage = random.randint(player.damage_min, max(player.damage_min, player.damage_max))
-                blades.append((player.x + math.cos(start) * radius,
-                               player.y + math.sin(start) * radius,
-                               radius, start, direction, damage))
-
-        # 交替入佇列：L0 R0 L1 R1 L2 R2，每 2 tick 一把
-        for i in range(3):
-            for j, (side_list, _) in enumerate(((left_blades, +1), (right_blades, -1))):
-                x, y, radius, orbit_angle, direction, damage = side_list[i]
-                self._blade_spawn_queue.append((
-                    self.tick + (i * 2 + j) * 2,
-                    owner_id, x, y, radius, orbit_angle, direction, damage,
-                ))
+        from game.chars.zombie.blade_state import activate_blade_arc
+        activate_blade_arc(self, owner_id, aim_x, aim_y)
 
     def step_blade_arcs(self) -> None:
-        # 處理延遲生成佇列
-        remaining = []
-        for entry in self._blade_spawn_queue:
-            spawn_tick, owner_id, x, y, radius, orbit_angle, direction, damage = entry
-            if self.tick >= spawn_tick:
-                bid = self._next_blade_id
-                self._next_blade_id = (self._next_blade_id + 1) % 256
-                self.blade_arcs[bid] = BladeArc(
-                    id=bid, owner_id=owner_id,
-                    x=x, y=y,
-                    orbit_radius=radius,
-                    orbit_angle=orbit_angle,
-                    direction=direction,
-                    damage=damage,
-                )
-            else:
-                remaining.append(entry)
-        self._blade_spawn_queue[:] = remaining
-
-        to_remove = []
-        for blade in self.blade_arcs.values():
-            player = self.players.get(blade.owner_id)
-            if player is None:
-                to_remove.append(blade.id)
-                continue
-            blade.age += 1
-            # 二次方緩出：開始快、結束慢
-            progress = blade.age / self._BLADE_LIFESPAN
-            ease = 1.0 - (1.0 - progress) ** 2
-            current_angle = blade.orbit_angle + blade.direction * (math.pi / 2) * ease
-            blade.x = player.x + math.cos(current_angle) * blade.orbit_radius
-            blade.y = player.y + math.sin(current_angle) * blade.orbit_radius
-            if not blade.hit:
-                opponent_id = 3 - blade.owner_id
-                opponent    = self.players.get(opponent_id)
-                if opponent:
-                    dist = math.hypot(blade.x - opponent.x, blade.y - opponent.y)
-                    if dist < PLAYER_RADIUS + self._BLADE_HIT_RADIUS:
-                        opponent.hp -= blade.damage
-                        blade.hit = True
-                        if opponent.hp <= 0:
-                            opponent.respawn()
-            if blade.age >= self._BLADE_LIFESPAN:
-                to_remove.append(blade.id)
-        for bid in to_remove:
-            self.blade_arcs.pop(bid, None)
-
-    _GRENADE_RADIUS  = 120.0
-    _GRENADE_DMG_MAX = 50    # 中心傷害
-    _GRENADE_DMG_MIN = 10    # 邊緣傷害
+        from game.chars.zombie.blade_state import step_blade_arcs
+        step_blade_arcs(self)
 
     def _spawn_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        player = self.players.get(owner_id)
-        if not player:
-            return
-        length = math.hypot(aim_x, aim_y)
-        if length == 0:
-            return
-        ux, uy = aim_x / length, aim_y / length
-        DECEL   = 0.2
-        LINGER  = 12
-        DELAYS  = (0, 4, 8)
-        spawn_x = player.x + ux * (PLAYER_RADIUS + 12)
-        spawn_y = player.y + uy * (PLAYER_RADIUS + 12)
-        for delay in DELAYS:
-            spd = round(random.uniform(8.0, 11.0), 1)
-            dev = math.radians(random.uniform(-12.0, 12.0))
-            cos_d, sin_d = math.cos(dev), math.sin(dev)
-            gux = ux * cos_d - uy * sin_d
-            guy = ux * sin_d + uy * cos_d
-            bid = self._next_bullet_id
-            self._next_bullet_id = (self._next_bullet_id + 1) % 256
-            b = Bullet(
-                id=bid, owner_id=owner_id,
-                x=spawn_x, y=spawn_y,
-                dx=gux * spd, dy=guy * spd,
-                aim_angle=math.degrees(math.atan2(guy * spd, gux * spd)),
-                max_range=BULLET_MAX_RANGE * 999,
-                decel=DECEL,
-                linger_ticks=LINGER,
-                bullet_type=2,
-            )
-            if delay == 0:
-                self.bullets[bid] = b
-            else:
-                self._pending_pellets.append((self.tick + delay, b))
+        from game.chars.rambo.grenade_state import spawn_grenade
+        spawn_grenade(self, owner_id, aim_x, aim_y)
 
     def _trigger_grenade_explosion(self, x: float, y: float, owner_id: int) -> None:
-        for pid, player in self.players.items():
-            if pid == owner_id:
-                continue
-            dist = math.hypot(player.x - x, player.y - y)
-            if dist <= self._GRENADE_RADIUS:
-                t      = dist / self._GRENADE_RADIUS                      # 0=中心 1=邊緣
-                damage = int(self._GRENADE_DMG_MIN
-                             + (self._GRENADE_DMG_MAX - self._GRENADE_DMG_MIN) * (1-t) * (1-t))
-                player.hp -= damage
-                if player.hp <= 0:
-                    player.respawn()
+        from game.chars.rambo.grenade_state import trigger_grenade_explosion
+        trigger_grenade_explosion(self, x, y, owner_id)
 
     def step_status_effects(self) -> None:
         for player in self.players.values():
