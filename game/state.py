@@ -265,12 +265,12 @@ class GameState:
         # 速度提升技能（survivor1 space）：與 shoot_slow 疊加
         if player.speed_boost_ticks > 0 and speed_mult == 1.0:
             mult *= player.speed_boost_mult
-        # 巨大化主動階段：移速 ×1.4
+        # 巨大化主動階段：移速 ×1.5
         if player.giant_tick >= 0 and speed_mult == 1.0:
             from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
             _ga = self.tick - player.giant_tick
             if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
-                mult *= 1.4
+                mult *= 1.5
         player.move(dx, dy, speed_mult=mult)
         player.stance = stance
         if math.hypot(aim_x, aim_y) > 0:
