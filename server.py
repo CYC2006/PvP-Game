@@ -142,6 +142,9 @@ def run():
                             elif p and p.char_key == 'survivor1':
                                 state._spawn_smoke_grenade(
                                     cmd.player_id, cmd.aim_x, cmd.aim_y)
+                            elif p and p.char_key == 'manOld':
+                                state._activate_log_barriers(
+                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
                         if cmd.use_skill_rmb:
                             if p and p.char_key == 'survivor1':
                                 state._spawn_shuriken(
@@ -152,6 +155,8 @@ def run():
                         if cmd.use_skill_space:
                             if p and p.char_key == 'survivor1':
                                 state._activate_speed_boost(cmd.player_id)
+                            elif p and p.char_key == 'manOld':
+                                state._spawn_mini_grenades(cmd.player_id)
                         if cmd.use_skill_r:
                             if p and p.char_key == 'survivor1':
                                 state._activate_r_skill(

@@ -108,6 +108,16 @@ class AirStrike:
 
 
 @dataclass
+class LogBarrier:
+    id:       int
+    owner_id: int
+    x:        float
+    y:        float
+    hp:       int
+    radius:   float = 12.0
+
+
+@dataclass
 class Bullet:
     id: int
     owner_id: int
@@ -171,6 +181,8 @@ class GameState:
     _blade_spawn_queue: list = field(default_factory=list)   # [(spawn_tick, owner_id, x, y, radius, orbit_angle, direction, damage)]
     air_strikes: dict        = field(default_factory=dict)   # aid → AirStrike
     _next_airstrike_id: int  = 0
+    log_barriers: dict       = field(default_factory=dict)   # lid → LogBarrier
+    _next_log_id: int        = 0
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -347,8 +359,8 @@ class GameState:
             hit = False
             shooter = self.players.get(bullet.owner_id)
             does_damage = not (shooter and shooter.damage_min == 0 and shooter.damage_max == 0)
-            if bullet.bullet_type in (1, 2):
-                does_damage = False   # 閃光彈/手榴彈不造成接觸傷害（type=3 手裡劍仍可傷人）
+            if bullet.bullet_type in (1, 2, 5):
+                does_damage = False   # 閃光彈/手榴彈/迷你手雷不造成接觸傷害
 
             # 手裡劍：碰撞半徑隨時間線性成長
             if bullet.bullet_type == 3:
@@ -419,8 +431,8 @@ class GameState:
                 if not obs.solid:          # 非實體（樹/草叢）→ 子彈穿透
                     continue
                 if obs.collides_circle(bullet.x, bullet.y, coll_r):
-                    if bullet.bullet_type in (1, 2, 3, 4):
-                        continue   # 投擲物 / 手裡劍無視障礙物，繼續飛行
+                    if bullet.bullet_type in (1, 2, 3, 4, 5):
+                        continue   # 投擲物 / 手裡劍 / 迷你手雷無視障礙物
                     if bullet.dot_interval > 0:
                         # DoT 子彈（毒氣泡）：撞牆時停住，不消失，持續傷害障礙物
                         if bullet.dx != 0.0 or bullet.dy != 0.0:
@@ -472,6 +484,25 @@ class GameState:
                         expired.append(bid)
                         break
 
+            # ── 子彈 vs 木頭障礙物 ──────────────────────────────────────
+            if not hit:
+                for lid in list(self.log_barriers):
+                    lb = self.log_barriers.get(lid)
+                    if lb is None:
+                        continue
+                    if math.hypot(bullet.x - lb.x, bullet.y - lb.y) < lb.radius + coll_r:
+                        if bullet.bullet_type in (1, 2, 3, 4, 5):
+                            continue   # 投擲物/手裡劍/迷你手雷穿透
+                        if does_damage and shooter:
+                            dmg = (random.randint(shooter.damage_min, shooter.damage_max)
+                                   if shooter.damage_min < shooter.damage_max
+                                   else shooter.damage_min)
+                            lb.hp -= dmg
+                            if lb.hp <= 0:
+                                self.log_barriers.pop(lid, None)
+                        expired.append(bid)
+                        break
+
         for bid in expired:
             b = self.bullets.get(bid)
             # 投擲物 linger 結束時爆炸
@@ -482,6 +513,8 @@ class GameState:
                     self._trigger_grenade_explosion(b.x, b.y, b.owner_id)
                 elif b.bullet_type == 4:
                     self._trigger_smoke_explosion(b.x, b.y)
+                elif b.bullet_type == 5:
+                    self._trigger_mini_grenade_explosion(b.x, b.y, b.owner_id)
             self.bullets.pop(bid, None)
             for k in [k for k in self._dot_cooldown if k[0] == bid]:
                 del self._dot_cooldown[k]
@@ -569,7 +602,8 @@ class GameState:
     _AIRSTRIKE_TOTAL_TICKS = 180   # 總持續時間
     _AIRSTRIKE_RADIUS      = 100.0
     _AIRSTRIKE_MAX_RANGE   = 300.0
-    _AIRSTRIKE_DMG         = 15
+    _AIRSTRIKE_DMG_MIN     = 10
+    _AIRSTRIKE_DMG_MAX     = 15
     _AIRSTRIKE_DMG_INTERVAL = 6    # 每 6 tick 傷害一次
 
     def _activate_airstrike(self, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -589,6 +623,43 @@ class GameState:
             spawn_tick=self.tick,
         )
 
+    def _spawn_mini_grenades(self, owner_id: int) -> None:
+        from game.chars.sniper.mini_grenade_state import spawn_mini_grenades
+        spawn_mini_grenades(self, owner_id)
+
+    def _trigger_mini_grenade_explosion(self, x: float, y: float, owner_id: int) -> None:
+        from game.chars.sniper.mini_grenade_state import trigger_mini_grenade_explosion
+        trigger_mini_grenade_explosion(self, x, y, owner_id)
+
+    _LOG_BARRIER_HP     = 60
+    _LOG_BARRIER_RADIUS = 18.0
+    _LOG_BARRIER_DIST   = 80.0
+
+    def _activate_log_barriers(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        player = self.players.get(owner_id)
+        if not player:
+            return
+        length = math.hypot(aim_x, aim_y)
+        if length == 0:
+            return
+        # 移除此玩家舊有的木頭障礙物
+        for lid in [k for k, lb in self.log_barriers.items() if lb.owner_id == owner_id]:
+            self.log_barriers.pop(lid)
+        ux, uy = aim_x / length, aim_y / length
+        for angle_offset in (0.0, math.radians(-45), math.radians(45)):
+            ca, sa = math.cos(angle_offset), math.sin(angle_offset)
+            dx = ux * ca - uy * sa
+            dy = ux * sa + uy * ca
+            lid = self._next_log_id
+            self._next_log_id = (self._next_log_id + 1) % 256
+            self.log_barriers[lid] = LogBarrier(
+                id=lid, owner_id=owner_id,
+                x=player.x + dx * self._LOG_BARRIER_DIST,
+                y=player.y + dy * self._LOG_BARRIER_DIST,
+                hp=self._LOG_BARRIER_HP,
+                radius=self._LOG_BARRIER_RADIUS,
+            )
+
     def step_air_strikes(self) -> None:
         to_remove = []
         for aid, strike in self.air_strikes.items():
@@ -604,7 +675,7 @@ class GameState:
                     if opponent:
                         dist = math.hypot(opponent.x - strike.cx, opponent.y - strike.cy)
                         if dist < self._AIRSTRIKE_RADIUS:
-                            opponent.hp -= self._AIRSTRIKE_DMG
+                            opponent.hp -= random.randint(self._AIRSTRIKE_DMG_MIN, self._AIRSTRIKE_DMG_MAX)
                             if opponent.hp <= 0:
                                 opponent.respawn()
         for aid in to_remove:
@@ -661,3 +732,12 @@ class GameState:
                 new_x, new_y = obs.push_out_circle(player.x, player.y, PLAYER_RADIUS)
                 player.x = new_x
                 player.y = new_y
+            for lb in list(self.log_barriers.values()):
+                min_dist = PLAYER_RADIUS + lb.radius
+                ddx = player.x - lb.x
+                ddy = player.y - lb.y
+                dist = math.hypot(ddx, ddy)
+                if dist < min_dist:
+                    scale = min_dist / dist if dist > 0 else 1.0
+                    player.x = lb.x + ddx * scale if dist > 0 else lb.x + min_dist
+                    player.y = lb.y + ddy * scale if dist > 0 else lb.y

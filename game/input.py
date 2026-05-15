@@ -154,8 +154,9 @@ def read_input(player_id: int, keys_held: set,
     _r_skill_active = (now - _r_skill_start_ms) < 500 and _r_skill_start_ms > 0
 
     # ── 位移 / WASD ───────────────────────────────────────────────
-    dx, dy     = 0.0, 0.0
-    speed_mult = 1.0
+    dx, dy          = 0.0, 0.0
+    speed_mult      = 1.0
+    use_skill_space = False
 
     if _dash_active:
         if _dash_speed < _DASH_MIN_SPEED:
@@ -179,6 +180,17 @@ def read_input(player_id: int, keys_held: set,
             if cd_remaining <= 0:
                 if _char_key == 'survivor1':
                     pass   # 冷卻由下方 use_skill_space 區塊統一記錄
+                elif _char_key == 'manOld':
+                    aim_len = math.hypot(aim_x, aim_y)
+                    if aim_len > 0:
+                        _dash_active     = True
+                        _dash_dx         = -aim_x / aim_len
+                        _dash_dy         = -aim_y / aim_len
+                        speed_mult       = 18.0 / max(_player_speed, 0.001)
+                        dx, dy           = _dash_dx, _dash_dy
+                        _dash_speed      = 18.0 - _DASH_DECEL
+                        _skill_last_ms['space'] = now
+                        use_skill_space  = True
                 else:
                     length = math.hypot(dx, dy)
                     if length > 0:
@@ -219,7 +231,6 @@ def read_input(player_id: int, keys_held: set,
                 _skill_last_ms['rmb'] = now
 
     # ── Space 技能（survivor1：速度提升）─────────────────────────
-    use_skill_space = False
     if (not _r_skill_active
             and _char_key == 'survivor1'
             and space_just_pressed

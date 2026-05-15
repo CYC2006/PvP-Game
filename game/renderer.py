@@ -10,6 +10,7 @@ from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _w
 
 from game.chars.agent    import flash_fx
 from game.chars.rambo    import grenade_fx, airstrike_fx
+from game.chars.sniper   import mini_grenade_fx
 from game.chars.zombie   import blade_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
 from game.chars.dancer   import bubble_fx
@@ -362,6 +363,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _process_hits(state, obstacles)
         _draw_obstacles(screen, obstacles, state.destroyed_obstacles, cx, cy)
 
+    _draw_log_barriers(screen, state, cx, cy)
     _draw_debris(screen, cx, cy)
     _draw_particles(screen, cx, cy)
     _draw_gold_ingots(screen, state, cx, cy)
@@ -379,6 +381,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     smoke_fx.draw_patches(screen, state, cx, cy, my_id)
     flash_fx.draw_explosions(screen, cx, cy)
     grenade_fx.draw_explosions(screen, cx, cy)
+    mini_grenade_fx.draw_explosions(screen, cx, cy)
     airstrike_fx.update(state)
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
@@ -433,6 +436,16 @@ def _draw_obstacles(screen, obstacles: dict, destroyed: set, cx, cy):
         ox, oy  = _shake_offset(oid)
         screen.blit(rotated, (sx - rotated.get_width()  // 2 + ox,
                                sy - rotated.get_height() // 2 + oy))
+
+
+def _draw_log_barriers(screen, state, cx, cy) -> None:
+    for lb in state.log_barriers.values():
+        sx, sy = _ws(lb.x, lb.y, cx, cy)
+        r = int(lb.radius)
+        if sx < -r - 10 or sx > SCREEN_W + r + 10 or sy < -r - 10 or sy > SCREEN_H + r + 10:
+            continue
+        pygame.draw.circle(screen, (120, 72, 28), (sx, sy), r)
+        pygame.draw.circle(screen, (70, 38, 10), (sx, sy), r, 2)
 
 
 def _draw_trees(screen, obstacles: dict, destroyed: set,
@@ -551,6 +564,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
     bubble_fx.cleanup(current_bids)
     flash_fx.detect_disappeared(state, now)
     grenade_fx.detect_disappeared(state, now)
+    mini_grenade_fx.detect_disappeared(state, now)
 
     for bullet in state.bullets.values():
         sx, sy = _ws(bullet.x, bullet.y, cx, cy)
@@ -559,7 +573,10 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
-            if btype == 4:   # 煙霧彈：小灰綠色圓點
+            if btype == 5:   # 迷你手雷：玩家色小圓點
+                mini_grenade_fx.track(bullet)
+                pygame.draw.circle(screen, color, (sx, sy), 5)
+            elif btype == 4:   # 煙霧彈：小灰綠色圓點
                 pygame.draw.circle(screen, (90, 120, 70), (sx, sy), 6)
             elif btype == 3:
                 shuriken_fx.draw_bullet(screen, bullet, sx, sy, color, state)
