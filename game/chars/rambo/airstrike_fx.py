@@ -39,11 +39,11 @@ def _spawn_explosion(cx: float, cy: float, owner_id: int) -> None:
     a        = random.uniform(0, math.tau)
     ex, ey   = cx + math.cos(a) * r, cy + math.sin(a) * r
     base_col = COL_BULLET.get(owner_id, (255, 200, 100))
-    for _ in range(random.randint(5, 10)):
+    for _ in range(random.randint(8, 14)):
         pa    = random.uniform(0, math.tau)
-        speed = random.uniform(20, 110)
-        life  = random.uniform(0.15, 0.45)
-        size  = random.uniform(2.0, 6.0)
+        speed = random.uniform(40, 180)
+        life  = random.uniform(0.25, 0.6)
+        size  = random.uniform(5.0, 16.0)
         col   = tuple(max(0, min(255, c + random.randint(-40, 40))) for c in base_col)
         _particles.append([ex, ey,
                            math.cos(pa) * speed, math.sin(pa) * speed,
