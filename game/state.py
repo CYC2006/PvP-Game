@@ -419,6 +419,8 @@ class GameState:
                                 damage = shooter.damage_min
                             else:
                                 damage = 1
+                            if bullet.bullet_scale != 1.0:
+                                damage = int(damage * bullet.bullet_scale)
                             if player.giant_tick >= 0:
                                 damage = int(damage * 0.8)
                             player.hp -= damage
@@ -443,6 +445,8 @@ class GameState:
                             damage = shooter.damage_min
                         else:
                             damage = 1
+                        if bullet.bullet_scale != 1.0:
+                            damage = int(damage * bullet.bullet_scale)
                         if player.giant_tick >= 0:
                             damage = int(damage * 0.8)
                         player.hp -= damage
