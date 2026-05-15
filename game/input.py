@@ -29,6 +29,10 @@ _r_holding:           bool  = False  # manBlue R 按住中（未施放）
 _last_aim_x:          float = 0.0   # 上幀瞄準偏移（world 座標，供 airstrike_fx 使用）
 _last_aim_y:          float = 0.0
 _giant_age:           int   = -1    # 巨人模式年齡（-1 = 未啟動），由 client 每幀更新
+_dash_player_x:       float = 0.0   # 本地玩家位置（client 每幀更新，供衝刺碰撞檢查）
+_dash_player_y:       float = 0.0
+_dash_obstacles:      dict  = {}    # {id: Obstacle}，client 每幀更新
+_dash_destroyed:      set   = set() # 已摧毀障礙物 id
 
 # ── 衝刺常數 ──────────────────────────────────────────────────────
 # 9 ticks：15 + 14.1 + … + 7.8 ≈ 102 px，接近 100 px
@@ -52,6 +56,15 @@ _e_prev:     bool = False
 def set_giant_age(age: int) -> None:
     global _giant_age
     _giant_age = age
+
+
+def set_dash_context(player_x: float, player_y: float,
+                     obstacles: dict, destroyed: set) -> None:
+    global _dash_player_x, _dash_player_y, _dash_obstacles, _dash_destroyed
+    _dash_player_x  = player_x
+    _dash_player_y  = player_y
+    _dash_obstacles = obstacles
+    _dash_destroyed = destroyed
 
 
 def init_char(char_key: str) -> None:
@@ -174,13 +187,23 @@ def read_input(player_id: int, keys_held: set,
 
     if _dash_active:
         if _dash_dist_remaining > 0:
-            # 等速衝刺（Rambo）：依剩餘距離決定是否結束
-            speed_mult           = _RAMBO_DASH_SPEED / max(_player_speed, 0.001)
-            dx, dy               = _dash_dx, _dash_dy
-            _dash_dist_remaining -= _RAMBO_DASH_SPEED
-            if _dash_dist_remaining <= 0:
+            # 等速衝刺（Rambo）：障礙物碰撞 → 立即停止
+            from game.state import PLAYER_RADIUS as _PR
+            _hit_obs = any(
+                obs.collides_circle(_dash_player_x, _dash_player_y, _PR)
+                for oid, obs in _dash_obstacles.items()
+                if oid not in _dash_destroyed
+            )
+            if _hit_obs:
                 _dash_active         = False
                 _dash_dist_remaining = 0.0
+            else:
+                speed_mult           = _RAMBO_DASH_SPEED / max(_player_speed, 0.001)
+                dx, dy               = _dash_dx, _dash_dy
+                _dash_dist_remaining -= _RAMBO_DASH_SPEED
+                if _dash_dist_remaining <= 0:
+                    _dash_active         = False
+                    _dash_dist_remaining = 0.0
         elif _dash_speed < _DASH_MIN_SPEED:
             _dash_active = False          # 速度低於閾值，衝刺結束
         else:

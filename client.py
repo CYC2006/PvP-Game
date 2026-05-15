@@ -6,7 +6,7 @@ import time
 import threading
 import pygame
 
-from game.input      import read_input, set_giant_age
+from game.input      import read_input, set_giant_age, set_dash_context
 from game.renderer   import draw, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
@@ -292,6 +292,9 @@ def run() -> None:
             state = unpack_state(latest)
 
         local_player = state.players.get(player_id)
+        if local_player:
+            set_dash_context(local_player.x, local_player.y,
+                             obstacles, state.destroyed_obstacles)
         if local_player:
             gt = local_player.giant_tick
             from game.chars.rambo.giant_state import TOTAL_TICKS
