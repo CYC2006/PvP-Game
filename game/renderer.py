@@ -9,7 +9,7 @@ from game.input import MAGAZINE_SIZE, RELOAD_TIME_MS
 from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _ws, COL_BULLET as _COL_BULLET_UTILS
 
 from game.chars.agent    import flash_fx
-from game.chars.rambo    import grenade_fx
+from game.chars.rambo    import grenade_fx, airstrike_fx
 from game.chars.zombie   import blade_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
 from game.chars.dancer   import bubble_fx
@@ -352,8 +352,11 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     me = state.players[my_id]
     cx, cy = _camera(me)
 
+    my_char = (player_chars or {}).get(my_id, "hitman1")
+
     _draw_map(screen, cx, cy)
     r_dash_fx.draw_r_trail(screen, cx, cy)
+    airstrike_fx.draw_preview(screen, cx, cy, me.x, me.y, my_id)
 
     if obstacles:
         _process_hits(state, obstacles)
@@ -376,6 +379,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     smoke_fx.draw_patches(screen, state, cx, cy, my_id)
     flash_fx.draw_explosions(screen, cx, cy)
     grenade_fx.draw_explosions(screen, cx, cy)
+    airstrike_fx.update(state)
+    airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
 
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns)

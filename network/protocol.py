@@ -1,6 +1,6 @@
 import struct
 from game.command import PlayerCommand
-from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc
+from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike
 
 # --- Packet types ---
 PKT_JOIN        = 0x01
@@ -27,7 +27,8 @@ _PLAYER_ENTRY  = struct.Struct("!BffHHhBHB")  # id x y hp max_hp aim_angle stanc
 _BULLET_ENTRY  = struct.Struct("!BBffhB")     # id owner x y angle_i16 bullet_type
 _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
 _SMOKE_ENTRY   = struct.Struct("!BffHI")     # id x y radius*10 spawn_tick
-_BLADE_ENTRY   = struct.Struct("!BhhBbB")   # id x_i16 y_i16 age dir owner_id
+_BLADE_ENTRY      = struct.Struct("!BhhBbB")   # id x_i16 y_i16 age dir owner_id
+_AIRSTRIKE_ENTRY  = struct.Struct("!BhhBB")    # id cx_i16 cy_i16 age(u8) owner_id
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -133,7 +134,15 @@ def pack_state(state: GameState) -> bytes:
         for b in blades
     )
 
-    return header + p_data + b_data + d_data + g_data + s_data + ba_data
+    strikes = list(state.air_strikes.values())
+    as_data = bytes([len(strikes)]) + b"".join(
+        _AIRSTRIKE_ENTRY.pack(
+            s.id, int(s.cx), int(s.cy),
+            min(255, state.tick - s.spawn_tick), s.owner_id)
+        for s in strikes
+    )
+
+    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -193,6 +202,18 @@ def unpack_state(data: bytes) -> GameState:
                 direction=direction, damage=0, age=age,
             )
             offset += _BLADE_ENTRY.size
+
+    if offset < len(data):
+        as_count = data[offset]; offset += 1
+        for _ in range(as_count):
+            sid, scx, scy, age, owner = _AIRSTRIKE_ENTRY.unpack(
+                data[offset: offset + _AIRSTRIKE_ENTRY.size])
+            state.air_strikes[sid] = AirStrike(
+                id=sid, owner_id=owner,
+                cx=float(scx), cy=float(scy),
+                spawn_tick=state.tick - age,
+            )
+            offset += _AIRSTRIKE_ENTRY.size
 
     return state
 

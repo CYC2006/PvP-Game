@@ -99,6 +99,15 @@ class BladeArc:
 
 
 @dataclass
+class AirStrike:
+    id: int
+    owner_id: int
+    cx: float
+    cy: float
+    spawn_tick: int
+
+
+@dataclass
 class Bullet:
     id: int
     owner_id: int
@@ -160,6 +169,8 @@ class GameState:
     smoke_patches: dict      = field(default_factory=dict)   # sid → SmokePatch
     blade_arcs: dict         = field(default_factory=dict)   # bid → BladeArc
     _blade_spawn_queue: list = field(default_factory=list)   # [(spawn_tick, owner_id, x, y, radius, orbit_angle, direction, damage)]
+    air_strikes: dict        = field(default_factory=dict)   # aid → AirStrike
+    _next_airstrike_id: int  = 0
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -551,6 +562,53 @@ class GameState:
     def step_smoke_patches(self) -> None:
         from game.chars.assassin.smoke_state import step_smoke_patches
         step_smoke_patches(self)
+
+    # ── 空襲（Rambo R）────────────────────────────────────────────
+    _AIRSTRIKE_WAIT_TICKS  = 60    # 1s 等待
+    _AIRSTRIKE_BOMB_TICKS  = 120   # 2s 轟炸
+    _AIRSTRIKE_TOTAL_TICKS = 180   # 總持續時間
+    _AIRSTRIKE_RADIUS      = 100.0
+    _AIRSTRIKE_MAX_RANGE   = 300.0
+    _AIRSTRIKE_DMG         = 15
+    _AIRSTRIKE_DMG_INTERVAL = 6    # 每 6 tick 傷害一次
+
+    def _activate_airstrike(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        player = self.players.get(owner_id)
+        if not player:
+            return
+        dist = math.hypot(aim_x, aim_y)
+        if dist > self._AIRSTRIKE_MAX_RANGE and dist > 0:
+            scale = self._AIRSTRIKE_MAX_RANGE / dist
+            aim_x *= scale
+            aim_y *= scale
+        aid = self._next_airstrike_id
+        self._next_airstrike_id = (self._next_airstrike_id + 1) % 256
+        self.air_strikes[aid] = AirStrike(
+            id=aid, owner_id=owner_id,
+            cx=player.x + aim_x, cy=player.y + aim_y,
+            spawn_tick=self.tick,
+        )
+
+    def step_air_strikes(self) -> None:
+        to_remove = []
+        for aid, strike in self.air_strikes.items():
+            age = self.tick - strike.spawn_tick
+            if age > self._AIRSTRIKE_TOTAL_TICKS:
+                to_remove.append(aid)
+                continue
+            if age >= self._AIRSTRIKE_WAIT_TICKS:
+                bomb_age = age - self._AIRSTRIKE_WAIT_TICKS
+                if bomb_age % self._AIRSTRIKE_DMG_INTERVAL == 0:
+                    opponent_id = 3 - strike.owner_id
+                    opponent    = self.players.get(opponent_id)
+                    if opponent:
+                        dist = math.hypot(opponent.x - strike.cx, opponent.y - strike.cy)
+                        if dist < self._AIRSTRIKE_RADIUS:
+                            opponent.hp -= self._AIRSTRIKE_DMG
+                            if opponent.hp <= 0:
+                                opponent.respawn()
+        for aid in to_remove:
+            self.air_strikes.pop(aid, None)
 
     def _activate_blade_arc(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.zombie.blade_state import activate_blade_arc

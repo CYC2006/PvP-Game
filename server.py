@@ -146,6 +146,9 @@ def run():
                             if p and p.char_key == 'survivor1':
                                 state._spawn_shuriken(
                                     cmd.player_id, cmd.aim_x, cmd.aim_y)
+                            elif p and p.char_key == 'manBlue':
+                                state._activate_airstrike(
+                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
                         if cmd.use_skill_space:
                             if p and p.char_key == 'survivor1':
                                 state._activate_speed_boost(cmd.player_id)
@@ -193,6 +196,7 @@ def run():
                 state.step_smoke_patches()
                 state.step_blade_arcs()
                 state.step_r_skill()
+                state.step_air_strikes()
 
                 payload = pack_state(state)
                 for addr in clients.values():
