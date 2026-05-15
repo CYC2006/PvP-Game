@@ -289,17 +289,17 @@ class GameState:
         ux = aim_x / length
         uy = aim_y / length
 
-        # 巨大化主動階段：子彈與射程放大 3 倍
+        # 巨大化主動階段：子彈與射程放大 2 倍
         _bscale = 1.0
         if player.giant_tick >= 0:
             from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
             _ga = self.tick - player.giant_tick
             if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
-                _bscale = 3.0
+                _bscale = 2.0
 
-        # 槍口偏移（固定用主瞄準方向計算，所有散彈共用同一出口）
-        barrel_fwd   = PLAYER_RADIUS + 10
-        barrel_right = 14
+        # 槍口偏移（巨人化時依縮放推遠，所有散彈共用同一出口）
+        barrel_fwd   = (PLAYER_RADIUS + 10) * _bscale
+        barrel_right = 14 * _bscale
         rx, ry = -uy, ux
         spawn_x = player.x + ux * barrel_fwd + rx * barrel_right
         spawn_y = player.y + uy * barrel_fwd + ry * barrel_right

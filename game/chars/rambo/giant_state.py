@@ -1,10 +1,10 @@
-GROW_TICKS   = 48    # 4 stages × 12 ticks
+GROW_TICKS   = 48    # 4 stages × 12 ticks  (100→125→150→175→200%)
 ACTIVE_TICKS = 300   # 5 seconds
 SHRINK_TICKS = 48
 TOTAL_TICKS  = 396   # entire skill duration
 
 _STAGE_TICKS = 12
-_STAGES      = ((1.0, 1.5), (1.5, 2.0), (2.0, 2.5), (2.5, 3.0))
+_STAGES      = ((1.0, 1.25), (1.25, 1.50), (1.50, 1.75), (1.75, 2.0))
 
 
 def get_scale(giant_age: int) -> float:
@@ -17,6 +17,6 @@ def get_scale(giant_age: int) -> float:
         s0, s1 = _STAGES[stage]
         return s0 + (s1 - s0) * t
     if giant_age < GROW_TICKS + ACTIVE_TICKS:
-        return 3.0
+        return 2.0
     shrink_t = (giant_age - GROW_TICKS - ACTIVE_TICKS) / SHRINK_TICKS
-    return 3.0 - shrink_t * 2.0
+    return 2.0 - shrink_t * 1.0
