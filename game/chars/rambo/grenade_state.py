@@ -53,6 +53,8 @@ def trigger_grenade_explosion(state, x: float, y: float, owner_id: int) -> None:
             t      = dist / GRENADE_RADIUS
             damage = int(GRENADE_DMG_MIN
                          + (GRENADE_DMG_MAX - GRENADE_DMG_MIN) * (1 - t) * (1 - t))
+            if player.giant_tick >= 0:
+                damage = int(damage * 0.8)
             player.hp -= damage
             if player.hp <= 0:
                 player.respawn()

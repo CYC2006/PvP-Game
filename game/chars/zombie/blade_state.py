@@ -76,7 +76,8 @@ def step_blade_arcs(state) -> None:
             if opponent:
                 dist = math.hypot(blade.x - opponent.x, blade.y - opponent.y)
                 if dist < PLAYER_RADIUS + BLADE_HIT_RADIUS:
-                    opponent.hp -= blade.damage
+                    dmg = int(blade.damage * 0.8) if opponent.giant_tick >= 0 else blade.damage
+                    opponent.hp -= dmg
                     blade.hit = True
                     if opponent.hp <= 0:
                         opponent.respawn()

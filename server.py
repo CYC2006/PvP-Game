@@ -161,6 +161,8 @@ def run():
                             if p and p.char_key == 'survivor1':
                                 state._activate_r_skill(
                                     cmd.player_id, cmd.aim_x, cmd.aim_y)
+                            elif p and p.char_key == 'manBlue':
+                                state._activate_giant(cmd.player_id)
                     state.apply_command(
                         cmd.player_id,
                         cmd.move_x, cmd.move_y,
@@ -202,6 +204,7 @@ def run():
                 state.step_blade_arcs()
                 state.step_r_skill()
                 state.step_air_strikes()
+                state.step_giant()
 
                 payload = pack_state(state)
                 for addr in clients.values():

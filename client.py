@@ -6,7 +6,7 @@ import time
 import threading
 import pygame
 
-from game.input      import read_input
+from game.input      import read_input, set_giant_age
 from game.renderer   import draw, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
@@ -290,6 +290,15 @@ def run() -> None:
                 break
         if latest:
             state = unpack_state(latest)
+
+        local_player = state.players.get(player_id)
+        if local_player:
+            gt = local_player.giant_tick
+            from game.chars.rambo.giant_state import TOTAL_TICKS
+            age = state.tick - gt if gt >= 0 else -1
+            set_giant_age(age if 0 <= age < TOTAL_TICKS else -1)
+        else:
+            set_giant_age(-1)
 
         draw(screen, state, player_id, font_sm, obstacles,
              effective_stance, aim_angle_deg, ammo, is_reloading,

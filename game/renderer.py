@@ -10,6 +10,7 @@ from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _w
 
 from game.chars.agent    import flash_fx
 from game.chars.rambo    import grenade_fx, airstrike_fx
+from game.chars.rambo.giant_state import get_scale as _giant_get_scale, GROW_TICKS, ACTIVE_TICKS, TOTAL_TICKS
 from game.chars.sniper   import mini_grenade_fx
 from game.chars.zombie   import blade_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
@@ -517,7 +518,8 @@ def _rot_pts(cx, cy, pts, angle_rad):
              cy + x * sin_a + y * cos_a) for x, y in pts]
 
 
-def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float):
+def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float,
+                       bullet_scale: float = 1.0):
     """依角色繪製不同形狀的子彈，color 為玩家顏色（藍/紅）。"""
     a = math.radians(angle_deg)   # 飛行方向（標準數學角，0=右，90=下）
 
@@ -548,8 +550,8 @@ def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float):
 
     # womanGreen 改在 _draw_bullets 直接處理（需要 bid 與時間資訊）
 
-    elif char_key == "manBlue":          # Rambo — 散彈圓點
-        pygame.draw.circle(screen, color, (sx, sy), 4)
+    elif char_key == "manBlue":          # Rambo — 散彈圓點（巨人模式等比放大）
+        pygame.draw.circle(screen, color, (sx, sy), max(1, int(4 * bullet_scale)))
 
     else:                               # Agent（Pistol）& 其他 — 標準圓形
         pygame.draw.circle(screen, color, (sx, sy), BULLET_RADIUS)
@@ -587,7 +589,8 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             elif char_key == "womanGreen":
                 bubble_fx.draw_bullet(screen, bullet, sx, sy, color, now)
             else:
-                _draw_bullet_shape(screen, char_key, color, sx, sy, bullet.aim_angle)
+                _draw_bullet_shape(screen, char_key, color, sx, sy, bullet.aim_angle,
+                                   getattr(bullet, 'bullet_scale', 1.0))
 
 
 
@@ -629,6 +632,18 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         char_key = player_chars.get(pid, "hitman1")
         sprite   = _get_player_sprite(char_key, stance)
         rotated = pygame.transform.rotate(sprite, 90 - angle)
+
+        # 巨人縮放
+        giant_scale = 1.0
+        if player.giant_tick >= 0:
+            giant_age = state.tick - player.giant_tick
+            if 0 <= giant_age < TOTAL_TICKS:
+                giant_scale = _giant_get_scale(giant_age)
+        if giant_scale != 1.0:
+            new_w = max(1, int(rotated.get_width()  * giant_scale))
+            new_h = max(1, int(rotated.get_height() * giant_scale))
+            rotated = pygame.transform.scale(rotated, (new_w, new_h))
+
         screen.blit(rotated, (sx - rotated.get_width()  // 2,
                                sy - rotated.get_height() // 2))
 

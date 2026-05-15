@@ -42,6 +42,8 @@ class Player:
     speed_boost_ticks: int  = 0     # >0：速度提升中，倒數至 0（survivor1 space）
     speed_boost_mult: float = 1.0   # 速度提升倍率
     char_key: str           = ""    # 角色 key，由 apply_char_stats 設定，不同步至 client
+    # ── manBlue R 技能狀態（巨大化）─────────────────────────────────
+    giant_tick: int            = -1   # tick when giant mode started (-1 = inactive)
     # ── survivor1 R 技能狀態 ──────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -133,6 +135,7 @@ class Bullet:
     dot_interval: int = 0              # >0：穿透玩家，每 N tick 傷害一次
     spawn_tick: int   = 0              # 建立時的 tick（DoT 半徑成長計算用）
     bubble_radius_max: float = 0.0     # DoT 泡泡最大碰撞半徑 px（由 server 亂數，client 同步）
+    bullet_scale: float = 1.0          # 巨大化子彈：3.0（碰撞半徑與視覺同比放大）
     bullet_type: int  = 0              # 0=一般子彈  1=閃光彈
 
     def step(self) -> None:
@@ -232,6 +235,15 @@ class GameState:
         if player_id not in self.players:
             return
         player = self.players[player_id]
+        # 巨大化進行中
+        if player.giant_tick >= 0:
+            from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
+            _giant_age = self.tick - player.giant_tick
+            if _giant_age < GROW_TICKS or _giant_age >= GROW_TICKS + ACTIVE_TICKS:
+                # 放大 / 縮小階段：原地不動，不接受任何輸入
+                if player._shoot_slow_timer > 0:
+                    player._shoot_slow_timer -= 1
+                return
         # R 技能進行中：禁止所有輸入，由 step_r_skill 驅動
         if player.r_skill_phase > 0:
             if player._shoot_slow_timer > 0:
@@ -253,6 +265,12 @@ class GameState:
         # 速度提升技能（survivor1 space）：與 shoot_slow 疊加
         if player.speed_boost_ticks > 0 and speed_mult == 1.0:
             mult *= player.speed_boost_mult
+        # 巨大化主動階段：移速 ×1.4
+        if player.giant_tick >= 0 and speed_mult == 1.0:
+            from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
+            _ga = self.tick - player.giant_tick
+            if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
+                mult *= 1.4
         player.move(dx, dy, speed_mult=mult)
         player.stance = stance
         if math.hypot(aim_x, aim_y) > 0:
@@ -270,6 +288,14 @@ class GameState:
             return
         ux = aim_x / length
         uy = aim_y / length
+
+        # 巨大化主動階段：子彈與射程放大 3 倍
+        _bscale = 1.0
+        if player.giant_tick >= 0:
+            from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
+            _ga = self.tick - player.giant_tick
+            if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
+                _bscale = 3.0
 
         # 槍口偏移（固定用主瞄準方向計算，所有散彈共用同一出口）
         barrel_fwd   = PLAYER_RADIUS + 10
@@ -300,9 +326,9 @@ class GameState:
             elif math.isinf(player.bullet_range):
                 pellet_range = player.bullet_range   # inf：子彈永遠不因距離消失
             elif player.bullet_range_min > 0:
-                pellet_range = random.uniform(player.bullet_range_min, player.bullet_range)
+                pellet_range = random.uniform(player.bullet_range_min, player.bullet_range) * _bscale
             else:
-                pellet_range = player.bullet_range
+                pellet_range = player.bullet_range * _bscale
             bid = self._next_bullet_id
             self._next_bullet_id = (self._next_bullet_id + 1) % 256
             bullet = Bullet(
@@ -319,6 +345,7 @@ class GameState:
                     random.uniform(BULLET_RADIUS * 5, BULLET_RADIUS * 7)
                     if player.dot_interval > 0 else 0.0
                 ),
+                bullet_scale=_bscale,
             )
             # pellet_interval > 0：第一顆立即發射，其餘排進待發佇列
             if player.pellet_interval > 0 and pellet_i > 0:
@@ -374,7 +401,7 @@ class GameState:
                 coll_r = (BULLET_RADIUS * 2
                           + (bullet.bubble_radius_max - BULLET_RADIUS * 2) * t_grow)
             else:
-                coll_r = float(BULLET_RADIUS)
+                coll_r = float(BULLET_RADIUS) * bullet.bullet_scale
 
             # ── 子彈 vs 玩家 ────────────────────────────────────────────
             if bullet.dot_interval > 0:
@@ -392,6 +419,8 @@ class GameState:
                                 damage = shooter.damage_min
                             else:
                                 damage = 1
+                            if player.giant_tick >= 0:
+                                damage = int(damage * 0.8)
                             player.hp -= damage
                             if player.hp <= 0:
                                 player.respawn()
@@ -414,6 +443,8 @@ class GameState:
                             damage = shooter.damage_min
                         else:
                             damage = 1
+                        if player.giant_tick >= 0:
+                            damage = int(damage * 0.8)
                         player.hp -= damage
                         if player.hp <= 0:
                             player.respawn()
@@ -660,6 +691,20 @@ class GameState:
                 radius=self._LOG_BARRIER_RADIUS,
             )
 
+    def _activate_giant(self, owner_id: int) -> None:
+        player = self.players.get(owner_id)
+        if not player or player.giant_tick >= 0:
+            return
+        player.giant_tick = self.tick
+
+    def step_giant(self) -> None:
+        from game.chars.rambo.giant_state import TOTAL_TICKS
+        for player in self.players.values():
+            if player.giant_tick < 0:
+                continue
+            if self.tick - player.giant_tick >= TOTAL_TICKS:
+                player.giant_tick = -1
+
     def step_air_strikes(self) -> None:
         to_remove = []
         for aid, strike in self.air_strikes.items():
@@ -675,7 +720,10 @@ class GameState:
                     if opponent:
                         dist = math.hypot(opponent.x - strike.cx, opponent.y - strike.cy)
                         if dist < self._AIRSTRIKE_RADIUS:
-                            opponent.hp -= random.randint(self._AIRSTRIKE_DMG_MIN, self._AIRSTRIKE_DMG_MAX)
+                            dmg = random.randint(self._AIRSTRIKE_DMG_MIN, self._AIRSTRIKE_DMG_MAX)
+                            if opponent.giant_tick >= 0:
+                                dmg = int(dmg * 0.8)
+                            opponent.hp -= dmg
                             if opponent.hp <= 0:
                                 opponent.respawn()
         for aid in to_remove:
