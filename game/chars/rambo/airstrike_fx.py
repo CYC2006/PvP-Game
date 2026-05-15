@@ -60,14 +60,19 @@ def draw(screen, state, cx: float, cy: float) -> None:
             continue
         sx, sy = ws(strike.cx, strike.cy, cx, cy)
         color  = COL_BULLET.get(strike.owner_id, (255, 200, 100))
-        r_px   = _RADIUS
+        # 等待階段：圓從 0 擴張到 _RADIUS（60 ticks = 1 秒）
+        if age < _WAIT_TICKS:
+            t    = age / _WAIT_TICKS
+            r_px = max(1, int(_RADIUS * t))
+        else:
+            r_px = _RADIUS
         pad    = 4
-        surf   = pygame.Surface((r_px * 2 + pad, r_px * 2 + pad), pygame.SRCALPHA)
-        center = (r_px + pad // 2, r_px + pad // 2)
+        surf   = pygame.Surface((_RADIUS * 2 + pad, _RADIUS * 2 + pad), pygame.SRCALPHA)
+        center = (_RADIUS + pad // 2, _RADIUS + pad // 2)
         if age >= _WAIT_TICKS:
             pygame.draw.circle(surf, (*color, 35), center, r_px)
         pygame.draw.circle(surf, (*color, 210), center, r_px, 3)
-        screen.blit(surf, (sx - r_px - pad // 2, sy - r_px - pad // 2))
+        screen.blit(surf, (sx - _RADIUS - pad // 2, sy - _RADIUS - pad // 2))
 
     alive = []
     for p in _particles:
