@@ -383,6 +383,9 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
 
+    # ── 殘血紅色暈邊（HUD 之前，保持 UI 在最上層）
+    _draw_low_hp_vignette(screen, me.hp, me.max_hp)
+
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns)
 
 
@@ -774,3 +777,56 @@ def _draw_waiting(screen, font):
     msg = font.render("Waiting for server...", True, COL_TEXT)
     screen.blit(msg, (SCREEN_W // 2 - msg.get_width() // 2,
                       SCREEN_H // 2 - msg.get_height() // 2))
+
+
+# ── 殘血紅色暈邊 ──────────────────────────────────────────────────────────────
+
+# 快取：避免每幀重建 Surface（key = quantized intensity bucket）
+_vignette_cache: dict = {}
+
+
+def _build_vignette(alpha_mult: float) -> pygame.Surface:
+    """建立一張 SRCALPHA 的紅色暈邊 Surface，alpha_mult ∈ [0,1]。"""
+    W, H    = LOGICAL_W, LOGICAL_H
+    surf    = pygame.Surface((W, H), pygame.SRCALPHA)
+    steps   = 36
+    max_in  = int(min(W, H) * 0.30)   # 暈邊最深延伸至畫面短邊 30%
+
+    for i in range(steps):
+        t     = i / (steps - 1)               # 0 = 最外圈, 1 = 最內圈
+        alpha = int(220 * (1.0 - t) ** 1.6 * alpha_mult)
+        if alpha <= 0:
+            continue
+        inset = int(max_in * t)
+        thick = max(1, max_in // steps + 2)
+        pygame.draw.rect(surf, (210, 12, 12, alpha),
+                         (inset, inset, W - 2 * inset, H - 2 * inset),
+                         thick)
+    return surf
+
+
+def _draw_low_hp_vignette(screen: pygame.Surface,
+                          hp: int, max_hp: int) -> None:
+    """血量 ≤ 30% 時在螢幕四邊繪製脈動紅色暈邊。"""
+    if max_hp <= 0:
+        return
+    ratio = hp / max_hp
+    if ratio > 0.30:
+        _vignette_cache.clear()   # 離開殘血狀態時清快取
+        return
+
+    # 強度：30% HP → 0，0% HP → 1
+    intensity = 1.0 - (ratio / 0.30)
+    # 脈動：~1.6 Hz，振幅隨強度增加
+    pulse     = 0.60 + 0.40 * math.sin(time.perf_counter() * math.pi * 1.6)
+    alpha_mul = round(intensity * pulse, 2)
+
+    # 以 0.04 為步進做快取分桶，減少重建次數
+    bucket = round(alpha_mul / 0.04) * 0.04
+    if bucket not in _vignette_cache:
+        _vignette_cache[bucket] = _build_vignette(bucket)
+        # 防止快取無限增長
+        if len(_vignette_cache) > 50:
+            _vignette_cache.pop(next(iter(_vignette_cache)))
+
+    screen.blit(_vignette_cache[bucket], (0, 0))
