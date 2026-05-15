@@ -43,6 +43,7 @@ class Player:
     speed_boost_mult: float = 1.0   # 速度提升倍率
     char_key: str           = ""    # 角色 key，由 apply_char_stats 設定，不同步至 client
     # ── manBlue R 技能狀態（巨大化）─────────────────────────────────
+    stun_until: int            = -1   # tick when stun ends (-1 = not stunned)
     giant_tick: int            = -1   # tick when giant mode started (-1 = inactive)
     # ── survivor1 R 技能狀態 ──────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
@@ -235,6 +236,9 @@ class GameState:
         if player_id not in self.players:
             return
         player = self.players[player_id]
+        # 暈眩中：忽略所有輸入
+        if self.tick < player.stun_until:
+            return
         # 巨大化進行中
         if player.giant_tick >= 0:
             from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
@@ -386,8 +390,8 @@ class GameState:
             hit = False
             shooter = self.players.get(bullet.owner_id)
             does_damage = not (shooter and shooter.damage_min == 0 and shooter.damage_max == 0)
-            if bullet.bullet_type in (1, 2, 5):
-                does_damage = False   # 閃光彈/手榴彈/迷你手雷不造成接觸傷害
+            if bullet.bullet_type in (1, 2, 5, 6):
+                does_damage = False   # 閃光彈/手榴彈/迷你手雷/暈眩彈不造成接觸傷害
 
             # 手裡劍：碰撞半徑隨時間線性成長
             if bullet.bullet_type == 3:
@@ -452,6 +456,17 @@ class GameState:
                         player.hp -= damage
                         if player.hp <= 0:
                             player.respawn()
+                        expired.append(bid)
+                        hit = True
+                        break
+
+            # ── 暈眩彈（type 6）vs 玩家：碰觸即加入 expired，爆炸在 expired 迴圈觸發 ──
+            if not hit and bullet.bullet_type == 6:
+                for pid, player in self.players.items():
+                    if pid == bullet.owner_id:
+                        continue
+                    if math.hypot(bullet.x - player.x,
+                                  bullet.y - player.y) < PLAYER_RADIUS + coll_r:
                         expired.append(bid)
                         hit = True
                         break
@@ -550,6 +565,10 @@ class GameState:
                     self._trigger_smoke_explosion(b.x, b.y)
                 elif b.bullet_type == 5:
                     self._trigger_mini_grenade_explosion(b.x, b.y, b.owner_id)
+            # 暈眩彈：任何原因消失都爆炸（包含射程耗盡、碰到玩家/障礙物）
+            if b and b.bullet_type == 6:
+                from game.chars.soldier.stun_bullet_state import trigger_stun_explosion
+                trigger_stun_explosion(self, b.x, b.y, b.owner_id)
             self.bullets.pop(bid, None)
             for k in [k for k in self._dot_cooldown if k[0] == bid]:
                 del self._dot_cooldown[k]
@@ -740,6 +759,10 @@ class GameState:
     def step_blade_arcs(self) -> None:
         from game.chars.zombie.blade_state import step_blade_arcs
         step_blade_arcs(self)
+
+    def _spawn_stun_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.soldier.stun_bullet_state import spawn_stun_bullet
+        spawn_stun_bullet(self, owner_id, aim_x, aim_y)
 
     def _spawn_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.rambo.grenade_state import spawn_grenade

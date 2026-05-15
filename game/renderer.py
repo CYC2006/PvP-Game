@@ -10,6 +10,7 @@ from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _w
 
 from game.chars.agent    import flash_fx
 from game.chars.rambo    import grenade_fx, airstrike_fx
+from game.chars.soldier  import stun_bullet_fx
 from game.chars.rambo.giant_state import get_scale as _giant_get_scale, GROW_TICKS, ACTIVE_TICKS, TOTAL_TICKS
 from game.chars.sniper   import mini_grenade_fx
 from game.chars.zombie   import blade_fx
@@ -383,6 +384,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     flash_fx.draw_explosions(screen, cx, cy)
     grenade_fx.draw_explosions(screen, cx, cy)
     mini_grenade_fx.draw_explosions(screen, cx, cy)
+    stun_bullet_fx.draw_explosions(screen, cx, cy)
     airstrike_fx.update(state)
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
@@ -567,6 +569,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
     flash_fx.detect_disappeared(state, now)
     grenade_fx.detect_disappeared(state, now)
     mini_grenade_fx.detect_disappeared(state, now)
+    stun_bullet_fx.detect_disappeared(state, now)
 
     for bullet in state.bullets.values():
         sx, sy = _ws(bullet.x, bullet.y, cx, cy)
@@ -575,7 +578,11 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
-            if btype == 5:   # 迷你手雷：玩家色小圓點
+            if btype == 6:   # 暈眩彈：固定黃色圓點
+                stun_bullet_fx.track(bullet)
+                pygame.draw.circle(screen, (255, 230, 40), (sx, sy), 6)
+                pygame.draw.circle(screen, (255, 255, 160), (sx, sy), 3)
+            elif btype == 5:   # 迷你手雷：玩家色小圓點
                 mini_grenade_fx.track(bullet)
                 pygame.draw.circle(screen, color, (sx, sy), 5)
             elif btype == 4:   # 煙霧彈：小灰綠色圓點
@@ -655,6 +662,21 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             head_y = sy - rotated.get_height() // 2 - 10
             _draw_opponent_hp_bar(screen, player.hp, player.max_hp, sx, head_y)
 
+        # 暈眩指示：三顆黃色小球繞頭頂旋轉
+        if player.stun_until > state.tick:
+            _draw_stun_indicator(screen, sx, sy - rotated.get_height() // 2 - 8)
+
+
+
+def _draw_stun_indicator(screen, cx: int, top_y: int) -> None:
+    """暈眩中：三顆黃色小球繞頭頂順時針旋轉。"""
+    t = time.perf_counter()
+    for i in range(3):
+        angle = t * 5.0 + i * math.tau / 3
+        ox = int(math.cos(angle) * 10)
+        oy = int(math.sin(angle) * 5) - 6
+        pygame.draw.circle(screen, (255, 230,  40), (cx + ox, top_y + oy), 4)
+        pygame.draw.circle(screen, (255, 255, 180), (cx + ox, top_y + oy), 2)
 
 
 def _draw_opponent_hp_bar(screen, hp: int, max_hp: int, cx: int, y: int):

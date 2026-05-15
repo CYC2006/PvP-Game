@@ -23,7 +23,7 @@ PKT_ALL_JOINED  = 0x07   # server → clients: 所有玩家都已連線，可進
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBffH")  # +H: speed_mult×1000
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBH")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age
+_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks
 _BULLET_ENTRY  = struct.Struct("!BBffhBB")    # id owner x y angle_i16 bullet_type bullet_scale_u8(×10)
 _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
 _SMOKE_ENTRY   = struct.Struct("!BffHI")     # id x y radius*10 spawn_tick
@@ -99,6 +99,7 @@ def pack_state(state: GameState) -> bytes:
             state.gold_counts.get(p.id, 0),
             min(255, max(0, p.flash_ticks)),
             min(65535, state.tick - p.giant_tick) if p.giant_tick >= 0 else 65535,
+            min(255, p.stun_until - state.tick) if p.stun_until > state.tick else 0,
         )
         for p in players
     )
@@ -161,12 +162,13 @@ def unpack_state(data: bytes) -> GameState:
 
     p_count = data[offset]; offset += 1
     for _ in range(p_count):
-        pid, x, y, hp, max_hp, aim_i16, stance_u8, gold, flash, giant_age = _PLAYER_ENTRY.unpack(
+        pid, x, y, hp, max_hp, aim_i16, stance_u8, gold, flash, giant_age, stun_b = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
         p = Player(id=pid, x=x, y=y, hp=hp, max_hp=max_hp,
                    aim_angle=float(aim_i16), stance=stance, flash_ticks=flash)
-        p.giant_tick = tick - giant_age if giant_age != 65535 else -1
+        p.giant_tick  = tick - giant_age if giant_age != 65535 else -1
+        p.stun_until  = tick + stun_b if stun_b > 0 else -1
         state.players[pid] = p
         state.gold_counts[pid] = gold
         offset += _PLAYER_ENTRY.size

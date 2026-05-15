@@ -257,7 +257,6 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
     W, H = LOGICAL_W, LOGICAL_H
 
     # ── Top bar ───────────────────────────────────────────────────────────────
-    pygame.draw.rect(screen, COL_TOPBAR, (0, 0, W, _TB))
     pygame.draw.line(screen, COL_SEP, (0, _TB), (W, _TB), 1)
 
     # Player info panel (top-left)
@@ -275,7 +274,6 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
         _btn(screen, r, bg, COL_BTN_BD, font_sm, lbl, COL_BTN_TXT, radius=8)
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
-    pygame.draw.rect(screen, COL_SIDEBAR, (0, _TB, _SW, H - _TB))
     pygame.draw.line(screen, COL_SEP, (_SW, _TB), (_SW, H), 1)
 
     for r, lbl in ((shop_r, "SHOP"),
@@ -285,23 +283,12 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
         _btn(screen, r, bg, COL_BTN_BD, font_sm, lbl, COL_BTN_TXT)
 
     # ── Main area ─────────────────────────────────────────────────────────────
-    # Title
-    title = font_lg.render("PvP  GAME", True, COL_TITLE)
-    tx    = _MCX - title.get_width() // 2
-    ty    = 90
-    screen.blit(title, (tx, ty))
-    pygame.draw.line(screen, (80, 70, 28),
-                     (tx, ty + title.get_height() + 4),
-                     (tx + title.get_width(), ty + title.get_height() + 4), 1)
-
     # Vertical divider between mode section and play section
-    pygame.draw.line(screen, COL_SEP, (_DVX, 165), (_DVX, H - 28), 1)
+    pygame.draw.line(screen, COL_SEP, (_DVX, _TB + 10), (_DVX, H - 28), 1)
 
     # ── Game mode section ─────────────────────────────────────────────────────
     sec_lbl = font_sm.render("GAME  MODE", True, (68, 105, 158))
     screen.blit(sec_lbl, (_MX, _MY0 - 36))
-    pygame.draw.rect(screen, (52, 110, 195),
-                     (_MX, _MY0 - 36 + sec_lbl.get_height() + 3, 52, 2))
 
     for i, (r, (name, desc)) in enumerate(zip(mode_rs, _MODES)):
         selected = (i == sel_mode)
@@ -334,12 +321,9 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
     screen.blit(ds, (_MX, _MY0 + len(_MODES) * (_MH + _MGAP) - _MGAP + 8))
 
     # ── Play section (right of divider) ───────────────────────────────────────
-    play_cx = (_DVX + W) // 2   # = 1004
-
+    # Section label left-aligned with the HOST/JOIN buttons
     play_lbl = font_sm.render("START  GAME", True, (68, 105, 158))
-    screen.blit(play_lbl, (play_cx - play_lbl.get_width() // 2, _HY - 44))
-    pygame.draw.rect(screen, (42, 88, 165),
-                     (play_cx - 30, _HY - 44 + play_lbl.get_height() + 3, 60, 2))
+    screen.blit(play_lbl, (_BX, _HY - 36))
 
     # HOST button
     hh = host_r.collidepoint(mx, my)
