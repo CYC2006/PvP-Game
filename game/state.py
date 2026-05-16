@@ -303,6 +303,7 @@ class GameState:
         uy = aim_y / length
 
         # 巨大化主動階段：子彈與射程放大 2 倍；可被 override 蓋過
+        _barrel_scale = 1.0   # 槍口偏移只跟玩家視覺大小有關（巨人化才放大）
         if bullet_scale_override > 0:
             _bscale = bullet_scale_override
         else:
@@ -312,10 +313,11 @@ class GameState:
                 _ga = self.tick - player.giant_tick
                 if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
                     _bscale = 2.0
+                    _barrel_scale = 2.0
 
         # 槍口偏移（巨人化時依縮放推遠，所有散彈共用同一出口）
-        barrel_fwd   = (PLAYER_RADIUS + 10) * _bscale
-        barrel_right = 14 * _bscale
+        barrel_fwd   = (PLAYER_RADIUS + 10) * _barrel_scale
+        barrel_right = 14 * _barrel_scale
         rx, ry = -uy, ux
         spawn_x = player.x + ux * barrel_fwd + rx * barrel_right
         spawn_y = player.y + uy * barrel_fwd + ry * barrel_right
