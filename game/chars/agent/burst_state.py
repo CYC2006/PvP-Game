@@ -23,7 +23,7 @@ def step_burst(state) -> None:
         if state.tick >= player.burst_next_tick:
             state._spawn_bullet(player.id,
                                 player.burst_aim_x, player.burst_aim_y,
-                                bullet_scale_override=3.0, spread_override=0.0)
+                                bullet_scale_override=2.0, spread_override=0.0)
             player.burst_shots_fired += 1
             if player.burst_shots_fired >= BURST_COUNT:
                 player.burst_next_tick   = -1

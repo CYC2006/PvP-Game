@@ -558,7 +558,7 @@ def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float,
         pygame.draw.circle(screen, color, (sx, sy), max(1, int(4 * bullet_scale)))
 
     else:                               # Agent（Pistol）& 其他 — 標準圓形
-        pygame.draw.circle(screen, color, (sx, sy), BULLET_RADIUS)
+        pygame.draw.circle(screen, color, (sx, sy), max(1, int(BULLET_RADIUS * bullet_scale)))
 
 
 def _draw_bullets(screen, state, cx, cy, player_chars: dict):
