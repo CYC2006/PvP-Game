@@ -657,32 +657,9 @@ class GameState:
         from game.chars.assassin.smoke_state import step_smoke_patches
         step_smoke_patches(self)
 
-    # ── 空襲（Rambo R）────────────────────────────────────────────
-    _AIRSTRIKE_WAIT_TICKS  = 60    # 1s 等待
-    _AIRSTRIKE_BOMB_TICKS  = 120   # 2s 轟炸
-    _AIRSTRIKE_TOTAL_TICKS = 180   # 總持續時間
-    _AIRSTRIKE_RADIUS      = 100.0
-    _AIRSTRIKE_MAX_RANGE   = 300.0
-    _AIRSTRIKE_DMG_MIN     = 10
-    _AIRSTRIKE_DMG_MAX     = 15
-    _AIRSTRIKE_DMG_INTERVAL = 6    # 每 6 tick 傷害一次
-
     def _activate_airstrike(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        player = self.players.get(owner_id)
-        if not player:
-            return
-        dist = math.hypot(aim_x, aim_y)
-        if dist > self._AIRSTRIKE_MAX_RANGE and dist > 0:
-            scale = self._AIRSTRIKE_MAX_RANGE / dist
-            aim_x *= scale
-            aim_y *= scale
-        aid = self._next_airstrike_id
-        self._next_airstrike_id = (self._next_airstrike_id + 1) % 256
-        self.air_strikes[aid] = AirStrike(
-            id=aid, owner_id=owner_id,
-            cx=player.x + aim_x, cy=player.y + aim_y,
-            spawn_tick=self.tick,
-        )
+        from game.chars.rambo.airstrike_state import activate_airstrike
+        activate_airstrike(self, owner_id, aim_x, aim_y)
 
     def _spawn_mini_grenades(self, owner_id: int) -> None:
         from game.chars.sniper.mini_grenade_state import spawn_mini_grenades
@@ -692,72 +669,21 @@ class GameState:
         from game.chars.sniper.mini_grenade_state import trigger_mini_grenade_explosion
         trigger_mini_grenade_explosion(self, x, y, owner_id)
 
-    _LOG_BARRIER_HP     = 60
-    _LOG_BARRIER_RADIUS = 18.0
-    _LOG_BARRIER_DIST   = 80.0
-
     def _activate_log_barriers(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        player = self.players.get(owner_id)
-        if not player:
-            return
-        length = math.hypot(aim_x, aim_y)
-        if length == 0:
-            return
-        # 移除此玩家舊有的木頭障礙物
-        for lid in [k for k, lb in self.log_barriers.items() if lb.owner_id == owner_id]:
-            self.log_barriers.pop(lid)
-        ux, uy = aim_x / length, aim_y / length
-        for angle_offset in (0.0, math.radians(-45), math.radians(45)):
-            ca, sa = math.cos(angle_offset), math.sin(angle_offset)
-            dx = ux * ca - uy * sa
-            dy = ux * sa + uy * ca
-            lid = self._next_log_id
-            self._next_log_id = (self._next_log_id + 1) % 256
-            self.log_barriers[lid] = LogBarrier(
-                id=lid, owner_id=owner_id,
-                x=player.x + dx * self._LOG_BARRIER_DIST,
-                y=player.y + dy * self._LOG_BARRIER_DIST,
-                hp=self._LOG_BARRIER_HP,
-                radius=self._LOG_BARRIER_RADIUS,
-            )
+        from game.chars.sniper.log_barrier_state import activate_log_barriers
+        activate_log_barriers(self, owner_id, aim_x, aim_y)
 
     def _activate_giant(self, owner_id: int) -> None:
-        player = self.players.get(owner_id)
-        if not player or player.giant_tick >= 0:
-            return
-        player.giant_tick = self.tick
+        from game.chars.rambo.giant_state import activate_giant
+        activate_giant(self, owner_id)
 
     def step_giant(self) -> None:
-        from game.chars.rambo.giant_state import TOTAL_TICKS
-        for player in self.players.values():
-            if player.giant_tick < 0:
-                continue
-            if self.tick - player.giant_tick >= TOTAL_TICKS:
-                player.giant_tick = -1
+        from game.chars.rambo.giant_state import step_giant
+        step_giant(self)
 
     def step_air_strikes(self) -> None:
-        to_remove = []
-        for aid, strike in self.air_strikes.items():
-            age = self.tick - strike.spawn_tick
-            if age > self._AIRSTRIKE_TOTAL_TICKS:
-                to_remove.append(aid)
-                continue
-            if age >= self._AIRSTRIKE_WAIT_TICKS:
-                bomb_age = age - self._AIRSTRIKE_WAIT_TICKS
-                if bomb_age % self._AIRSTRIKE_DMG_INTERVAL == 0:
-                    opponent_id = 3 - strike.owner_id
-                    opponent    = self.players.get(opponent_id)
-                    if opponent:
-                        dist = math.hypot(opponent.x - strike.cx, opponent.y - strike.cy)
-                        if dist < self._AIRSTRIKE_RADIUS:
-                            dmg = random.randint(self._AIRSTRIKE_DMG_MIN, self._AIRSTRIKE_DMG_MAX)
-                            if opponent.giant_tick >= 0:
-                                dmg = int(dmg * 0.8)
-                            opponent.hp -= dmg
-                            if opponent.hp <= 0:
-                                opponent.respawn()
-        for aid in to_remove:
-            self.air_strikes.pop(aid, None)
+        from game.chars.rambo.airstrike_state import step_air_strikes
+        step_air_strikes(self)
 
     def _activate_blade_arc(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.zombie.blade_state import activate_blade_arc
@@ -768,31 +694,12 @@ class GameState:
         step_blade_arcs(self)
 
     def _activate_burst(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        player = self.players.get(owner_id)
-        if not player or player.burst_next_tick >= 0:
-            return
-        if math.hypot(aim_x, aim_y) == 0:
-            return
-        player.burst_shots_fired = 0
-        player.burst_aim_x       = aim_x
-        player.burst_aim_y       = aim_y
-        player.burst_next_tick   = self.tick
-        player.aim_angle         = math.degrees(math.atan2(aim_x, -aim_y))
+        from game.chars.agent.burst_state import activate_burst
+        activate_burst(self, owner_id, aim_x, aim_y)
 
     def step_burst(self) -> None:
-        _BURST_COUNT    = 6
-        _BURST_INTERVAL = 6
-        for player in self.players.values():
-            if player.burst_next_tick < 0:
-                continue
-            if self.tick >= player.burst_next_tick:
-                self._spawn_bullet(player.id, player.burst_aim_x, player.burst_aim_y)
-                player.burst_shots_fired += 1
-                if player.burst_shots_fired >= _BURST_COUNT:
-                    player.burst_next_tick  = -1
-                    player.burst_shots_fired = 0
-                else:
-                    player.burst_next_tick = self.tick + _BURST_INTERVAL
+        from game.chars.agent.burst_state import step_burst
+        step_burst(self)
 
     def _spawn_stun_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.soldier.stun_bullet_state import spawn_stun_bullet

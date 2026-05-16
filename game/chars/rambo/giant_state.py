@@ -7,6 +7,21 @@ _STAGE_TICKS = 12
 _STAGES      = ((1.0, 1.25), (1.25, 1.50), (1.50, 1.75), (1.75, 2.0))
 
 
+def activate_giant(state, owner_id: int) -> None:
+    player = state.players.get(owner_id)
+    if not player or player.giant_tick >= 0:
+        return
+    player.giant_tick = state.tick
+
+
+def step_giant(state) -> None:
+    for player in state.players.values():
+        if player.giant_tick < 0:
+            continue
+        if state.tick - player.giant_tick >= TOTAL_TICKS:
+            player.giant_tick = -1
+
+
 def get_scale(giant_age: int) -> float:
     """Return visual scale given ticks since skill activation (0 = just started)."""
     if giant_age < 0 or giant_age >= TOTAL_TICKS:
