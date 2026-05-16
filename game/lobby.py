@@ -284,10 +284,10 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
     ls = font_sm.render(f"{IC_BOLT}  Lv. 1", True, COL_LEVEL)
     screen.blit(ls, (pl_r.x + 12, pl_r.y + 27))
 
-    # Top-right: SFX + SET icon buttons
-    for r, icon, lbl in ((sfx_r, IC_VOLUME, "SFX"), (set_r, IC_COG, "SET")):
+    # Top-right: SFX + SET — icon only, no text
+    for r, icon in ((sfx_r, IC_VOLUME), (set_r, IC_COG)):
         bg = COL_BTN_HOV if r.collidepoint(mx, my) else COL_BTN
-        _btn(screen, r, bg, COL_BTN_BD, font_sm, f"{icon} {lbl}", COL_BTN_TXT, radius=8)
+        _btn(screen, r, bg, COL_BTN_BD, font_lg, icon, COL_BTN_TXT, radius=8)
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     pygame.draw.line(screen, COL_SEP, (_SW, _TB), (_SW, H), 1)
@@ -316,8 +316,12 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
         pygame.draw.rect(screen, bg, r, border_radius=8)
         pygame.draw.rect(screen, bd, r, 2, border_radius=8)
 
-        ns2 = font_lg.render(f"{icon}  {name}", True, tc)
-        screen.blit(ns2, (r.x + 14, r.centery - ns2.get_height() // 2))
+        # Icon at fixed x; name at fixed offset so all 4 names align vertically
+        ic_surf = font_lg.render(icon, True, tc)
+        nm_surf = font_lg.render(name, True, tc)
+        ty2 = r.centery - ic_surf.get_height() // 2
+        screen.blit(ic_surf, (r.x + 14, ty2))
+        screen.blit(nm_surf, (r.x + 46, ty2))   # fixed 46px indent for all rows
 
         # Radio indicator (right side)
         ix, iy = r.right - 20, r.centery
