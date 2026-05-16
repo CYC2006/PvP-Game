@@ -65,16 +65,17 @@ _TB   = 68    # top-bar height
 _SW   = 170   # sidebar width
 
 # 2×2 game-mode tile grid
-_GX   = 190   # grid left edge (20 px right of sidebar)
+_GX   = 220   # grid left edge (50 px right of sidebar)
 _GY   = 112   # grid top edge
-_GTW  = 535   # tile width   — 2 tiles + 10 gap = 1080 px, fits 190→1270
+_GRGT = 40    # right margin from screen edge
+_GTW  = (LOGICAL_W - _GX - _GRGT - 10) // 2   # = 505
 _GTH  = 240   # tile height
 _GGAP = 10    # gap between tiles (both axes)
 
-# HOST / JOIN — side by side below the grid
-_HJBW = _GTW              # same width as one tile column
+# HOST / JOIN — side by side below the 2v2 TEAM tile (right column)
+_HJBW = (_GTW - _GGAP) // 2   # two buttons together = one tile width
 _HJBH = 64
-_HJBY = _GY + 2 * _GTH + _GGAP + 14   # = 616
+_HJBY = _GY + 2 * _GTH + _GGAP + 14   # below bottom row
 
 # ─── Nerd Fonts icons (MapleMono-NF has these built in) ──────────────────────
 IC_USER       = ''   #
@@ -174,9 +175,10 @@ def lobby_screen(screen: pygame.Surface,
         for i in range(len(_MODES))
     ]
 
-    # HOST / JOIN — side by side
-    HOST_R = pygame.Rect(_GX,              _HJBY, _HJBW, _HJBH)
-    JOIN_R = pygame.Rect(_GX + _HJBW + _GGAP, _HJBY, _HJBW, _HJBH)
+    # HOST / JOIN — side by side below the 2v2 TEAM tile (right column)
+    _hj_x  = _GX + _GTW + _GGAP          # x of right tile column
+    HOST_R = pygame.Rect(_hj_x,                   _HJBY, _HJBW, _HJBH)
+    JOIN_R = pygame.Rect(_hj_x + _HJBW + _GGAP,   _HJBY, _HJBW, _HJBH)
 
     # Sub-screen buttons (centered on full screen)
     CX      = LOGICAL_W // 2
