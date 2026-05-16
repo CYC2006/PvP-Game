@@ -159,6 +159,9 @@ def run():
                             elif p and p.char_key == 'soldier1':
                                 state._spawn_stun_bullet(
                                     cmd.player_id, cmd.aim_x, cmd.aim_y)
+                            elif p and p.char_key == 'manBrown':
+                                state._spawn_explosion_bullet(
+                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
                         if not _bursting:
                             if cmd.use_skill_space:
                                 if p and p.char_key == 'survivor1':

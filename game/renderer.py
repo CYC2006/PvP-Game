@@ -16,6 +16,7 @@ from game.chars.sniper   import mini_grenade_fx
 from game.chars.zombie   import blade_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
 from game.chars.dancer   import bubble_fx
+from game.chars.bear     import explosion_bullet_fx
 
 # colours
 COL_BG         = (30,  30,  30)
@@ -385,6 +386,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     grenade_fx.draw_explosions(screen, cx, cy)
     mini_grenade_fx.draw_explosions(screen, cx, cy)
     stun_bullet_fx.draw_explosions(screen, cx, cy)
+    explosion_bullet_fx.draw_explosions(screen, cx, cy)
     airstrike_fx.update(state)
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
@@ -570,6 +572,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
     grenade_fx.detect_disappeared(state, now)
     mini_grenade_fx.detect_disappeared(state, now)
     stun_bullet_fx.detect_disappeared(state, now)
+    explosion_bullet_fx.detect_disappeared(state, now)
 
     for bullet in state.bullets.values():
         sx, sy = _ws(bullet.x, bullet.y, cx, cy)
@@ -578,7 +581,11 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
-            if btype == 6:   # 暈眩彈：固定黃色圓點
+            if btype == 7:   # 爆炸彈：橙色圓點
+                explosion_bullet_fx.track(bullet)
+                pygame.draw.circle(screen, (255, 140, 20), (sx, sy), 7)
+                pygame.draw.circle(screen, (255, 220, 80), (sx, sy), 3)
+            elif btype == 6:   # 暈眩彈：固定黃色圓點
                 stun_bullet_fx.track(bullet)
                 pygame.draw.circle(screen, (255, 230, 40), (sx, sy), 6)
                 pygame.draw.circle(screen, (255, 255, 160), (sx, sy), 3)

@@ -1,7 +1,7 @@
 import math
 
-BURST_COUNT    = 6
-BURST_INTERVAL = 6   # ticks between shots
+BURST_COUNT    = 3
+BURST_INTERVAL = 3   # ticks between shots
 
 
 def activate_burst(state, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -14,7 +14,6 @@ def activate_burst(state, owner_id: int, aim_x: float, aim_y: float) -> None:
     player.burst_aim_x       = aim_x
     player.burst_aim_y       = aim_y
     player.burst_next_tick   = state.tick
-    player.aim_angle         = math.degrees(math.atan2(aim_x, -aim_y))
 
 
 def step_burst(state) -> None:
@@ -22,10 +21,12 @@ def step_burst(state) -> None:
         if player.burst_next_tick < 0:
             continue
         if state.tick >= player.burst_next_tick:
-            state._spawn_bullet(player.id, player.burst_aim_x, player.burst_aim_y)
+            state._spawn_bullet(player.id,
+                                player.burst_aim_x, player.burst_aim_y,
+                                bullet_scale_override=2.0, spread_override=0.0)
             player.burst_shots_fired += 1
             if player.burst_shots_fired >= BURST_COUNT:
-                player.burst_next_tick  = -1
+                player.burst_next_tick   = -1
                 player.burst_shots_fired = 0
             else:
                 player.burst_next_tick = state.tick + BURST_INTERVAL

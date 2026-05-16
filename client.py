@@ -292,9 +292,6 @@ def run() -> None:
             state = unpack_state(latest)
 
         local_player = state.players.get(player_id)
-        # 連射中：用 server 鎖定的角度，不跟隨滑鼠
-        if local_player and local_player.burst_shots_fired < 6:
-            aim_angle_deg = local_player.aim_angle
         if local_player:
             set_dash_context(local_player.x, local_player.y,
                              obstacles, state.destroyed_obstacles)
@@ -305,7 +302,7 @@ def run() -> None:
             set_giant_age(age if 0 <= age < TOTAL_TICKS else -1)
         else:
             set_giant_age(-1)
-        set_burst_shots_left(max(0, 6 - local_player.burst_shots_fired)
+        set_burst_shots_left(max(0, 3 - local_player.burst_shots_fired)
                              if local_player and local_player.burst_next_tick >= 0
                              else 0)
 

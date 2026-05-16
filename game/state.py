@@ -281,10 +281,10 @@ class GameState:
                 mult *= 1.5
         player.move(dx, dy, speed_mult=mult)
         player.stance = stance
-        # 連射期間：鎖定瞄準方向，禁止普攻
+        # 連射期間：禁止普攻（避免與連射子彈重疊）
         if player.burst_next_tick >= 0:
             shooting = False
-        elif math.hypot(aim_x, aim_y) > 0:
+        if math.hypot(aim_x, aim_y) > 0:
             player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
         if shooting:
             if player.char_key == 'zoimbie1':
@@ -292,7 +292,9 @@ class GameState:
             else:
                 self._spawn_bullet(player_id, aim_x, aim_y)
 
-    def _spawn_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+    def _spawn_bullet(self, owner_id: int, aim_x: float, aim_y: float,
+                      bullet_scale_override: float = 0.0,
+                      spread_override: float = -1.0) -> None:
         player = self.players[owner_id]
         length = math.hypot(aim_x, aim_y)
         if length == 0:
@@ -300,13 +302,16 @@ class GameState:
         ux = aim_x / length
         uy = aim_y / length
 
-        # 巨大化主動階段：子彈與射程放大 2 倍
-        _bscale = 1.0
-        if player.giant_tick >= 0:
-            from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
-            _ga = self.tick - player.giant_tick
-            if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
-                _bscale = 2.0
+        # 巨大化主動階段：子彈與射程放大 2 倍；可被 override 蓋過
+        if bullet_scale_override > 0:
+            _bscale = bullet_scale_override
+        else:
+            _bscale = 1.0
+            if player.giant_tick >= 0:
+                from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
+                _ga = self.tick - player.giant_tick
+                if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
+                    _bscale = 2.0
 
         # 槍口偏移（巨人化時依縮放推遠，所有散彈共用同一出口）
         barrel_fwd   = (PLAYER_RADIUS + 10) * _bscale
@@ -315,11 +320,12 @@ class GameState:
         spawn_x = player.x + ux * barrel_fwd + rx * barrel_right
         spawn_y = player.y + uy * barrel_fwd + ry * barrel_right
 
+        effective_spread = spread_override if spread_override >= 0 else player.spread
         for pellet_i in range(player.pellet_count):
             # 每顆散彈獨立隨機偏角
             pux, puy = ux, uy
-            if player.spread > 0:
-                dev = math.radians(random.uniform(-player.spread, player.spread))
+            if effective_spread > 0:
+                dev = math.radians(random.uniform(-effective_spread, effective_spread))
                 cos_s, sin_s = math.cos(dev), math.sin(dev)
                 pux = ux * cos_s - uy * sin_s
                 puy = ux * sin_s + uy * cos_s
@@ -397,8 +403,8 @@ class GameState:
             hit = False
             shooter = self.players.get(bullet.owner_id)
             does_damage = not (shooter and shooter.damage_min == 0 and shooter.damage_max == 0)
-            if bullet.bullet_type in (1, 2, 5, 6):
-                does_damage = False   # 閃光彈/手榴彈/迷你手雷/暈眩彈不造成接觸傷害
+            if bullet.bullet_type in (1, 2, 5, 6, 7):
+                does_damage = False   # 閃光彈/手榴彈/迷你手雷/暈眩彈/爆炸彈不造成接觸傷害
 
             # 手裡劍：碰撞半徑隨時間線性成長
             if bullet.bullet_type == 3:
@@ -469,6 +475,17 @@ class GameState:
 
             # ── 暈眩彈（type 6）vs 玩家：碰觸即加入 expired，爆炸在 expired 迴圈觸發 ──
             if not hit and bullet.bullet_type == 6:
+                for pid, player in self.players.items():
+                    if pid == bullet.owner_id:
+                        continue
+                    if math.hypot(bullet.x - player.x,
+                                  bullet.y - player.y) < PLAYER_RADIUS + coll_r:
+                        expired.append(bid)
+                        hit = True
+                        break
+
+            # ── 爆炸彈（type 7）vs 玩家：碰觸即加入 expired，爆炸在 expired 迴圈觸發 ──
+            if not hit and bullet.bullet_type == 7:
                 for pid, player in self.players.items():
                     if pid == bullet.owner_id:
                         continue
@@ -576,6 +593,9 @@ class GameState:
             if b and b.bullet_type == 6:
                 from game.chars.soldier.stun_bullet_state import trigger_stun_explosion
                 trigger_stun_explosion(self, b.x, b.y, b.owner_id)
+            # 爆炸彈：任何原因消失都爆炸
+            if b and b.bullet_type == 7:
+                self._trigger_explosion_bullet(b.x, b.y, b.owner_id)
             self.bullets.pop(bid, None)
             for k in [k for k in self._dot_cooldown if k[0] == bid]:
                 del self._dot_cooldown[k]
@@ -704,6 +724,14 @@ class GameState:
     def _spawn_stun_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.soldier.stun_bullet_state import spawn_stun_bullet
         spawn_stun_bullet(self, owner_id, aim_x, aim_y)
+
+    def _spawn_explosion_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.bear.explosion_bullet_state import spawn_explosion_bullet
+        spawn_explosion_bullet(self, owner_id, aim_x, aim_y)
+
+    def _trigger_explosion_bullet(self, x: float, y: float, owner_id: int) -> None:
+        from game.chars.bear.explosion_bullet_state import trigger_explosion
+        trigger_explosion(self, x, y, owner_id)
 
     def _spawn_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.rambo.grenade_state import spawn_grenade
