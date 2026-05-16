@@ -299,8 +299,8 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
         _btn(screen, r, bg, COL_BTN_BD, font_sm, f"{icon}  {lbl}", COL_BTN_TXT)
 
     # ── 2×2 Game mode tile grid ───────────────────────────────────────────────
-    sec_lbl = font_sm.render(f"{IC_GAMEPAD}  GAME  MODE", True, (68, 105, 158))
-    screen.blit(sec_lbl, (_GX, _GY - 22))
+    sec_lbl = font_lg.render(f"{IC_GAMEPAD}  GAME  MODE", True, (68, 105, 158))
+    screen.blit(sec_lbl, (_GX, _GY - sec_lbl.get_height() - 8))
 
     for i, (r, (icon, name, desc)) in enumerate(zip(mode_rs, _MODES)):
         selected = (i == sel_mode)
@@ -324,13 +324,6 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
                                ty + (nm_surf.get_height() - ic_surf.get_height()) // 2))
         screen.blit(nm_surf, (r.x + 16 + ic_surf.get_width() + 10, ty))
 
-        # Selected indicator dot (top-right corner of tile)
-        dot_x, dot_y = r.right - 18, r.y + 18
-        if selected:
-            pygame.draw.circle(screen, COL_M_SEL_BD, (dot_x, dot_y), 6)
-            pygame.draw.circle(screen, (210, 230, 255), (dot_x, dot_y), 3)
-        else:
-            pygame.draw.circle(screen, bd, (dot_x, dot_y), 5, 1)
 
     # ── HOST / JOIN — side by side ────────────────────────────────────────────
     hh = host_r.collidepoint(mx, my)
