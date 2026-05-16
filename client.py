@@ -6,7 +6,7 @@ import time
 import threading
 import pygame
 
-from game.input      import read_input, set_giant_age, set_dash_context
+from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left
 from game.renderer   import draw, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
@@ -302,6 +302,9 @@ def run() -> None:
             set_giant_age(age if 0 <= age < TOTAL_TICKS else -1)
         else:
             set_giant_age(-1)
+        set_burst_shots_left(max(0, 6 - local_player.burst_shots_fired)
+                             if local_player and local_player.burst_next_tick >= 0
+                             else 0)
 
         draw(screen, state, player_id, font_sm, obstacles,
              effective_stance, aim_angle_deg, ammo, is_reloading,

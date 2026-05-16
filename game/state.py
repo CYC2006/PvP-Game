@@ -44,6 +44,10 @@ class Player:
     char_key: str           = ""    # 角色 key，由 apply_char_stats 設定，不同步至 client
     # ── manBlue R 技能狀態（巨大化）─────────────────────────────────
     stun_until: int            = -1   # tick when stun ends (-1 = not stunned)
+    burst_next_tick: int       = -1   # tick to fire next burst shot (-1 = inactive)
+    burst_shots_fired: int     = 0    # shots fired so far in current burst
+    burst_aim_x: float         = 0.0  # locked aim direction for burst
+    burst_aim_y: float         = 0.0
     giant_tick: int            = -1   # tick when giant mode started (-1 = inactive)
     # ── survivor1 R 技能狀態 ──────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
@@ -277,7 +281,10 @@ class GameState:
                 mult *= 1.5
         player.move(dx, dy, speed_mult=mult)
         player.stance = stance
-        if math.hypot(aim_x, aim_y) > 0:
+        # 連射期間：鎖定瞄準方向，禁止普攻
+        if player.burst_next_tick >= 0:
+            shooting = False
+        elif math.hypot(aim_x, aim_y) > 0:
             player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
         if shooting:
             if player.char_key == 'zoimbie1':
@@ -759,6 +766,33 @@ class GameState:
     def step_blade_arcs(self) -> None:
         from game.chars.zombie.blade_state import step_blade_arcs
         step_blade_arcs(self)
+
+    def _activate_burst(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        player = self.players.get(owner_id)
+        if not player or player.burst_next_tick >= 0:
+            return
+        if math.hypot(aim_x, aim_y) == 0:
+            return
+        player.burst_shots_fired = 0
+        player.burst_aim_x       = aim_x
+        player.burst_aim_y       = aim_y
+        player.burst_next_tick   = self.tick
+        player.aim_angle         = math.degrees(math.atan2(aim_x, -aim_y))
+
+    def step_burst(self) -> None:
+        _BURST_COUNT    = 6
+        _BURST_INTERVAL = 9
+        for player in self.players.values():
+            if player.burst_next_tick < 0:
+                continue
+            if self.tick >= player.burst_next_tick:
+                self._spawn_bullet(player.id, player.burst_aim_x, player.burst_aim_y)
+                player.burst_shots_fired += 1
+                if player.burst_shots_fired >= _BURST_COUNT:
+                    player.burst_next_tick  = -1
+                    player.burst_shots_fired = 0
+                else:
+                    player.burst_next_tick = self.tick + _BURST_INTERVAL
 
     def _spawn_stun_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.soldier.stun_bullet_state import spawn_stun_bullet

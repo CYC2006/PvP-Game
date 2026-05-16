@@ -29,6 +29,7 @@ _r_holding:           bool  = False  # manBlue R 按住中（未施放）
 _last_aim_x:          float = 0.0   # 上幀瞄準偏移（world 座標，供 airstrike_fx 使用）
 _last_aim_y:          float = 0.0
 _giant_age:           int   = -1    # 巨人模式年齡（-1 = 未啟動），由 client 每幀更新
+_burst_shots_left:    int   = 0     # 連射剩餘發數（> 0 = 連射中），由 client 每幀更新
 _dash_player_x:       float = 0.0   # 本地玩家位置（client 每幀更新，供衝刺碰撞檢查）
 _dash_player_y:       float = 0.0
 _dash_obstacles:      dict  = {}    # {id: Obstacle}，client 每幀更新
@@ -56,6 +57,11 @@ _e_prev:     bool = False
 def set_giant_age(age: int) -> None:
     global _giant_age
     _giant_age = age
+
+
+def set_burst_shots_left(n: int) -> None:
+    global _burst_shots_left
+    _burst_shots_left = n
 
 
 def set_dash_context(player_x: float, player_y: float,
@@ -211,7 +217,7 @@ def read_input(player_id: int, keys_held: set,
             dx, dy      = _dash_dx, _dash_dy
             _dash_speed -= _DASH_DECEL
 
-    if not _dash_active and not _giant_frozen:
+    if not _dash_active and not _giant_frozen and not _burst_shots_left:
         if pygame.K_w in keys_held or pygame.K_UP    in keys_held: dy -= 1.0
         if pygame.K_s in keys_held or pygame.K_DOWN  in keys_held: dy += 1.0
         if pygame.K_a in keys_held or pygame.K_LEFT  in keys_held: dx -= 1.0
@@ -261,7 +267,7 @@ def read_input(player_id: int, keys_held: set,
 
     # ── E 技能（閃光彈等）────────────────────────────────────────
     use_skill_e = False
-    if (not _r_skill_active and not _giant_frozen
+    if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
             and e_just_pressed and _skill_cds_ms.get('e', -1) >= 0):
         cd_remaining = _skill_cds_ms['e'] - (now - _skill_last_ms['e'])
         if cd_remaining <= 0:
@@ -270,7 +276,7 @@ def read_input(player_id: int, keys_held: set,
 
     # ── RMB 技能（manBlue：按住蓄力放開施放；其他角色：按下即發）──
     use_skill_rmb = False
-    if not _r_skill_active and not _giant_frozen and _skill_cds_ms.get('rmb', -1) >= 0:
+    if not _r_skill_active and not _giant_frozen and not _burst_shots_left and _skill_cds_ms.get('rmb', -1) >= 0:
         rmb_cd_ms = _skill_cds_ms['rmb']
         if _char_key == 'manBlue':
             cd_ok = (rmb_cd_ms - (now - _skill_last_ms['rmb'])) <= 0
@@ -299,16 +305,16 @@ def read_input(player_id: int, keys_held: set,
 
     # ── R 技能（按下即發）────────────────────────────────────────
     use_skill_r = False
-    if not _r_skill_active and not _giant_frozen and _skill_cds_ms.get('r', -1) >= 0:
+    if not _r_skill_active and not _giant_frozen and not _burst_shots_left and _skill_cds_ms.get('r', -1) >= 0:
         if r_just_pressed and (_skill_cds_ms['r'] - (now - _skill_last_ms['r'])) <= 0:
             use_skill_r = True
             _skill_last_ms['r']  = now
             _r_skill_start_ms    = now
             _r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
 
-    # ── 射擊（換彈中禁止 / R 技能期間禁止）──────────────────────
+    # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────
     shooting = False
-    if (not _reloading and not _r_skill_active
+    if (not _reloading and not _r_skill_active and not _burst_shots_left
             and pygame.mouse.get_pressed()[0]
             and (now - _last_shot_time) >= SHOOT_COOLDOWN_MS):
         shooting        = True

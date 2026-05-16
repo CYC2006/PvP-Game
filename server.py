@@ -145,8 +145,12 @@ def run():
                             elif p and p.char_key == 'manOld':
                                 state._activate_log_barriers(
                                     cmd.player_id, cmd.aim_x, cmd.aim_y)
+                        _bursting = p and p.burst_next_tick >= 0
                         if cmd.use_skill_rmb:
-                            if p and p.char_key == 'survivor1':
+                            if p and p.char_key == 'hitman1':
+                                state._activate_burst(
+                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
+                            elif p and p.char_key == 'survivor1':
                                 state._spawn_shuriken(
                                     cmd.player_id, cmd.aim_x, cmd.aim_y)
                             elif p and p.char_key == 'manBlue':
@@ -155,17 +159,18 @@ def run():
                             elif p and p.char_key == 'soldier1':
                                 state._spawn_stun_bullet(
                                     cmd.player_id, cmd.aim_x, cmd.aim_y)
-                        if cmd.use_skill_space:
-                            if p and p.char_key == 'survivor1':
-                                state._activate_speed_boost(cmd.player_id)
-                            elif p and p.char_key == 'manOld':
-                                state._spawn_mini_grenades(cmd.player_id)
-                        if cmd.use_skill_r:
-                            if p and p.char_key == 'survivor1':
-                                state._activate_r_skill(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
-                            elif p and p.char_key == 'manBlue':
-                                state._activate_giant(cmd.player_id)
+                        if not _bursting:
+                            if cmd.use_skill_space:
+                                if p and p.char_key == 'survivor1':
+                                    state._activate_speed_boost(cmd.player_id)
+                                elif p and p.char_key == 'manOld':
+                                    state._spawn_mini_grenades(cmd.player_id)
+                            if cmd.use_skill_r:
+                                if p and p.char_key == 'survivor1':
+                                    state._activate_r_skill(
+                                        cmd.player_id, cmd.aim_x, cmd.aim_y)
+                                elif p and p.char_key == 'manBlue':
+                                    state._activate_giant(cmd.player_id)
                     state.apply_command(
                         cmd.player_id,
                         cmd.move_x, cmd.move_y,
@@ -208,6 +213,7 @@ def run():
                 state.step_r_skill()
                 state.step_air_strikes()
                 state.step_giant()
+                state.step_burst()
 
                 payload = pack_state(state)
                 for addr in clients.values():
