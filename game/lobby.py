@@ -316,12 +316,12 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
         pygame.draw.rect(screen, bg, r, border_radius=8)
         pygame.draw.rect(screen, bd, r, 2, border_radius=8)
 
-        # Icon at fixed x; name at fixed offset so all 4 names align vertically
-        ic_surf = font_lg.render(icon, True, tc)
+        # Icon (font_sm keeps all glyphs a uniform small size);
+        # name (font_lg) starts at a fixed offset so all rows align.
+        ic_surf = font_sm.render(icon, True, tc)
         nm_surf = font_lg.render(name, True, tc)
-        ty2 = r.centery - ic_surf.get_height() // 2
-        screen.blit(ic_surf, (r.x + 14, ty2))
-        screen.blit(nm_surf, (r.x + 46, ty2))   # fixed 46px indent for all rows
+        screen.blit(ic_surf, (r.x + 16, r.centery - ic_surf.get_height() // 2))
+        screen.blit(nm_surf, (r.x + 58, r.centery - nm_surf.get_height() // 2))
 
         # Radio indicator (right side)
         ix, iy = r.right - 20, r.centery
