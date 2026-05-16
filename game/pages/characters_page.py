@@ -34,24 +34,26 @@ _RATINGS: dict = {
 # (skill_name, key_label, cooldown_secs, description)
 _SKILLS: dict = {
     'hitman1': [
-        ("BURST FIRE",    "RMB",   5,
-         "Fires three rounds in rapid succession toward the cursor. "
-         "Ideal for punishing an exposed or retreating enemy at close to mid range."),
-        ("—",             "SPACE", 0,
-         "Skill under development."),
-        ("FLASH GRENADE", "E",     6,
+        ("POWER SHOT",    "RMB",   5,
+         "Fire a single enhanced bullet — twice the normal size, double damage, "
+         "and zero spread. A glowing afterimage trail marks its path through the air."),
+        ("DASH",          "SPACE", 3,
+         "Lunge in the current movement direction for a rapid burst of speed. "
+         "Requires an active movement input to trigger; no direction, no dash."),
+        ("FLASH GRENADE", "E",     8,
          "Lobs a stun grenade that detonates on landing. "
          "Any enemy inside the blast radius is briefly blinded and disoriented."),
         ("—",             "R",     0,
          "Skill under development."),
     ],
     'manBlue': [
-        ("AIRSTRIKE",     "RMB",   8,
+        ("AIRSTRIKE",     "RMB",   5,
          "Calls a sequence of bombs along the aimed trajectory. "
          "Impacts land in a line with a short delay, covering a wide zone."),
-        ("—",             "SPACE", 0,
-         "Skill under development."),
-        ("FRAG GRENADE",  "E",     7,
+        ("CHARGE",        "SPACE", 6,
+         "Surge toward the cursor at high speed for a fixed distance. "
+         "Closes gaps aggressively or repositions through open terrain."),
+        ("FRAG GRENADE",  "E",     8,
          "Hurls a fragmentation grenade that explodes on impact, "
          "dealing heavy damage to all enemies within the blast radius."),
         ("GIANT FORM",    "R",     20,
