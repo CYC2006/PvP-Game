@@ -61,26 +61,20 @@ COL_INPUT_BG  = (20,  26,  40)
 COL_INPUT_BD  = ( 72, 132, 212)
 
 # ─── Layout constants ─────────────────────────────────────────────────────────
-_TB  = 68          # top-bar height
-_SW  = 170         # sidebar width
-_MCX = (_SW + LOGICAL_W) // 2   # main-area center-x = 725
+_TB   = 68    # top-bar height
+_SW   = 170   # sidebar width
 
-# Game-mode section (left half of main area)
-_MX   = 205        # left edge of mode buttons
-_MW   = 345        # mode-button width
-_MH   = 52         # mode-button height
-_MGAP = 11         # gap between mode buttons
-_MY0  = 310        # y of first mode button
+# 2×2 game-mode tile grid
+_GX   = 190   # grid left edge (20 px right of sidebar)
+_GY   = 112   # grid top edge
+_GTW  = 535   # tile width   — 2 tiles + 10 gap = 1080 px, fits 190→1270
+_GTH  = 240   # tile height
+_GGAP = 10    # gap between tiles (both axes)
 
-# Divider between mode section and play section
-_DVX  = 728
-
-# HOST / JOIN (bottom-right)
-_BW   = 255
-_BH   = 72
-_BX   = LOGICAL_W - 26 - _BW   # = 999
-_HY   = 498        # HOST button y
-_JY   = _HY + _BH + 15         # JOIN button y = 585
+# HOST / JOIN — side by side below the grid
+_HJBW = _GTW              # same width as one tile column
+_HJBH = 64
+_HJBY = _GY + 2 * _GTH + _GGAP + 14   # = 616
 
 # ─── Nerd Fonts icons (MapleMono-NF has these built in) ──────────────────────
 IC_USER       = ''   #
@@ -170,15 +164,19 @@ def lobby_screen(screen: pygame.Surface,
     CHARS_R = pygame.Rect(15, _TB + 86,             _SW - 30, 48)
     MISS_R  = pygame.Rect(15, LOGICAL_H - 24 - 44,  _SW - 30, 44)
 
-    # Game-mode buttons
+    # Game-mode tiles (2×2 grid)
     MODE_RS = [
-        pygame.Rect(_MX, _MY0 + i * (_MH + _MGAP), _MW, _MH)
+        pygame.Rect(
+            _GX + (i % 2) * (_GTW + _GGAP),
+            _GY + (i // 2) * (_GTH + _GGAP),
+            _GTW, _GTH
+        )
         for i in range(len(_MODES))
     ]
 
-    # HOST / JOIN
-    HOST_R = pygame.Rect(_BX, _HY, _BW, _BH)
-    JOIN_R = pygame.Rect(_BX, _JY, _BW, _BH)
+    # HOST / JOIN — side by side
+    HOST_R = pygame.Rect(_GX,              _HJBY, _HJBW, _HJBH)
+    JOIN_R = pygame.Rect(_GX + _HJBW + _GGAP, _HJBY, _HJBW, _HJBH)
 
     # Sub-screen buttons (centered on full screen)
     CX      = LOGICAL_W // 2
@@ -298,9 +296,9 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
         bg = COL_BTN_HOV if r.collidepoint(mx, my) else COL_BTN
         _btn(screen, r, bg, COL_BTN_BD, font_sm, f"{icon}  {lbl}", COL_BTN_TXT)
 
-    # ── Game mode section ─────────────────────────────────────────────────────
+    # ── 2×2 Game mode tile grid ───────────────────────────────────────────────
     sec_lbl = font_sm.render(f"{IC_GAMEPAD}  GAME  MODE", True, (68, 105, 158))
-    screen.blit(sec_lbl, (_MX, _MY0 - 36))
+    screen.blit(sec_lbl, (_GX, _GY - 22))
 
     for i, (r, (icon, name, desc)) in enumerate(zip(mode_rs, _MODES)):
         selected = (i == sel_mode)
@@ -313,41 +311,31 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
         else:
             bg, bd, tc = COL_M_UN,   COL_M_UN_BD,  COL_M_UN_TXT
 
-        pygame.draw.rect(screen, bg, r, border_radius=8)
-        pygame.draw.rect(screen, bd, r, 2, border_radius=8)
+        pygame.draw.rect(screen, bg, r, border_radius=10)
+        pygame.draw.rect(screen, bd, r, 2, border_radius=10)
 
-        # Icon (font_sm keeps all glyphs a uniform small size);
-        # name (font_lg) starts at a fixed offset so all rows align.
+        # Icon + name at the top of the tile
         ic_surf = font_sm.render(icon, True, tc)
         nm_surf = font_lg.render(name, True, tc)
-        screen.blit(ic_surf, (r.x + 16, r.centery - ic_surf.get_height() // 2))
-        screen.blit(nm_surf, (r.x + 58, r.centery - nm_surf.get_height() // 2))
+        ty      = r.y + 16
+        screen.blit(ic_surf, (r.x + 16,
+                               ty + (nm_surf.get_height() - ic_surf.get_height()) // 2))
+        screen.blit(nm_surf, (r.x + 16 + ic_surf.get_width() + 10, ty))
 
-        # Radio indicator (right side)
-        ix, iy = r.right - 20, r.centery
+        # Selected indicator dot (top-right corner of tile)
+        dot_x, dot_y = r.right - 18, r.y + 18
         if selected:
-            pygame.draw.circle(screen, COL_M_SEL_BD, (ix, iy), 7)
-            pygame.draw.circle(screen, (210, 230, 255), (ix, iy), 3)
+            pygame.draw.circle(screen, COL_M_SEL_BD, (dot_x, dot_y), 6)
+            pygame.draw.circle(screen, (210, 230, 255), (dot_x, dot_y), 3)
         else:
-            pygame.draw.circle(screen, bd, (ix, iy), 6, 2)
+            pygame.draw.circle(screen, bd, (dot_x, dot_y), 5, 1)
 
-    # Description of currently selected mode
-    _, _, sel_desc = _MODES[sel_mode]
-    ds = font_sm.render(sel_desc, True, (82, 122, 172))
-    screen.blit(ds, (_MX, _MY0 + len(_MODES) * (_MH + _MGAP) - _MGAP + 8))
-
-    # ── Play section (right of divider) ───────────────────────────────────────
-    # Section label left-aligned with the HOST/JOIN buttons
-    play_lbl = font_sm.render(f"{IC_BOLT}  START  GAME", True, (68, 105, 158))
-    screen.blit(play_lbl, (_BX, _HY - 36))
-
-    # HOST button
+    # ── HOST / JOIN — side by side ────────────────────────────────────────────
     hh = host_r.collidepoint(mx, my)
     _btn(screen, host_r,
          COL_HOST_HOV if hh else COL_HOST, COL_HOST_BD,
          font_lg, f"{IC_SERVER}  HOST", COL_HOST_TXT, radius=10)
 
-    # JOIN button
     jh = join_r.collidepoint(mx, my)
     _btn(screen, join_r,
          COL_JOIN_HOV if jh else COL_JOIN, COL_JOIN_BD,
