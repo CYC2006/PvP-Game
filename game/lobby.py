@@ -145,6 +145,7 @@ def lobby_screen(screen: pygame.Surface,
 
     FPS       = 60
     state     = "main"   # "main" | "host" | "join"
+    page      = "game"   # "game" | "shop" | "characters" | "missions"
     sel_mode  = 0
     ip_text   = ""
     cursor_on = True
@@ -160,10 +161,22 @@ def lobby_screen(screen: pygame.Surface,
     SFX_R  = pygame.Rect(LOGICAL_W - 26 - 46 - 10 - 46, 11, 46, 46)
     SET_R  = pygame.Rect(LOGICAL_W - 26 - 46,            11, 46, 46)
 
-    # Sidebar buttons
-    SHOP_R  = pygame.Rect(15, _TB + 24,             _SW - 30, 48)
-    CHARS_R = pygame.Rect(15, _TB + 86,             _SW - 30, 48)
-    MISS_R  = pygame.Rect(15, LOGICAL_H - 24 - 44,  _SW - 30, 44)
+    # Sidebar nav tabs: GAME / SHOP / CHARACTERS / MISSIONS
+    _TAB_W = _SW - 20
+    _TAB_H = 50
+    _TAB_X = 10
+    _TAB_Y0 = _TB + 18
+    _TAB_STEP = _TAB_H + 8
+    SIDEBAR_TABS = [
+        ("game",       IC_GAMEPAD, "GAME"),
+        ("shop",       IC_CART,    "SHOP"),
+        ("characters", IC_USER,    "CHARACTERS"),
+        ("missions",   IC_TASKS,   "MISSIONS"),
+    ]
+    TAB_RS = [
+        pygame.Rect(_TAB_X, _TAB_Y0 + i * _TAB_STEP, _TAB_W, _TAB_H)
+        for i in range(len(SIDEBAR_TABS))
+    ]
 
     # Game-mode tiles (2×2 grid)
     MODE_RS = [
@@ -176,7 +189,7 @@ def lobby_screen(screen: pygame.Surface,
     ]
 
     # HOST / JOIN — side by side below the 2v2 TEAM tile (right column)
-    _hj_x  = _GX + _GTW + _GGAP          # x of right tile column
+    _hj_x  = _GX + _GTW + _GGAP
     HOST_R = pygame.Rect(_hj_x,                   _HJBY, _HJBW, _HJBH)
     JOIN_R = pygame.Rect(_hj_x + _HJBW + _GGAP,   _HJBY, _HJBW, _HJBH)
 
@@ -225,14 +238,19 @@ def lobby_screen(screen: pygame.Surface,
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if state == "main":
-                    for i, r in enumerate(MODE_RS):
+                    # Sidebar tab switching
+                    for (pg, _, _lbl), r in zip(SIDEBAR_TABS, TAB_RS):
                         if r.collidepoint(mx, my):
-                            sel_mode = i
-                    if HOST_R.collidepoint(mx, my):
-                        state = "host"
-                    elif JOIN_R.collidepoint(mx, my):
-                        state = "join"
-                    # Sidebar & top-right buttons: no action (not implemented)
+                            page = pg
+
+                    if page == "game":
+                        for i, r in enumerate(MODE_RS):
+                            if r.collidepoint(mx, my):
+                                sel_mode = i
+                        if HOST_R.collidepoint(mx, my):
+                            state = "host"
+                        elif JOIN_R.collidepoint(mx, my):
+                            state = "join"
 
                 elif state == "host":
                     if BACK_R.collidepoint(mx, my):
@@ -252,9 +270,13 @@ def lobby_screen(screen: pygame.Surface,
         screen.fill(COL_BG)
 
         if state == "main":
-            _draw_main(screen, font_lg, font_sm, mx, my,
-                       sel_mode, MODE_RS, HOST_R, JOIN_R,
-                       SHOP_R, CHARS_R, MISS_R, SFX_R, SET_R)
+            _draw_topbar(screen, font_lg, font_sm, SFX_R, SET_R, mx, my)
+            _draw_sidebar(screen, font_lg, font_sm, page, SIDEBAR_TABS, TAB_RS, mx, my)
+            if page == "game":
+                _draw_game_page(screen, font_lg, font_sm, mx, my,
+                                sel_mode, MODE_RS, HOST_R, JOIN_R)
+            else:
+                _draw_placeholder(screen, font_lg, page)
         elif state == "host":
             _draw_host(screen, font_lg, font_sm,
                        local_ip, pub_ip[0], BACK_R, START_R, mx, my)
@@ -265,17 +287,12 @@ def lobby_screen(screen: pygame.Surface,
         pygame.display.flip()
 
 
-# ─── Main screen ──────────────────────────────────────────────────────────────
+# ─── Persistent chrome ────────────────────────────────────────────────────────
 
-def _draw_main(screen, font_lg, font_sm, mx, my,
-               sel_mode, mode_rs, host_r, join_r,
-               shop_r, chars_r, miss_r, sfx_r, set_r):
-    W, H = LOGICAL_W, LOGICAL_H
-
-    # ── Top bar ───────────────────────────────────────────────────────────────
+def _draw_topbar(screen, font_lg, font_sm, sfx_r, set_r, mx, my):
+    W = LOGICAL_W
     pygame.draw.line(screen, COL_SEP, (0, _TB), (W, _TB), 1)
 
-    # Player info panel (top-left)
     pl_r = pygame.Rect(18, 10, 235, 48)
     pygame.draw.rect(screen, COL_PL_BG, pl_r, border_radius=8)
     pygame.draw.rect(screen, COL_PL_BD, pl_r, 2, border_radius=8)
@@ -284,24 +301,56 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
     ls = font_sm.render(f"{IC_BOLT}  Lv. 1", True, COL_LEVEL)
     screen.blit(ls, (pl_r.x + 12, pl_r.y + 27))
 
-    # Top-right: SFX + SET — icon only, no text
     for r, icon in ((sfx_r, IC_VOLUME), (set_r, IC_COG)):
         bg = COL_BTN_HOV if r.collidepoint(mx, my) else COL_BTN
         _btn(screen, r, bg, COL_BTN_BD, font_lg, icon, COL_BTN_TXT, radius=8)
 
-    # ── Sidebar ───────────────────────────────────────────────────────────────
+
+def _draw_sidebar(screen, font_lg, font_sm, page, tabs, tab_rs, mx, my):
+    H = LOGICAL_H
     pygame.draw.line(screen, COL_SEP, (_SW, _TB), (_SW, H), 1)
 
-    for r, icon, lbl in ((shop_r,  IC_CART,  "SHOP"),
-                         (chars_r, IC_USER,  "CHARACTERS"),
-                         (miss_r,  IC_TASKS, "MISSIONS")):
-        bg = COL_BTN_HOV if r.collidepoint(mx, my) else COL_BTN
-        _btn(screen, r, bg, COL_BTN_BD, font_sm, f"{icon}  {lbl}", COL_BTN_TXT)
+    COL_TAB_ACT    = (28,  38,  58)
+    COL_TAB_ACT_BD = ( 60, 140, 230)
+    COL_TAB_TXT_A  = (180, 215, 255)
 
-    # ── 2×2 Game mode tile grid ───────────────────────────────────────────────
+    for (pg, icon, lbl), r in zip(tabs, tab_rs):
+        active   = (pg == page)
+        hovering = (not active) and r.collidepoint(mx, my)
+
+        if active:
+            bg, bd, tc = COL_TAB_ACT, COL_TAB_ACT_BD, COL_TAB_TXT_A
+        elif hovering:
+            bg, bd, tc = COL_BTN_HOV, COL_BTN_BD,     COL_BTN_TXT
+        else:
+            bg, bd, tc = COL_BTN,     COL_BTN_BD,      COL_BTN_TXT
+
+        pygame.draw.rect(screen, bg, r, border_radius=8)
+        pygame.draw.rect(screen, bd, r, 2, border_radius=8)
+
+        # Active left accent bar
+        if active:
+            pygame.draw.rect(screen, COL_TAB_ACT_BD,
+                             (r.x, r.y + 6, 3, r.h - 12), border_radius=2)
+
+        ic_s = font_sm.render(icon, True, tc)
+        nm_s = font_sm.render(lbl,  True, tc)
+        total_w = ic_s.get_width() + 8 + nm_s.get_width()
+        bx = r.centerx - total_w // 2
+        by = r.centery - nm_s.get_height() // 2
+        screen.blit(ic_s, (bx, r.centery - ic_s.get_height() // 2))
+        screen.blit(nm_s, (bx + ic_s.get_width() + 8, by))
+
+
+# ─── Page: GAME ───────────────────────────────────────────────────────────────
+
+def _draw_game_page(screen, font_lg, font_sm, mx, my,
+                    sel_mode, mode_rs, host_r, join_r):
+    # Section label
     sec_lbl = font_lg.render(f"{IC_GAMEPAD}  GAME  MODE", True, (68, 105, 158))
     screen.blit(sec_lbl, (_GX, _GY - sec_lbl.get_height() - 8))
 
+    # 2×2 tile grid
     for i, (r, (icon, name, desc)) in enumerate(zip(mode_rs, _MODES)):
         selected = (i == sel_mode)
         hovering = (not selected) and r.collidepoint(mx, my)
@@ -316,16 +365,14 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
         pygame.draw.rect(screen, bg, r, border_radius=10)
         pygame.draw.rect(screen, bd, r, 2, border_radius=10)
 
-        # Icon + name at the top of the tile
         ic_surf = font_sm.render(icon, True, tc)
         nm_surf = font_lg.render(name, True, tc)
-        ty      = r.y + 16
+        ty = r.y + 16
         screen.blit(ic_surf, (r.x + 16,
                                ty + (nm_surf.get_height() - ic_surf.get_height()) // 2))
         screen.blit(nm_surf, (r.x + 16 + ic_surf.get_width() + 10, ty))
 
-
-    # ── HOST / JOIN — side by side ────────────────────────────────────────────
+    # HOST / JOIN
     hh = host_r.collidepoint(mx, my)
     _btn(screen, host_r,
          COL_HOST_HOV if hh else COL_HOST, COL_HOST_BD,
@@ -335,6 +382,15 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
     _btn(screen, join_r,
          COL_JOIN_HOV if jh else COL_JOIN, COL_JOIN_BD,
          font_lg, f"{IC_SIGNIN}  JOIN", COL_JOIN_TXT, radius=10)
+
+
+# ─── Page: placeholder ────────────────────────────────────────────────────────
+
+def _draw_placeholder(screen, font_lg, page: str):
+    CX = (_SW + LOGICAL_W) // 2
+    CY = (_TB + LOGICAL_H) // 2
+    label = font_lg.render(page.upper(), True, (40, 52, 78))
+    screen.blit(label, (CX - label.get_width() // 2, CY - label.get_height() // 2))
 
 
 
