@@ -18,6 +18,7 @@ from game.chars.zombie   import blade_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
 from game.chars.dancer   import bubble_fx
 from game.chars.bear     import explosion_bullet_fx
+from game.chars.bear     import mine_fx as bear_mine_fx
 
 # colours
 COL_BG         = (30,  30,  30)
@@ -388,6 +389,9 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     mini_grenade_fx.draw_explosions(screen, cx, cy)
     stun_bullet_fx.draw_explosions(screen, cx, cy)
     explosion_bullet_fx.draw_explosions(screen, cx, cy)
+    bear_mine_fx.update(state, my_id)
+    bear_mine_fx.draw(screen, state, cx, cy, my_id)
+    bear_mine_fx.draw_explosions(screen, cx, cy)
     airstrike_fx.update(state)
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)

@@ -145,6 +145,8 @@ def run():
                             elif p and p.char_key == 'manOld':
                                 state._activate_log_barriers(
                                     cmd.player_id, cmd.aim_x, cmd.aim_y)
+                            elif p and p.char_key == 'manBrown':
+                                state._place_mine(cmd.player_id)
                         _bursting = p and p.burst_next_tick >= 0
                         if cmd.use_skill_rmb:
                             if p and p.char_key == 'hitman1':
@@ -217,6 +219,7 @@ def run():
                 state.step_air_strikes()
                 state.step_giant()
                 state.step_burst()
+                state.step_mines()
 
                 payload = pack_state(state)
                 for addr in clients.values():

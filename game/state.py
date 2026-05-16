@@ -115,6 +115,15 @@ class AirStrike:
 
 
 @dataclass
+class Mine:
+    id:             int
+    owner_id:       int
+    x:              float
+    y:              float
+    triggered_tick: int = -1   # -1 = 等待中；>= 0 = 引爆倒數開始的 tick
+
+
+@dataclass
 class LogBarrier:
     id:       int
     owner_id: int
@@ -191,6 +200,8 @@ class GameState:
     _next_airstrike_id: int  = 0
     log_barriers: dict       = field(default_factory=dict)   # lid → LogBarrier
     _next_log_id: int        = 0
+    mines: dict              = field(default_factory=dict)   # mid → Mine
+    _next_mine_id: int       = 0
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -722,6 +733,14 @@ class GameState:
     def step_burst(self) -> None:
         from game.chars.agent.burst_state import step_burst
         step_burst(self)
+
+    def _place_mine(self, owner_id: int) -> None:
+        from game.chars.bear.mine_state import place_mine
+        place_mine(self, owner_id)
+
+    def step_mines(self) -> None:
+        from game.chars.bear.mine_state import step_mines
+        step_mines(self)
 
     def _spawn_stun_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.soldier.stun_bullet_state import spawn_stun_bullet

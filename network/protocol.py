@@ -1,6 +1,6 @@
 import struct
 from game.command import PlayerCommand
-from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier
+from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine
 
 # --- Packet types ---
 PKT_JOIN        = 0x01
@@ -30,6 +30,7 @@ _SMOKE_ENTRY   = struct.Struct("!BffHI")     # id x y radius*10 spawn_tick
 _BLADE_ENTRY      = struct.Struct("!BhhBbB")   # id x_i16 y_i16 age dir owner_id
 _AIRSTRIKE_ENTRY  = struct.Struct("!BhhBB")    # id cx_i16 cy_i16 age(u8) owner_id
 _LOG_BARRIER_ENTRY = struct.Struct("!BhhBB")  # id x_i16 y_i16 hp(u8) owner_id
+_MINE_ENTRY        = struct.Struct("!BhhHB")  # id x_i16 y_i16 triggered_age_u16(65535=idle) owner_id
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -153,7 +154,16 @@ def pack_state(state: GameState) -> bytes:
         for lb in barriers
     )
 
-    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data
+    mine_list = list(state.mines.values())
+    mine_data = bytes([len(mine_list)]) + b"".join(
+        _MINE_ENTRY.pack(
+            m.id, int(m.x), int(m.y),
+            min(65534, state.tick - m.triggered_tick) if m.triggered_tick >= 0 else 65535,
+            m.owner_id)
+        for m in mine_list
+    )
+
+    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -238,6 +248,16 @@ def unpack_state(data: bytes) -> GameState:
             state.log_barriers[lid] = LogBarrier(
                 id=lid, owner_id=lowner, x=float(lx), y=float(ly), hp=lhp)
             offset += _LOG_BARRIER_ENTRY.size
+
+    if offset < len(data):
+        mine_count = data[offset]; offset += 1
+        for _ in range(mine_count):
+            mid, mx, my, trig_age, mowner = _MINE_ENTRY.unpack(
+                data[offset: offset + _MINE_ENTRY.size])
+            m = Mine(id=mid, owner_id=mowner, x=float(mx), y=float(my))
+            m.triggered_tick = state.tick - trig_age if trig_age != 65535 else -1
+            state.mines[mid] = m
+            offset += _MINE_ENTRY.size
 
     return state
 
