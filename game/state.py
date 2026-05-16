@@ -781,7 +781,7 @@ class GameState:
 
     def step_burst(self) -> None:
         _BURST_COUNT    = 6
-        _BURST_INTERVAL = 9
+        _BURST_INTERVAL = 6
         for player in self.players.values():
             if player.burst_next_tick < 0:
                 continue

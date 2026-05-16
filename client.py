@@ -274,6 +274,9 @@ def run() -> None:
         cmd, effective_stance, ammo, is_reloading, skill_cooldowns = read_input(
             player_id, keys_held, logical_mouse, shift_held)
         aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
+        # 連射中：用 server 鎖定的角度，不跟隨滑鼠（burst_shots_fired < 6 = 連射中）
+        if local_player and local_player.burst_shots_fired < 6:
+            aim_angle_deg = local_player.aim_angle
 
         try:
             sock.sendto(pack_command(cmd), server_addr)
