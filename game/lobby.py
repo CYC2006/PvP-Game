@@ -23,7 +23,7 @@ from game.pages.layout import (
     IC_CART, IC_TASKS, IC_GAMEPAD as _IC_GAME,
     btn, cx,
 )
-from game.pages import game_page, characters_page, shop_page, missions_page
+from game.pages import game_page, characters_page, map_page, shop_page, missions_page
 
 
 # ── Sidebar tab definitions ───────────────────────────────────────────────────
@@ -33,10 +33,13 @@ _TAB_X    = 10
 _TAB_Y0   = _TB + 18
 _TAB_STEP = _TAB_H + 8
 
+IC_MAP = ''   # nf-fa-map (Nerd Fonts)
+
 SIDEBAR_TABS = [
     ("game",       IC_GAMEPAD, "GAME"),
     ("shop",       IC_CART,    "SHOP"),
     ("characters", IC_USER,    "CHARACTERS"),
+    ("map",        IC_MAP,     "MAP"),
     ("missions",   IC_TASKS,   "MISSIONS"),
 ]
 
@@ -198,9 +201,10 @@ def lobby_screen(screen: pygame.Surface,
 
     FPS           = 60
     state         = "main"   # "main" | "host" | "join"
-    page          = "game"   # "game" | "shop" | "characters" | "missions"
+    page          = "game"   # "game" | "shop" | "characters" | "map" | "missions"
     sel_mode      = 0
     char_page_idx = 0
+    map_page_idx  = 0
     ip_text       = ""
     cursor_on     = True
     ctime         = 0.0
@@ -278,6 +282,11 @@ def lobby_screen(screen: pygame.Surface,
                             if r.collidepoint(mx, my):
                                 char_page_idx = i
 
+                    elif page == "map":
+                        for i, r in enumerate(map_page.MAP_RS):
+                            if r.collidepoint(mx, my):
+                                map_page_idx = i
+
                 elif state == "host":
                     if BACK_R.collidepoint(mx, my):
                         state = "main"
@@ -303,6 +312,8 @@ def lobby_screen(screen: pygame.Surface,
                 game_page.draw(screen, font_lg, font_sm, mx, my, sel_mode)
             elif page == "characters":
                 characters_page.draw(screen, font_lg, font_sm, char_page_idx)
+            elif page == "map":
+                map_page.draw(screen, font_lg, font_sm, map_page_idx)
             elif page == "shop":
                 shop_page.draw(screen, font_lg, font_sm)
             elif page == "missions":
