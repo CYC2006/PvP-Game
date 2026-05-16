@@ -82,12 +82,28 @@ _BX   = LOGICAL_W - 26 - _BW   # = 999
 _HY   = 498        # HOST button y
 _JY   = _HY + _BH + 15         # JOIN button y = 585
 
+# ─── Nerd Fonts icons (MapleMono-NF has these built in) ──────────────────────
+IC_USER       = ''   #
+IC_COG        = ''   #
+IC_CART       = ''   #
+IC_TASKS      = ''   #
+IC_USERS      = ''   #
+IC_GAMEPAD    = ''   #
+IC_FLAG       = ''   #
+IC_CROSSHAIRS = ''   #
+IC_BULLSEYE   = ''   #
+IC_SERVER     = ''   #
+IC_SIGNIN     = ''   #
+IC_VOLUME     = ''   #
+IC_BOLT       = ''   #
+IC_HOME       = ''   #
+
 # ─── Game modes ───────────────────────────────────────────────────────────────
 _MODES = [
-    ("DEATHMATCH",       "Eliminate the enemy player"),
-    ("CAPTURE THE FLAG", "Capture and return the flag"),
-    ("CAPTURE POINT",    "Hold key positions longer"),
-    ("2v2  TEAM",        "Two versus two squad battle"),
+    (IC_CROSSHAIRS, "DEATHMATCH",       "Eliminate the enemy player"),
+    (IC_FLAG,       "CAPTURE THE FLAG", "Capture and return the flag"),
+    (IC_BULLSEYE,   "CAPTURE POINT",    "Hold key positions longer"),
+    (IC_USERS,      "2v2  TEAM",        "Two versus two squad battle"),
 ]
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -263,34 +279,30 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
     pl_r = pygame.Rect(18, 10, 235, 48)
     pygame.draw.rect(screen, COL_PL_BG, pl_r, border_radius=8)
     pygame.draw.rect(screen, COL_PL_BD, pl_r, 2, border_radius=8)
-    ns = font_lg.render("PLAYER_001", True, COL_PL_NAME)
+    ns = font_lg.render(f"{IC_USER}  PLAYER_001", True, COL_PL_NAME)
     screen.blit(ns, (pl_r.x + 12, pl_r.y + 5))
-    ls = font_sm.render("Lv. 1", True, COL_LEVEL)
+    ls = font_sm.render(f"{IC_BOLT}  Lv. 1", True, COL_LEVEL)
     screen.blit(ls, (pl_r.x + 12, pl_r.y + 27))
 
     # Top-right: SFX + SET icon buttons
-    for r, lbl in ((sfx_r, "SFX"), (set_r, "SET")):
+    for r, icon, lbl in ((sfx_r, IC_VOLUME, "SFX"), (set_r, IC_COG, "SET")):
         bg = COL_BTN_HOV if r.collidepoint(mx, my) else COL_BTN
-        _btn(screen, r, bg, COL_BTN_BD, font_sm, lbl, COL_BTN_TXT, radius=8)
+        _btn(screen, r, bg, COL_BTN_BD, font_sm, f"{icon} {lbl}", COL_BTN_TXT, radius=8)
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
     pygame.draw.line(screen, COL_SEP, (_SW, _TB), (_SW, H), 1)
 
-    for r, lbl in ((shop_r, "SHOP"),
-                   (chars_r, "CHARACTERS"),
-                   (miss_r,  "MISSIONS")):
+    for r, icon, lbl in ((shop_r,  IC_CART,  "SHOP"),
+                         (chars_r, IC_USER,  "CHARACTERS"),
+                         (miss_r,  IC_TASKS, "MISSIONS")):
         bg = COL_BTN_HOV if r.collidepoint(mx, my) else COL_BTN
-        _btn(screen, r, bg, COL_BTN_BD, font_sm, lbl, COL_BTN_TXT)
-
-    # ── Main area ─────────────────────────────────────────────────────────────
-    # Vertical divider between mode section and play section
-    pygame.draw.line(screen, COL_SEP, (_DVX, _TB + 10), (_DVX, H - 28), 1)
+        _btn(screen, r, bg, COL_BTN_BD, font_sm, f"{icon}  {lbl}", COL_BTN_TXT)
 
     # ── Game mode section ─────────────────────────────────────────────────────
-    sec_lbl = font_sm.render("GAME  MODE", True, (68, 105, 158))
+    sec_lbl = font_sm.render(f"{IC_GAMEPAD}  GAME  MODE", True, (68, 105, 158))
     screen.blit(sec_lbl, (_MX, _MY0 - 36))
 
-    for i, (r, (name, desc)) in enumerate(zip(mode_rs, _MODES)):
+    for i, (r, (icon, name, desc)) in enumerate(zip(mode_rs, _MODES)):
         selected = (i == sel_mode)
         hovering = (not selected) and r.collidepoint(mx, my)
 
@@ -304,7 +316,7 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
         pygame.draw.rect(screen, bg, r, border_radius=8)
         pygame.draw.rect(screen, bd, r, 2, border_radius=8)
 
-        ns2 = font_lg.render(name, True, tc)
+        ns2 = font_lg.render(f"{icon}  {name}", True, tc)
         screen.blit(ns2, (r.x + 14, r.centery - ns2.get_height() // 2))
 
         # Radio indicator (right side)
@@ -316,30 +328,27 @@ def _draw_main(screen, font_lg, font_sm, mx, my,
             pygame.draw.circle(screen, bd, (ix, iy), 6, 2)
 
     # Description of currently selected mode
-    _, sel_desc = _MODES[sel_mode]
+    _, _, sel_desc = _MODES[sel_mode]
     ds = font_sm.render(sel_desc, True, (82, 122, 172))
     screen.blit(ds, (_MX, _MY0 + len(_MODES) * (_MH + _MGAP) - _MGAP + 8))
 
     # ── Play section (right of divider) ───────────────────────────────────────
     # Section label left-aligned with the HOST/JOIN buttons
-    play_lbl = font_sm.render("START  GAME", True, (68, 105, 158))
+    play_lbl = font_sm.render(f"{IC_BOLT}  START  GAME", True, (68, 105, 158))
     screen.blit(play_lbl, (_BX, _HY - 36))
 
     # HOST button
     hh = host_r.collidepoint(mx, my)
     _btn(screen, host_r,
          COL_HOST_HOV if hh else COL_HOST, COL_HOST_BD,
-         font_lg, "HOST", COL_HOST_TXT, radius=10)
+         font_lg, f"{IC_SERVER}  HOST", COL_HOST_TXT, radius=10)
 
     # JOIN button
     jh = join_r.collidepoint(mx, my)
     _btn(screen, join_r,
          COL_JOIN_HOV if jh else COL_JOIN, COL_JOIN_BD,
-         font_lg, "JOIN", COL_JOIN_TXT, radius=10)
+         font_lg, f"{IC_SIGNIN}  JOIN", COL_JOIN_TXT, radius=10)
 
-    # Bottom hint
-    hint = font_sm.render("v0.1  —  UDP  5000", True, (38, 48, 68))
-    screen.blit(hint, (W - hint.get_width() - 12, H - hint.get_height() - 8))
 
 
 # ─── Host sub-screen ──────────────────────────────────────────────────────────
@@ -354,7 +363,7 @@ def _draw_host(screen, font_lg, font_sm,
     pygame.draw.rect(screen, COL_TOPBAR,  panel, border_radius=16)
     pygame.draw.rect(screen, (45, 58, 88), panel, 2, border_radius=16)
 
-    _cx(screen, font_lg, "HOST  YOUR  GAME", CX, 118, COL_TITLE)
+    _cx(screen, font_lg, f"{IC_SERVER}  HOST  YOUR  GAME", CX, 118, COL_TITLE)
 
     pygame.draw.line(screen, (45, 58, 88), (CX - 280, 155), (CX + 280, 155), 1)
 
@@ -375,7 +384,7 @@ def _draw_host(screen, font_lg, font_sm,
     hov = start_r.collidepoint(mx, my)
     _btn(screen, start_r,
          COL_HOST_HOV if hov else COL_HOST, COL_HOST_BD,
-         font_lg, "START WAITING", COL_HOST_TXT, radius=10)
+         font_lg, f"{IC_BOLT}  START WAITING", COL_HOST_TXT, radius=10)
     _cx(screen, font_sm, "or press  Enter", CX, start_r.bottom + 10, (68, 85, 110))
 
     # BACK button
@@ -398,7 +407,7 @@ def _draw_join(screen, font_lg, font_sm,
     pygame.draw.rect(screen, COL_TOPBAR,  panel, border_radius=16)
     pygame.draw.rect(screen, (40, 54, 84), panel, 2, border_radius=16)
 
-    _cx(screen, font_lg, "JOIN  A  GAME", CX, 132, COL_TITLE)
+    _cx(screen, font_lg, f"{IC_SIGNIN}  JOIN  A  GAME", CX, 132, COL_TITLE)
 
     pygame.draw.line(screen, (40, 54, 84), (CX - 260, 168), (CX + 260, 168), 1)
 
@@ -420,7 +429,7 @@ def _draw_join(screen, font_lg, font_sm,
     bg  = (COL_JOIN_HOV if hov else COL_JOIN)   if ip_valid else (22, 27, 40)
     bd  = COL_JOIN_BD                            if ip_valid else (38, 46, 68)
     tc  = COL_JOIN_TXT                           if ip_valid else (58, 68, 88)
-    _btn(screen, conn_r, bg, bd, font_lg, "CONNECT", tc, radius=10)
+    _btn(screen, conn_r, bg, bd, font_lg, f"{IC_SIGNIN}  CONNECT", tc, radius=10)
 
     # BACK button
     hov_b = back_r.collidepoint(mx, my)
