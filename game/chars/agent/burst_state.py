@@ -1,7 +1,7 @@
 import math
 
-BURST_COUNT    = 3
-BURST_INTERVAL = 3   # ticks between shots
+BURST_COUNT    = 1
+BURST_INTERVAL = 3   # ticks between shots (unused for single shot)
 
 
 def activate_burst(state, owner_id: int, aim_x: float, aim_y: float) -> None:

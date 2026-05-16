@@ -9,6 +9,7 @@ from game.input import MAGAZINE_SIZE, RELOAD_TIME_MS
 from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _ws, COL_BULLET as _COL_BULLET_UTILS
 
 from game.chars.agent    import flash_fx
+from game.chars.agent    import burst_bullet_fx
 from game.chars.rambo    import grenade_fx, airstrike_fx
 from game.chars.soldier  import stun_bullet_fx
 from game.chars.rambo.giant_state import get_scale as _giant_get_scale, GROW_TICKS, ACTIVE_TICKS, TOTAL_TICKS
@@ -568,6 +569,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
     # 各 fx 模組清除已消失子彈的追蹤狀態
     shuriken_fx.cleanup(current_bids)
     bubble_fx.cleanup(current_bids)
+    burst_bullet_fx.cleanup(current_bids)
     flash_fx.detect_disappeared(state, now)
     grenade_fx.detect_disappeared(state, now)
     mini_grenade_fx.detect_disappeared(state, now)
@@ -603,8 +605,12 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             elif char_key == "womanGreen":
                 bubble_fx.draw_bullet(screen, bullet, sx, sy, color, now)
             else:
-                _draw_bullet_shape(screen, char_key, color, sx, sy, bullet.aim_angle,
-                                   getattr(bullet, 'bullet_scale', 1.0))
+                bscale = getattr(bullet, 'bullet_scale', 1.0)
+                # Agent burst 子彈（scale > 1）加殘影
+                if char_key == "hitman1" and bscale > 1.0:
+                    burst_bullet_fx.track(bullet)
+                    burst_bullet_fx.draw_trail(screen, bullet, cx, cy, color)
+                _draw_bullet_shape(screen, char_key, color, sx, sy, bullet.aim_angle, bscale)
 
 
 
