@@ -5,6 +5,7 @@ import random
 import pygame
 from game.state import (GameState, MAP_WIDTH, MAP_HEIGHT,
                         PLAYER_RADIUS, BULLET_RADIUS)
+import game.input as _inp
 from game.input import MAGAZINE_SIZE, RELOAD_TIME_MS
 from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _ws, COL_BULLET as _COL_BULLET_UTILS
 
@@ -62,8 +63,10 @@ COL_SKILL_FILL         = ( 25,  25,  38)
 from game.char_data import CHAR_STATS as _CHAR_STATS
 CHAR_DIR: dict = {key: (s['folder'], key) for key, s in _CHAR_STATS.items()}
 
-# 障礙物圖片快取：(kind, w, h) → Surface
+# 障礙物圖片快取：(kind, w, h) → Surface（未旋轉原始縮放圖）
 _sprite_cache: dict = {}
+# 預旋轉障礙物快取：(kind, w, h, angle_deg_int) → Surface
+_rotated_cache: dict = {}
 # 角色圖片快取：(char_key, stance) → Surface（原尺寸 × PLAYER_SPRITE_SCALE）
 _player_cache: dict = {}
 
@@ -332,12 +335,17 @@ def _get_obstacle_sprite(kind: str, w: int, h: int) -> pygame.Surface:
     return _sprite_cache[key]
 
 
+def _get_rotated_obstacle_sprite(kind: str, w: int, h: int, angle_rad: float) -> pygame.Surface:
+    """Return a pre-rotated obstacle sprite, cached by (kind, w, h, angle_deg_int)."""
+    angle_deg = -math.degrees(angle_rad)
+    rkey = (kind, w, h, int(round(angle_deg)))
+    if rkey not in _rotated_cache:
+        _rotated_cache[rkey] = pygame.transform.rotate(_get_obstacle_sprite(kind, w, h), angle_deg)
+    return _rotated_cache[rkey]
+
+
 def _camera(my_player) -> tuple:
     return SCREEN_W // 2 - my_player.x, SCREEN_H // 2 - my_player.y
-
-
-def _ws(wx, wy, cx, cy) -> tuple:
-    return int(wx + cx), int(wy + cy)
 
 
 # ── 主繪圖入口 ────────────────────────────────────────────────────────────────
@@ -444,8 +452,7 @@ def _draw_obstacles(screen, obstacles: dict, destroyed: set, cx, cy):
         if sx < -w or sx > SCREEN_W + w or sy < -h or sy > SCREEN_H + h:
             continue
 
-        sprite  = _get_obstacle_sprite(obs.kind, w, h)
-        rotated = pygame.transform.rotate(sprite, -math.degrees(obs.angle))
+        rotated = _get_rotated_obstacle_sprite(obs.kind, w, h, obs.angle)
         ox, oy  = _shake_offset(oid)
         screen.blit(rotated, (sx - rotated.get_width()  // 2 + ox,
                                sy - rotated.get_height() // 2 + oy))
@@ -477,8 +484,7 @@ def _draw_trees(screen, obstacles: dict, destroyed: set,
         if sx < -w or sx > SCREEN_W + w or sy < -h or sy > SCREEN_H + h:
             continue
 
-        sprite  = _get_obstacle_sprite(obs.kind, w, h)
-        rotated = pygame.transform.rotate(sprite, -math.degrees(obs.angle))
+        rotated = _get_rotated_obstacle_sprite(obs.kind, w, h, obs.angle)
         draw_x  = sx - rotated.get_width()  // 2
         draw_y  = sy - rotated.get_height() // 2
 
@@ -745,7 +751,6 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
 
     if is_reloading:
         # 換彈進度條（從 input 模組的全域取進度）
-        import game.input as _inp
         elapsed  = now - _inp._reload_start_ms
         progress = min(1.0, elapsed / _inp.RELOAD_TIME_MS)
         pygame.draw.rect(screen, (60, 20, 20),
@@ -759,7 +764,6 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
         label = font.render("RELOADING...", True, (255, 90, 90))
     else:
         # 子彈數字
-        import game.input as _inp
         mag   = _inp.MAGAZINE_SIZE
         ammo_display = ammo if mag < 9999 else "∞"
         mag_display  = mag  if mag < 9999 else "∞"
