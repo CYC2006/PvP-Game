@@ -41,7 +41,9 @@ def spawn_grenade(state, owner_id: int, aim_x: float, aim_y: float) -> None:
         if delay == 0:
             state.bullets[bid] = b
         else:
-            state._pending_pellets.append((state.tick + delay, b))
+            import bisect
+            bisect.insort(state._pending_pellets, (state.tick + delay, state._pending_seq, b))
+            state._pending_seq += 1
 
 
 def trigger_grenade_explosion(state, x: float, y: float, owner_id: int) -> None:
