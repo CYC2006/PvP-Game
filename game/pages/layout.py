@@ -46,21 +46,22 @@ COL_INPUT_BD  = ( 72, 132, 212)
 _TB = 68    # top-bar height
 _SW = 170   # sidebar width
 
-# ── Nerd Fonts icons ─────────────────────────────────────────────────────────
-IC_USER       = ''
-IC_COG        = ''
-IC_CART       = ''
-IC_TASKS      = ''
-IC_USERS      = ''
-IC_GAMEPAD    = ''
-IC_FLAG       = ''
-IC_CROSSHAIRS = ''
-IC_BULLSEYE   = ''
-IC_SERVER     = ''
-IC_SIGNIN     = ''
-IC_VOLUME     = ''
-IC_BOLT       = ''
-IC_HOME       = ''
+# ── Nerd Fonts icons (Font Awesome via MapleMono-NF) ─────────────────────────
+# Using explicit Unicode escapes so the codepoints survive any encoding round-trip.
+IC_USER       = ''   # nf-fa-user
+IC_COG        = ''   # nf-fa-cog
+IC_CART       = ''   # nf-fa-shopping-cart
+IC_TASKS      = ''   # nf-fa-tasks
+IC_USERS      = ''   # nf-fa-users
+IC_GAMEPAD    = ''   # nf-fa-gamepad
+IC_FLAG       = ''   # nf-fa-flag
+IC_CROSSHAIRS = ''   # nf-fa-crosshairs
+IC_BULLSEYE   = ''   # nf-fa-bullseye
+IC_SERVER     = ''   # nf-fa-server
+IC_SIGNIN     = ''   # nf-fa-sign-in
+IC_VOLUME     = ''   # nf-fa-volume-up
+IC_BOLT       = ''   # nf-fa-bolt
+IC_HOME       = ''   # nf-fa-home
 
 # ── Tiny draw helpers ─────────────────────────────────────────────────────────
 

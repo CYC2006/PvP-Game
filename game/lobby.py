@@ -33,7 +33,7 @@ _TAB_X    = 10
 _TAB_Y0   = _TB + 18
 _TAB_STEP = _TAB_H + 8
 
-IC_MAP = ''   # nf-fa-map (Nerd Fonts)
+IC_MAP = ''   # nf-fa-map (Nerd Fonts)
 
 SIDEBAR_TABS = [
     ("game",       IC_GAMEPAD, "GAME"),

@@ -14,8 +14,8 @@ from game.pages.layout import LOGICAL_W, LOGICAL_H, _TB, _SW
 from game.charselect import CHARACTERS as _CHAR_LIST, _load_sprite as _cs_load_sprite
 
 # ── Star icons ────────────────────────────────────────────────────────────────
-IC_STAR  = ''   # fa-star  (filled)
-IC_STAR0 = ''   # fa-star-o (empty)
+IC_STAR  = ''   # fa-star  (filled)
+IC_STAR0 = ''   # fa-star-o (empty)
 
 # ── Per-character ratings (ATK, AGI, DEF, UTL) out of 5 ──────────────────────
 _RATINGS: dict = {
