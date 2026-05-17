@@ -600,8 +600,8 @@ class GameState:
             for k in [k for k in self._dot_cooldown if k[0] == bid]:
                 del self._dot_cooldown[k]
 
-    def _spawn_gold_single(self, x: float, y: float) -> None:
-        """掉落 1 顆金錠，位置稍微隨機偏移。"""
+    def _spawn_item(self, x: float, y: float, kind: str) -> None:
+        """掉落 1 個道具（金錠或血包），位置稍微隨機偏移。"""
         angle = random.uniform(0, math.tau)
         dist  = random.uniform(10, 30)
         gid   = self._next_gold_id
@@ -610,20 +610,7 @@ class GameState:
             id=gid,
             x=x + math.cos(angle) * dist,
             y=y + math.sin(angle) * dist,
-            kind="gold",
-        )
-
-    def _spawn_health_pack(self, x: float, y: float) -> None:
-        """掉落 1 個血包，位置稍微隨機偏移。"""
-        angle = random.uniform(0, math.tau)
-        dist  = random.uniform(10, 30)
-        gid   = self._next_gold_id
-        self._next_gold_id = (self._next_gold_id + 1) % 256
-        self.gold_ingots[gid] = GoldIngot(
-            id=gid,
-            x=x + math.cos(angle) * dist,
-            y=y + math.sin(angle) * dist,
-            kind="health",
+            kind=kind,
         )
 
     def _spawn_gold(self, x: float, y: float) -> None:
