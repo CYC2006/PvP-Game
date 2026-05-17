@@ -114,7 +114,9 @@ _SKILLS: dict = {
          "upon arrival that strikes any enemy caught in the sweep."),
     ],
     'womanGreen': [
-        ("—", "RMB",   0, "Skill under development."),
+        ("POISON POOL", "RMB", 9,
+         "Fires a toxic projectile that splashes on contact, creating a poison zone. "
+         "Enemies caught inside take continuous damage and move 20% slower."),
         ("—", "SPACE", 0, "Skill under development."),
         ("—", "E",     0, "Skill under development."),
         ("—", "R",     0, "Skill under development."),

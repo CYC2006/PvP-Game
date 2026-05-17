@@ -203,7 +203,9 @@ class GameState:
     _next_smoke_id: int      = 0
     _next_blade_id: int      = 0
     _dot_cooldown: dict      = field(default_factory=dict)   # {(bid, pid): next_hit_tick}
-    _pending_pellets: list   = field(default_factory=list)   # [(fire_tick, Bullet)]
+    _dot_keys_by_bid: dict   = field(default_factory=dict)   # bid → set of (bid,*) keys in _dot_cooldown
+    _pending_pellets: list   = field(default_factory=list)   # sorted [(fire_tick, seq, Bullet)], earliest first
+    _pending_seq: int        = 0                             # monotonic counter breaks fire_tick ties
     smoke_patches: dict      = field(default_factory=dict)   # sid → SmokePatch
     blade_arcs: dict         = field(default_factory=dict)   # bid → BladeArc
     _blade_spawn_queue: list = field(default_factory=list)   # [(spawn_tick, owner_id, x, y, radius, orbit_angle, direction, damage)]
@@ -392,24 +394,22 @@ class GameState:
                 ),
                 bullet_scale=_bscale,
             )
-            # pellet_interval > 0：第一顆立即發射，其餘排進待發佇列
+            # pellet_interval > 0：第一顆立即發射，其餘依 fire_tick 升序插入佇列
             if player.pellet_interval > 0 and pellet_i > 0:
                 fire_tick = self.tick + pellet_i * player.pellet_interval
-                self._pending_pellets.append((fire_tick, bullet))
+                import bisect
+                bisect.insort(self._pending_pellets, (fire_tick, self._pending_seq, bullet))
+                self._pending_seq += 1
             else:
                 self.bullets[bid] = bullet
 
     def step_pending_pellets(self) -> None:
-        """將佇列中到達發射時間的散彈加入戰場。"""
-        if not self._pending_pellets:
-            return
-        remaining = []
-        for fire_tick, bullet in self._pending_pellets:
-            if self.tick >= fire_tick:
-                self.bullets[bullet.id] = bullet
-            else:
-                remaining.append((fire_tick, bullet))
-        self._pending_pellets = remaining
+        """將佇列中到達發射時間的散彈加入戰場。
+        _pending_pellets 保持依 fire_tick 升序排列，break 提前結束。
+        """
+        while self._pending_pellets and self._pending_pellets[0][0] <= self.tick:
+            _, _seq, bullet = self._pending_pellets.pop(0)
+            self.bullets[bullet.id] = bullet
 
     @staticmethod
     def _roll_damage(shooter) -> int:
@@ -485,6 +485,7 @@ class GameState:
                             if player.hp <= 0:
                                 player.respawn()
                             self._dot_cooldown[key] = self.tick + bullet.dot_interval
+                            self._dot_keys_by_bid.setdefault(bid, set()).add(key)
             elif does_damage:
                 # 一般子彈：碰到玩家即消失
                 for pid, player in self.players.items():
@@ -546,6 +547,7 @@ class GameState:
                                     self.destroyed_obstacles.add(oid)
                                     self._handle_obstacle_drop(obs)
                                 self._dot_cooldown[key] = self.tick + bullet.dot_interval
+                                self._dot_keys_by_bid.setdefault(bid, set()).add(key)
                         break   # 只對第一個相交的障礙物作用
                     else:
                         # 一般子彈：碰到障礙物即消失，可能破壞
@@ -596,8 +598,8 @@ class GameState:
             if b and b.bullet_type == 8 and b.distance_travelled < b.max_range:
                 self._create_poison_pool(b.x, b.y, b.owner_id)
             self.bullets.pop(bid, None)
-            for k in [k for k in self._dot_cooldown if k[0] == bid]:
-                del self._dot_cooldown[k]
+            for k in self._dot_keys_by_bid.pop(bid, ()):
+                self._dot_cooldown.pop(k, None)
 
     def _spawn_item(self, x: float, y: float, kind: str) -> None:
         """掉落 1 個道具（金錠或血包），位置稍微隨機偏移。"""
