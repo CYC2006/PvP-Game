@@ -50,6 +50,8 @@ class Player:
     burst_aim_y: float         = 0.0
     giant_tick: int            = -1   # tick when giant mode started (-1 = inactive)
     speed_penalty: float       = 1.0  # 通用速度懲罰倍率（由角色技能模組每 tick 設定，預設 1.0 = 無懲罰）
+    kb_vx: float               = 0.0  # 擊退速度 x（px/tick，每 tick 衰減）
+    kb_vy: float               = 0.0  # 擊退速度 y
     # ── survivor1 R 技能狀態 ──────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -123,6 +125,16 @@ class PoisonPool:
     y:          float
     spawn_tick: int
     radius:     float = 300.0
+
+
+@dataclass
+class PushZone:
+    id:         int
+    owner_id:   int
+    x:          float
+    y:          float
+    angle:      float   # 朝滑鼠方向的角度（degrees，math 座標系）
+    spawn_tick: int
 
 
 @dataclass
@@ -217,6 +229,8 @@ class GameState:
     _next_mine_id: int       = 0
     poison_pools: dict       = field(default_factory=dict)   # ppid → PoisonPool
     _next_pool_id: int       = 0
+    push_zones: dict         = field(default_factory=dict)   # pzid → PushZone
+    _next_push_zone_id: int  = 0
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -378,6 +392,7 @@ class GameState:
                 pellet_range = player.bullet_range * _bscale
             bid = self._next_bullet_id
             self._next_bullet_id = (self._next_bullet_id + 1) % 256
+            _btype = 9 if player.char_key == 'robot1' else 0
             bullet = Bullet(
                 id=bid, owner_id=owner_id,
                 x=spawn_x, y=spawn_y,
@@ -393,6 +408,7 @@ class GameState:
                     if player.dot_interval > 0 else 0.0
                 ),
                 bullet_scale=_bscale,
+                bullet_type=_btype,
             )
             # pellet_interval > 0：第一顆立即發射，其餘依 fire_tick 升序插入佇列
             if player.pellet_interval > 0 and pellet_i > 0:
@@ -728,6 +744,33 @@ class GameState:
     def step_mines(self) -> None:
         from game.chars.bear.mine_state import step_mines
         step_mines(self)
+
+    def step_knockback(self) -> None:
+        """每 tick 執行：套用並衰減所有玩家的擊退速度（kb_vx / kb_vy）。
+        暈眩期間玩家無法自主移動，但擊退位移照常執行。
+        邊界碰撞由 MAP 邊框 clamp 處理，障礙物碰撞由 resolve_player_collisions 處理。
+        """
+        for player in self.players.values():
+            if player.kb_vx == 0.0 and player.kb_vy == 0.0:
+                continue
+            player.x = max(PLAYER_RADIUS, min(MAP_WIDTH  - PLAYER_RADIUS,
+                                              player.x + player.kb_vx))
+            player.y = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS,
+                                              player.y + player.kb_vy))
+            player.kb_vx *= 0.78
+            player.kb_vy *= 0.78
+            if abs(player.kb_vx) < 0.3:
+                player.kb_vx = 0.0
+            if abs(player.kb_vy) < 0.3:
+                player.kb_vy = 0.0
+
+    def _activate_push_zone(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.robot.push_state import activate_push
+        activate_push(self, owner_id, aim_x, aim_y)
+
+    def step_push_zones(self) -> None:
+        from game.chars.robot.push_state import step_push_zones
+        step_push_zones(self)
 
     def _spawn_stun_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.soldier.stun_bullet_state import spawn_stun_bullet

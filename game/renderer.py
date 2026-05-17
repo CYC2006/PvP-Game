@@ -21,6 +21,7 @@ from game.chars.dancer   import bubble_fx
 from game.chars.dancer   import poison_pool_fx
 from game.chars.bear     import explosion_bullet_fx
 from game.chars.bear     import mine_fx as bear_mine_fx
+from game.chars.robot    import push_fx as robot_push_fx
 
 # colours
 COL_BG         = (30,  30,  30)
@@ -409,6 +410,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     bear_mine_fx.draw_explosions(screen, cx, cy)
     poison_pool_fx.update(state)
     poison_pool_fx.draw(screen, state, cx, cy)
+    robot_push_fx.draw(screen, state, my_id, cx, cy)
     airstrike_fx.update(state)
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
@@ -602,7 +604,15 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
-            if btype == 8:   # 毒液彈：綠色圓點
+            if btype == 9:   # Laser：黃色線狀矩形
+                a = math.radians(bullet.aim_angle)
+                hw, hl = 2, 10   # half-width / half-length（像素）
+                pts = [(-hl, -hw), (hl, -hw), (hl, hw), (-hl, hw)]
+                rotated = [(sx + int(px * math.cos(a) - py * math.sin(a)),
+                            sy + int(px * math.sin(a) + py * math.cos(a)))
+                           for px, py in pts]
+                pygame.draw.polygon(screen, (255, 240, 80), rotated)
+            elif btype == 8:   # 毒液彈：綠色圓點
                 pygame.draw.circle(screen, (60, 200, 60),  (sx, sy), 9)
                 pygame.draw.circle(screen, (150, 255, 150),(sx, sy), 4)
             elif btype == 7:   # 爆炸彈：橙色圓點

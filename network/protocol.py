@@ -1,6 +1,6 @@
 import struct
 from game.command import PlayerCommand
-from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool
+from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool, PushZone
 
 # --- Packet types ---
 PKT_JOIN        = 0x01
@@ -32,6 +32,7 @@ _AIRSTRIKE_ENTRY  = struct.Struct("!BhhBB")    # id cx_i16 cy_i16 age(u8) owner_
 _LOG_BARRIER_ENTRY = struct.Struct("!BhhBB")  # id x_i16 y_i16 hp(u8) owner_id
 _MINE_ENTRY        = struct.Struct("!BhhHB")  # id x_i16 y_i16 triggered_age_u16(65535=idle) owner_id
 _POOL_ENTRY        = struct.Struct("!BhhHB")  # id x_i16 y_i16 age_u16 owner_id
+_PUSH_ENTRY        = struct.Struct("!BhhHhB") # id x_i16 y_i16 age_u16 angle_i16 owner_id
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -171,7 +172,16 @@ def pack_state(state: GameState) -> bytes:
         for p in pool_list
     )
 
-    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data
+    push_list = list(state.push_zones.values())
+    push_data = bytes([len(push_list)]) + b"".join(
+        _PUSH_ENTRY.pack(pz.id, int(pz.x), int(pz.y),
+                         min(65534, state.tick - pz.spawn_tick),
+                         int(pz.angle) % 360 - (360 if int(pz.angle) % 360 > 180 else 0),
+                         pz.owner_id)
+        for pz in push_list
+    )
+
+    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -276,6 +286,19 @@ def unpack_state(data: bytes) -> GameState:
                             spawn_tick=state.tick - page)
             state.poison_pools[ppid] = pp
             offset += _POOL_ENTRY.size
+
+    if offset < len(data):
+        push_count = data[offset]; offset += 1
+        for _ in range(push_count):
+            pzid, pzx, pzy, pzage, pzangle, pzowner = _PUSH_ENTRY.unpack(
+                data[offset: offset + _PUSH_ENTRY.size])
+            state.push_zones[pzid] = PushZone(
+                id=pzid, owner_id=pzowner,
+                x=float(pzx), y=float(pzy),
+                angle=float(pzangle),
+                spawn_tick=state.tick - pzage,
+            )
+            offset += _PUSH_ENTRY.size
 
     return state
 

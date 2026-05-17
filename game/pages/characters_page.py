@@ -89,7 +89,10 @@ _SKILLS: dict = {
         ("—", "RMB",   0, "Skill under development."),
         ("—", "SPACE", 0, "Skill under development."),
         ("—", "E",     0, "Skill under development."),
-        ("—", "R",     0, "Skill under development."),
+        ("PUSH ZONE", "R", 5,
+         "Projects a 160×100 px force field toward the cursor. "
+         "Enemies caught inside are launched away and stunned for 1 second. "
+         "Only you see the targeting rectangle before it fires."),
     ],
     'soldier1': [
         ("STUN ROUND",    "RMB",   6,
