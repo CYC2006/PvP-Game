@@ -11,6 +11,36 @@ from network.protocol import (
 )
 
 
+# ── 技能 dispatch 表（char_key → callable(state, pid, aim_x, aim_y)）────────
+# 新增角色時只需在對應欄位加一行，不用改動 run() 本體
+_SKILL_E: dict = {
+    'hitman1':  lambda s, pid, ax, ay: s._spawn_flash_grenade(pid, ax, ay),
+    'manBlue':  lambda s, pid, ax, ay: s._spawn_grenade(pid, ax, ay),
+    'survivor1': lambda s, pid, ax, ay: s._spawn_smoke_grenade(pid, ax, ay),
+    'manOld':   lambda s, pid, ax, ay: s._activate_log_barriers(pid, ax, ay),
+    'manBrown': lambda s, pid, ax, ay: s._place_mine(pid),
+}
+
+_SKILL_RMB: dict = {
+    'hitman1':   lambda s, pid, ax, ay: s._activate_burst(pid, ax, ay),
+    'survivor1': lambda s, pid, ax, ay: s._spawn_shuriken(pid, ax, ay),
+    'manBlue':   lambda s, pid, ax, ay: s._activate_airstrike(pid, ax, ay),
+    'soldier1':  lambda s, pid, ax, ay: s._spawn_stun_bullet(pid, ax, ay),
+    'manBrown':  lambda s, pid, ax, ay: s._spawn_explosion_bullet(pid, ax, ay),
+    'womanGreen': lambda s, pid, ax, ay: s._spawn_pool_bullet(pid, ax, ay),
+}
+
+_SKILL_SPACE: dict = {
+    'survivor1': lambda s, pid, ax, ay: s._activate_speed_boost(pid),
+    'manOld':    lambda s, pid, ax, ay: s._spawn_mini_grenades(pid),
+}
+
+_SKILL_R: dict = {
+    'survivor1': lambda s, pid, ax, ay: s._activate_r_skill(pid, ax, ay),
+    'manBlue':   lambda s, pid, ax, ay: s._activate_giant(pid),
+}
+
+
 HOST        = "0.0.0.0"
 PORT        = 5000
 TICK_RATE   = 60
@@ -128,57 +158,29 @@ def run():
             elif ptype == PKT_CMD:
                 if addr in addr_to_id and game_started:
                     cmd = unpack_command(data)
-                    # 技能觸發（依角色 char_key 判斷）
+                    # 技能觸發（依 dispatch 表查角色 char_key）
                     p        = state.players.get(cmd.player_id)
                     r_active = p and p.r_skill_phase > 0
-                    if not r_active:
+                    if p and not r_active:
+                        pid, ax, ay = cmd.player_id, cmd.aim_x, cmd.aim_y
                         if cmd.use_skill_e:
-                            if p and p.char_key == 'hitman1':
-                                state._spawn_flash_grenade(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
-                            elif p and p.char_key == 'manBlue':
-                                state._spawn_grenade(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
-                            elif p and p.char_key == 'survivor1':
-                                state._spawn_smoke_grenade(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
-                            elif p and p.char_key == 'manOld':
-                                state._activate_log_barriers(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
-                            elif p and p.char_key == 'manBrown':
-                                state._place_mine(cmd.player_id)
-                        _bursting = p and p.burst_next_tick >= 0
+                            fn = _SKILL_E.get(p.char_key)
+                            if fn:
+                                fn(state, pid, ax, ay)
+                        _bursting = p.burst_next_tick >= 0
                         if cmd.use_skill_rmb:
-                            if p and p.char_key == 'hitman1':
-                                state._activate_burst(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
-                            elif p and p.char_key == 'survivor1':
-                                state._spawn_shuriken(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
-                            elif p and p.char_key == 'manBlue':
-                                state._activate_airstrike(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
-                            elif p and p.char_key == 'soldier1':
-                                state._spawn_stun_bullet(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
-                            elif p and p.char_key == 'manBrown':
-                                state._spawn_explosion_bullet(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
-                            elif p and p.char_key == 'womanGreen':
-                                state._spawn_pool_bullet(
-                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
+                            fn = _SKILL_RMB.get(p.char_key)
+                            if fn:
+                                fn(state, pid, ax, ay)
                         if not _bursting:
                             if cmd.use_skill_space:
-                                if p and p.char_key == 'survivor1':
-                                    state._activate_speed_boost(cmd.player_id)
-                                elif p and p.char_key == 'manOld':
-                                    state._spawn_mini_grenades(cmd.player_id)
+                                fn = _SKILL_SPACE.get(p.char_key)
+                                if fn:
+                                    fn(state, pid, ax, ay)
                             if cmd.use_skill_r:
-                                if p and p.char_key == 'survivor1':
-                                    state._activate_r_skill(
-                                        cmd.player_id, cmd.aim_x, cmd.aim_y)
-                                elif p and p.char_key == 'manBlue':
-                                    state._activate_giant(cmd.player_id)
+                                fn = _SKILL_R.get(p.char_key)
+                                if fn:
+                                    fn(state, pid, ax, ay)
                     state.apply_command(
                         cmd.player_id,
                         cmd.move_x, cmd.move_y,
