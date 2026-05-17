@@ -298,7 +298,7 @@ class GameState:
         if math.hypot(aim_x, aim_y) > 0:
             player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
         if shooting:
-            if player.char_key == 'zoimbie1':
+            if player.char_key == 'zombie1':
                 self._activate_blade_arc(player_id, aim_x, aim_y)
             else:
                 self._spawn_bullet(player_id, aim_x, aim_y)
