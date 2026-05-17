@@ -1,6 +1,6 @@
 import math
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 OBSTACLE_CONFIG: dict = {
     "box_normal":  {"width": 64, "height": 64, "hp": 60,  "shape": "obb", "destructible": True},
@@ -33,27 +33,29 @@ class Obstacle:
     radius_ratio: float = HITBOX_RATIO  # circle shape 用：碰撞半徑 = (width/2)*ratio
     solid:        bool  = True        # False → 玩家/子彈穿透，繪製於最頂層（樹/草叢）
 
-    # ── circle shape 用的碰撞半徑 ────────────────────────────────
-    @property
-    def _collision_radius(self) -> float:
-        return (self.width / 2) * self.radius_ratio
+    # 預計算不變量（angle/width/height 在 load 後不再改變）
+    _collision_radius: float = field(init=False, repr=False)
+    _hw: float               = field(init=False, repr=False)
+    _hh: float               = field(init=False, repr=False)
+    _cos_neg: float          = field(init=False, repr=False)  # cos(-angle)
+    _sin_neg: float          = field(init=False, repr=False)  # sin(-angle)
+    _cos_pos: float          = field(init=False, repr=False)  # cos(angle)
+    _sin_pos: float          = field(init=False, repr=False)  # sin(angle)
 
-    # ── OBB 半邊長 ───────────────────────────────────────────────
-    @property
-    def _hw(self) -> float:
-        return self.width  * HITBOX_RATIO / 2
-
-    @property
-    def _hh(self) -> float:
-        return self.height * HITBOX_RATIO / 2
+    def __post_init__(self) -> None:
+        self._collision_radius = (self.width / 2) * self.radius_ratio
+        self._hw      = self.width  * HITBOX_RATIO / 2
+        self._hh      = self.height * HITBOX_RATIO / 2
+        self._cos_neg = math.cos(-self.angle)
+        self._sin_neg = math.sin(-self.angle)
+        self._cos_pos = math.cos(self.angle)
+        self._sin_pos = math.sin(self.angle)
 
     # ── 世界座標 → OBB 本地座標 ───────────────────────────────────
     def _to_local(self, cx: float, cy: float):
         dx = cx - self.x
         dy = cy - self.y
-        c  = math.cos(-self.angle)
-        s  = math.sin(-self.angle)
-        return dx * c - dy * s, dx * s + dy * c
+        return dx * self._cos_neg - dy * self._sin_neg, dx * self._sin_neg + dy * self._cos_neg
 
     # ── 碰撞偵測 ─────────────────────────────────────────────────
     def collides_circle(self, cx: float, cy: float, radius: float) -> bool:
@@ -107,11 +109,9 @@ class Obstacle:
             push_lx  = (diff_x / dist) * overlap
             push_ly  = (diff_y / dist) * overlap
 
-        c = math.cos(self.angle)
-        s = math.sin(self.angle)
         return (
-            cx + push_lx * c - push_ly * s,
-            cy + push_lx * s + push_ly * c,
+            cx + push_lx * self._cos_pos - push_ly * self._sin_pos,
+            cy + push_lx * self._sin_pos + push_ly * self._cos_pos,
         )
 
 
