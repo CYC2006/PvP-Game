@@ -72,7 +72,7 @@ def draw(screen, state, cx: float, cy: float) -> None:
                     by = sy + int(ly - spd * elapsed)
                     alpha = int(160 * fade * (1.0 - t))
                     br_int = max(1, int(br * (1.0 - t * 0.3)))
-                    if -br_int <= bx - sx <= r + br_int:
+                    if abs(bx - sx) <= r + br_int and abs(by - sy) <= r + br_int:
                         bsurf = pygame.Surface((br_int * 2 + 2, br_int * 2 + 2), pygame.SRCALPHA)
                         pygame.draw.circle(bsurf, (100, 230, 100, alpha),
                                            (br_int + 1, br_int + 1), br_int, 2)
