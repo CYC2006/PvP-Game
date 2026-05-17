@@ -69,6 +69,12 @@ _sprite_cache: dict = {}
 _rotated_cache: dict = {}
 # 角色圖片快取：(char_key, stance) → Surface（原尺寸 × PLAYER_SPRITE_SCALE）
 _player_cache: dict = {}
+# 靜態地圖底層（背景 + 網格），在 pygame 初始化後第一次 draw() 時建立
+_map_surface: "pygame.Surface | None" = None
+# skill HUD 圓形背景 Surface（固定大小，建立一次重複使用）
+_skill_bg_surf: "pygame.Surface | None" = None
+# skill HUD 冷卻扇形 Surface（固定大小，每幀 fill 清空後重繪，省掉 allocation）
+_skill_pie_surf: "pygame.Surface | None" = None
 
 # ── 障礙物被擊中震動 ──────────────────────────────────────────────
 # {oid: (expiry, duration)}  ← perf_counter 時間戳 + 本次持續秒數
@@ -415,25 +421,25 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
 
 # ── 地圖底層 ──────────────────────────────────────────────────────────────────
 
-def _draw_map(screen, cx, cy):
-    map_rect = pygame.Rect(int(cx), int(cy), MAP_WIDTH, MAP_HEIGHT)
-    pygame.draw.rect(screen, COL_MAP_BG, map_rect)
-
+def _build_map_surface() -> "pygame.Surface":
+    """預渲染整張地圖底層（背景色 + 網格線 + 邊框）到 MAP_WIDTH×MAP_HEIGHT Surface。
+    建立一次，每幀只做一次 blit。
+    """
+    surf = pygame.Surface((MAP_WIDTH, MAP_HEIGHT))
+    surf.fill(COL_MAP_BG)
     for x in range(0, MAP_WIDTH + 1, GRID_SIZE):
-        sx, _ = _ws(x, 0, cx, cy)
-        if 0 <= sx <= SCREEN_W:
-            pygame.draw.line(screen, COL_GRID,
-                             (sx, max(0, int(cy))),
-                             (sx, min(SCREEN_H, int(cy + MAP_HEIGHT))))
-
+        pygame.draw.line(surf, COL_GRID, (x, 0), (x, MAP_HEIGHT))
     for y in range(0, MAP_HEIGHT + 1, GRID_SIZE):
-        _, sy = _ws(0, y, cx, cy)
-        if 0 <= sy <= SCREEN_H:
-            pygame.draw.line(screen, COL_GRID,
-                             (max(0, int(cx)), sy),
-                             (min(SCREEN_W, int(cx + MAP_WIDTH)), sy))
+        pygame.draw.line(surf, COL_GRID, (0, y), (MAP_WIDTH, y))
+    pygame.draw.rect(surf, COL_MAP_BORDER, surf.get_rect(), 2)
+    return surf
 
-    pygame.draw.rect(screen, COL_MAP_BORDER, map_rect, 2)
+
+def _draw_map(screen, cx, cy):
+    global _map_surface
+    if _map_surface is None:
+        _map_surface = _build_map_surface()
+    screen.blit(_map_surface, (int(cx), int(cy)))
 
 
 # ── 障礙物 ────────────────────────────────────────────────────────────────────
@@ -798,11 +804,13 @@ def _draw_skill_hud(screen, font, skill_cooldowns: dict) -> None:
             secs       = remaining_ms / 1000.0
             text       = f"{secs:.0f}" if secs >= 1.0 else f"{secs:.1f}"
 
-        # ── 背景填充 ──────────────────────────────────────────────
-        surf = pygame.Surface((SKILL_CIRCLE_R * 2, SKILL_CIRCLE_R * 2), pygame.SRCALPHA)
-        pygame.draw.circle(surf, (*COL_SKILL_FILL, 200),
-                           (SKILL_CIRCLE_R, SKILL_CIRCLE_R), SKILL_CIRCLE_R)
-        screen.blit(surf, (cx - SKILL_CIRCLE_R, cy - SKILL_CIRCLE_R))
+        # ── 背景填充（使用預建 Surface，省掉每幀 allocation）──────
+        global _skill_bg_surf
+        if _skill_bg_surf is None:
+            _skill_bg_surf = pygame.Surface((SKILL_CIRCLE_R * 2, SKILL_CIRCLE_R * 2), pygame.SRCALPHA)
+            pygame.draw.circle(_skill_bg_surf, (*COL_SKILL_FILL, 200),
+                               (SKILL_CIRCLE_R, SKILL_CIRCLE_R), SKILL_CIRCLE_R)
+        screen.blit(_skill_bg_surf, (cx - SKILL_CIRCLE_R, cy - SKILL_CIRCLE_R))
 
         # ── 冷卻覆蓋（暗色扇形）────────────────────────────────────
         if 0 < remaining_ms and max_ms > 0:
@@ -815,12 +823,16 @@ def _draw_skill_hud(screen, font, skill_cooldowns: dict) -> None:
                 a = start_a + sweep * j / steps
                 pts.append((cx + SKILL_CIRCLE_R * math.cos(a),
                              cy + SKILL_CIRCLE_R * math.sin(a)))
-            pie = pygame.Surface((SKILL_CIRCLE_R * 2 + 2, SKILL_CIRCLE_R * 2 + 2),
-                                  pygame.SRCALPHA)
+            # 重複使用預配置 pie Surface（fill 清空後重繪，省掉每幀 allocation）
+            global _skill_pie_surf
+            if _skill_pie_surf is None:
+                _skill_pie_surf = pygame.Surface(
+                    (SKILL_CIRCLE_R * 2 + 2, SKILL_CIRCLE_R * 2 + 2), pygame.SRCALPHA)
+            _skill_pie_surf.fill((0, 0, 0, 0))
             lpts = [(x - cx + SKILL_CIRCLE_R + 1, y - cy + SKILL_CIRCLE_R + 1)
                     for x, y in pts]
-            pygame.draw.polygon(pie, (10, 10, 20, 180), lpts)
-            screen.blit(pie, (cx - SKILL_CIRCLE_R - 1, cy - SKILL_CIRCLE_R - 1))
+            pygame.draw.polygon(_skill_pie_surf, (10, 10, 20, 180), lpts)
+            screen.blit(_skill_pie_surf, (cx - SKILL_CIRCLE_R - 1, cy - SKILL_CIRCLE_R - 1))
 
         # ── 外框 ──────────────────────────────────────────────────
         pygame.draw.circle(screen, border_col, (cx, cy), SKILL_CIRCLE_R, 2)
