@@ -4,8 +4,8 @@ import random
 import pygame
 from game.render_utils import ws, SCREEN_W, SCREEN_H
 
-POOL_RADIUS    = 300.0
-POOL_TICKS     = 600
+POOL_RADIUS    = 150.0
+POOL_TICKS     = 300
 BUBBLE_INTERVAL = 0.08   # 秒，生成新泡泡的最短間隔
 
 # pool_id → {'last_bubble_t': float, 'bubbles': list[(lx, ly, r, birth_t, lifetime, speed_y)]}

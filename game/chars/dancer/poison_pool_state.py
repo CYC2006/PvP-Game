@@ -2,8 +2,8 @@ import math
 import random
 from game.state import Bullet, PoisonPool, PLAYER_RADIUS
 
-POOL_RADIUS         = 300.0
-POOL_TICKS          = 600    # 10s
+POOL_RADIUS         = 150.0
+POOL_TICKS          = 300    # 5s
 DOT_INTERVAL        = 30     # 每 0.5s
 DOT_MIN             = 3
 DOT_MAX             = 5
@@ -46,9 +46,9 @@ def create_poison_pool(state, x: float, y: float, owner_id: int) -> None:
 
 
 def step_poison_pools(state) -> None:
-    # 重置所有玩家的毒液狀態
+    # 每 tick 開始先重置所有玩家的速度懲罰（由本模組負責管理）
     for player in state.players.values():
-        player.in_poison = False
+        player.speed_penalty = 1.0
 
     to_remove = []
     for ppid, pool in state.poison_pools.items():
@@ -62,7 +62,7 @@ def step_poison_pools(state) -> None:
         if opp:
             dist = math.hypot(opp.x - pool.x, opp.y - pool.y)
             if dist <= POOL_RADIUS:
-                opp.in_poison = True
+                opp.speed_penalty = 0.8   # 毒液慢速 20%
                 if age > 0 and age % DOT_INTERVAL == 0:
                     dmg = random.randint(DOT_MIN, DOT_MAX)
                     if opp.giant_tick >= 0:

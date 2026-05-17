@@ -49,7 +49,7 @@ class Player:
     burst_aim_x: float         = 0.0  # locked aim direction for burst
     burst_aim_y: float         = 0.0
     giant_tick: int            = -1   # tick when giant mode started (-1 = inactive)
-    in_poison: bool            = False # 本 tick 是否在毒液區域內（server-side only）
+    speed_penalty: float       = 1.0  # 通用速度懲罰倍率（由角色技能模組每 tick 設定，預設 1.0 = 無懲罰）
     # ── survivor1 R 技能狀態 ──────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -303,9 +303,8 @@ class GameState:
             _ga = self.tick - player.giant_tick
             if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
                 mult *= 1.5
-        # 毒液區域：移速 ×0.8（與速度提升疊加：1.2×0.8=0.96）
-        if player.in_poison:
-            mult *= 0.8
+        # 通用速度懲罰（由技能模組設定，如毒液區域 0.8）
+        mult *= player.speed_penalty
         player.move(dx, dy, speed_mult=mult)
         player.stance = stance
         # 連射期間：禁止普攻（避免與連射子彈重疊）
