@@ -72,17 +72,53 @@ def _fetch_public_ip(result: list) -> None:
 
 # ── Persistent chrome ─────────────────────────────────────────────────────────
 
-def _draw_topbar(screen, font_lg, font_sm, sfx_r, set_r, mx, my):
+def _draw_topbar(screen, font_lg, font_sm, sfx_r, set_r, mx, my,
+                 gold: int = 0, gems: int = 0):
     pygame.draw.line(screen, COL_SEP, (0, _TB), (LOGICAL_W, _TB), 1)
 
-    pl_r = pygame.Rect(18, 10, 235, 48)
+    # ── Player name container ──────────────────────────────────────────────
+    pl_r = pygame.Rect(18, 10, 178, 48)
     pygame.draw.rect(screen, COL_PL_BG, pl_r, border_radius=8)
     pygame.draw.rect(screen, COL_PL_BD, pl_r, 2, border_radius=8)
-    screen.blit(font_lg.render(f"{IC_USER}  PLAYER_001", True, COL_PL_NAME),
-                (pl_r.x + 12, pl_r.y + 5))
-    screen.blit(font_sm.render(f"{IC_BOLT}  Lv. 1", True, COL_LEVEL),
-                (pl_r.x + 12, pl_r.y + 27))
+    ns = font_lg.render(f"{IC_USER}  PLAYER_001", True, COL_PL_NAME)
+    screen.blit(ns, (pl_r.x + 10, pl_r.centery - ns.get_height() // 2))
 
+    # ── Level badge (right of name) ────────────────────────────────────────
+    lv_r = pygame.Rect(pl_r.right + 8, 10, 74, 48)
+    pygame.draw.rect(screen, COL_PL_BG, lv_r, border_radius=8)
+    pygame.draw.rect(screen, COL_PL_BD, lv_r, 2, border_radius=8)
+    lv_s = font_sm.render(f"{IC_BOLT}  Lv. 1", True, COL_LEVEL)
+    screen.blit(lv_s, (lv_r.centerx - lv_s.get_width() // 2,
+                        lv_r.centery - lv_s.get_height() // 2))
+
+    # ── Gold ingot counter ─────────────────────────────────────────────────
+    gd_r = pygame.Rect(lv_r.right + 10, 10, 96, 48)
+    pygame.draw.rect(screen, COL_PL_BG, gd_r, border_radius=8)
+    pygame.draw.rect(screen, (75, 62, 22), gd_r, 2, border_radius=8)
+    # Gold ingot icon (small yellow bar)
+    ix, iy = gd_r.x + 10, gd_r.centery - 6
+    pygame.draw.rect(screen, (175, 128, 25), (ix,     iy,     20, 12), border_radius=3)
+    pygame.draw.rect(screen, (235, 190, 55), (ix + 3, iy + 2, 14,  5), border_radius=2)
+    gv_s = font_lg.render(str(gold), True, (220, 178, 60))
+    gl_s = font_sm.render("GOLD", True, (110, 88, 28))
+    screen.blit(gl_s, (ix + 26, gd_r.centery - gv_s.get_height() // 2 - 1))
+    screen.blit(gv_s, (ix + 26 + gl_s.get_width() + 5, gd_r.centery - gv_s.get_height() // 2))
+
+    # ── Gem counter ────────────────────────────────────────────────────────
+    gm_r = pygame.Rect(gd_r.right + 8, 10, 96, 48)
+    pygame.draw.rect(screen, COL_PL_BG, gm_r, border_radius=8)
+    pygame.draw.rect(screen, (22, 72, 48), gm_r, 2, border_radius=8)
+    # Gem icon (green diamond)
+    gx2, gy2 = gm_r.x + 18, gm_r.centery
+    gem_pts = [(gx2, gy2 - 8), (gx2 + 7, gy2), (gx2, gy2 + 8), (gx2 - 7, gy2)]
+    pygame.draw.polygon(screen, (42, 165, 100), gem_pts)
+    pygame.draw.polygon(screen, (80, 220, 148), gem_pts, 1)
+    gmv_s = font_lg.render(str(gems), True, (80, 210, 135))
+    gml_s = font_sm.render("GEMS", True, (28, 100, 62))
+    screen.blit(gml_s, (gx2 + 14, gm_r.centery - gmv_s.get_height() // 2 - 1))
+    screen.blit(gmv_s, (gx2 + 14 + gml_s.get_width() + 5, gm_r.centery - gmv_s.get_height() // 2))
+
+    # ── SFX / Settings buttons ─────────────────────────────────────────────
     for r, icon in ((sfx_r, IC_VOLUME), (set_r, IC_COG)):
         bg = COL_BTN_HOV if r.collidepoint(mx, my) else COL_BTN
         btn(screen, r, bg, COL_BTN_BD, font_lg, icon, COL_BTN_TXT, radius=8)
@@ -115,8 +151,7 @@ def _draw_sidebar(screen, font_lg, font_sm, page, mx, my):
 
         ic_s = font_sm.render(icon, True, tc)
         nm_s = font_sm.render(lbl,  True, tc)
-        total_w = ic_s.get_width() + 8 + nm_s.get_width()
-        bx = r.centerx - total_w // 2
+        bx   = r.x + 14   # left-aligned with padding
         screen.blit(ic_s, (bx, r.centery - ic_s.get_height() // 2))
         screen.blit(nm_s, (bx + ic_s.get_width() + 8,
                             r.centery - nm_s.get_height() // 2))
