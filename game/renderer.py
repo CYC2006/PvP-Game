@@ -17,6 +17,7 @@ from game.chars.sniper   import mini_grenade_fx
 from game.chars.zombie   import blade_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
 from game.chars.dancer   import bubble_fx
+from game.chars.dancer   import poison_pool_fx
 from game.chars.bear     import explosion_bullet_fx
 from game.chars.bear     import mine_fx as bear_mine_fx
 
@@ -392,6 +393,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     bear_mine_fx.update(state, my_id)
     bear_mine_fx.draw(screen, state, cx, cy, my_id)
     bear_mine_fx.draw_explosions(screen, cx, cy)
+    poison_pool_fx.update(state)
+    poison_pool_fx.draw(screen, state, cx, cy)
     airstrike_fx.update(state)
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
@@ -587,7 +590,10 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
             char_key = player_chars.get(bullet.owner_id, "hitman1")
 
-            if btype == 7:   # 爆炸彈：橙色圓點
+            if btype == 8:   # 毒液彈：綠色圓點
+                pygame.draw.circle(screen, (60, 200, 60),  (sx, sy), 9)
+                pygame.draw.circle(screen, (150, 255, 150),(sx, sy), 4)
+            elif btype == 7:   # 爆炸彈：橙色圓點
                 explosion_bullet_fx.track(bullet)
                 pygame.draw.circle(screen, (255, 140, 20), (sx, sy), 7)
                 pygame.draw.circle(screen, (255, 220, 80), (sx, sy), 3)

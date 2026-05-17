@@ -164,6 +164,9 @@ def run():
                             elif p and p.char_key == 'manBrown':
                                 state._spawn_explosion_bullet(
                                     cmd.player_id, cmd.aim_x, cmd.aim_y)
+                            elif p and p.char_key == 'womanGreen':
+                                state._spawn_pool_bullet(
+                                    cmd.player_id, cmd.aim_x, cmd.aim_y)
                         if not _bursting:
                             if cmd.use_skill_space:
                                 if p and p.char_key == 'survivor1':
@@ -220,6 +223,7 @@ def run():
                 state.step_giant()
                 state.step_burst()
                 state.step_mines()
+                state.step_poison_pools()
 
                 payload = pack_state(state)
                 for addr in clients.values():

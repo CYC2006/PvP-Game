@@ -13,9 +13,10 @@ import pygame
 from game.pages.layout import LOGICAL_W, LOGICAL_H, _TB, _SW
 from game.charselect import CHARACTERS as _CHAR_LIST, _load_sprite as _cs_load_sprite
 
-# ── Star icons ────────────────────────────────────────────────────────────────
-IC_STAR  = ''   # fa-star  (filled)
-IC_STAR0 = ''   # fa-star-o (empty)
+# ── Icons ────────────────────────────────────────────────────────────────
+IC_STAR  = chr(0xf005)   # fa-star  (filled)
+IC_STAR0 = chr(0xf006)   # fa-star-o (empty)
+IC_CLOCK = chr(0xf017)   # fa-clock-o (cooldown)
 
 # ── Per-character ratings (ATK, AGI, DEF, UTL) out of 5 ──────────────────────
 _RATINGS: dict = {
@@ -330,7 +331,7 @@ def draw(screen: pygame.Surface,
 
         # Cooldown (right-aligned in header row)
         if scd > 0:
-            cd_s = font_sm.render(f"CD  {scd}s", True, (95, 140, 195))
+            cd_s = font_sm.render(f"{IC_CLOCK}  {scd}s", True, (95, 140, 195))
             screen.blit(cd_s, (skx + SK_W - cd_s.get_width() - 10, HDR_Y + 4))
 
         # Separator

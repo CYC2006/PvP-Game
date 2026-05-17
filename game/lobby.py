@@ -76,47 +76,61 @@ def _draw_topbar(screen, font_lg, font_sm, sfx_r, set_r, mx, my,
                  gold: int = 0, gems: int = 0):
     pygame.draw.line(screen, COL_SEP, (0, _TB), (LOGICAL_W, _TB), 1)
 
-    # ── Player name container ──────────────────────────────────────────────
-    pl_r = pygame.Rect(18, 10, 178, 48)
+    PY, PH = 10, 48   # vertical position & height shared by all containers
+    PAD    = 12        # inner horizontal padding
+
+    # ── Player name container (icon + name, left-aligned) ─────────────────
+    pl_r = pygame.Rect(18, PY, 220, PH)
     pygame.draw.rect(screen, COL_PL_BG, pl_r, border_radius=8)
     pygame.draw.rect(screen, COL_PL_BD, pl_r, 2, border_radius=8)
     ns = font_lg.render(f"{IC_USER}  PLAYER_001", True, COL_PL_NAME)
-    screen.blit(ns, (pl_r.x + 10, pl_r.centery - ns.get_height() // 2))
+    screen.blit(ns, (pl_r.x + PAD, pl_r.centery - ns.get_height() // 2))
 
-    # ── Level badge (right of name) ────────────────────────────────────────
-    lv_r = pygame.Rect(pl_r.right + 8, 10, 74, 48)
+    # ── Level container  [⚡ Lv.  ···  1] ────────────────────────────────
+    lv_r = pygame.Rect(pl_r.right + 8, PY, 148, PH)
     pygame.draw.rect(screen, COL_PL_BG, lv_r, border_radius=8)
     pygame.draw.rect(screen, COL_PL_BD, lv_r, 2, border_radius=8)
-    lv_s = font_sm.render(f"{IC_BOLT}  Lv. 1", True, COL_LEVEL)
-    screen.blit(lv_s, (lv_r.centerx - lv_s.get_width() // 2,
-                        lv_r.centery - lv_s.get_height() // 2))
+    # Left: bolt icon + label
+    lv_lbl = font_sm.render(f"{IC_BOLT}  Lv.", True, COL_LEVEL)
+    screen.blit(lv_lbl, (lv_r.x + PAD,
+                          lv_r.centery - lv_lbl.get_height() // 2))
+    # Right: level value
+    lv_val = font_lg.render("1", True, COL_LEVEL)
+    screen.blit(lv_val, (lv_r.right - PAD - lv_val.get_width(),
+                          lv_r.centery - lv_val.get_height() // 2))
 
-    # ── Gold ingot counter ─────────────────────────────────────────────────
-    gd_r = pygame.Rect(lv_r.right + 10, 10, 96, 48)
+    # ── Gold container  [[ingot] GOLD  ···  0] ────────────────────────────
+    gd_r = pygame.Rect(lv_r.right + 8, PY, 190, PH)
     pygame.draw.rect(screen, COL_PL_BG, gd_r, border_radius=8)
     pygame.draw.rect(screen, (75, 62, 22), gd_r, 2, border_radius=8)
-    # Gold ingot icon (small yellow bar)
-    ix, iy = gd_r.x + 10, gd_r.centery - 6
-    pygame.draw.rect(screen, (175, 128, 25), (ix,     iy,     20, 12), border_radius=3)
-    pygame.draw.rect(screen, (235, 190, 55), (ix + 3, iy + 2, 14,  5), border_radius=2)
-    gv_s = font_lg.render(str(gold), True, (220, 178, 60))
-    gl_s = font_sm.render("GOLD", True, (110, 88, 28))
-    screen.blit(gl_s, (ix + 26, gd_r.centery - gv_s.get_height() // 2 - 1))
-    screen.blit(gv_s, (ix + 26 + gl_s.get_width() + 5, gd_r.centery - gv_s.get_height() // 2))
+    # Left: ingot icon
+    ix, iy = gd_r.x + PAD, gd_r.centery - 6
+    pygame.draw.rect(screen, (175, 128, 25), (ix,     iy,     22, 12), border_radius=3)
+    pygame.draw.rect(screen, (235, 190, 55), (ix + 3, iy + 2, 16,  5), border_radius=2)
+    # Left: "GOLD" label
+    gl_s = font_sm.render("GOLD", True, (152, 118, 45))
+    screen.blit(gl_s, (ix + 28, gd_r.centery - gl_s.get_height() // 2))
+    # Right: value
+    gv_s = font_lg.render(str(gold), True, (225, 182, 65))
+    screen.blit(gv_s, (gd_r.right - PAD - gv_s.get_width(),
+                        gd_r.centery - gv_s.get_height() // 2))
 
-    # ── Gem counter ────────────────────────────────────────────────────────
-    gm_r = pygame.Rect(gd_r.right + 8, 10, 96, 48)
+    # ── Gem container  [[diamond] GEMS  ···  0] ───────────────────────────
+    gm_r = pygame.Rect(gd_r.right + 8, PY, 190, PH)
     pygame.draw.rect(screen, COL_PL_BG, gm_r, border_radius=8)
     pygame.draw.rect(screen, (22, 72, 48), gm_r, 2, border_radius=8)
-    # Gem icon (green diamond)
-    gx2, gy2 = gm_r.x + 18, gm_r.centery
+    # Left: gem diamond icon
+    gx2, gy2 = gm_r.x + PAD + 7, gm_r.centery
     gem_pts = [(gx2, gy2 - 8), (gx2 + 7, gy2), (gx2, gy2 + 8), (gx2 - 7, gy2)]
     pygame.draw.polygon(screen, (42, 165, 100), gem_pts)
-    pygame.draw.polygon(screen, (80, 220, 148), gem_pts, 1)
-    gmv_s = font_lg.render(str(gems), True, (80, 210, 135))
-    gml_s = font_sm.render("GEMS", True, (28, 100, 62))
-    screen.blit(gml_s, (gx2 + 14, gm_r.centery - gmv_s.get_height() // 2 - 1))
-    screen.blit(gmv_s, (gx2 + 14 + gml_s.get_width() + 5, gm_r.centery - gmv_s.get_height() // 2))
+    pygame.draw.polygon(screen, (95, 230, 158), gem_pts, 1)
+    # Left: "GEMS" label
+    gml_s = font_sm.render("GEMS", True, (42, 138, 82))
+    screen.blit(gml_s, (gm_r.x + PAD + 20, gm_r.centery - gml_s.get_height() // 2))
+    # Right: value
+    gmv_s = font_lg.render(str(gems), True, (85, 215, 140))
+    screen.blit(gmv_s, (gm_r.right - PAD - gmv_s.get_width(),
+                         gm_r.centery - gmv_s.get_height() // 2))
 
     # ── SFX / Settings buttons ─────────────────────────────────────────────
     for r, icon in ((sfx_r, IC_VOLUME), (set_r, IC_COG)):

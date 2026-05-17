@@ -1,6 +1,6 @@
 import struct
 from game.command import PlayerCommand
-from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine
+from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool
 
 # --- Packet types ---
 PKT_JOIN        = 0x01
@@ -31,6 +31,7 @@ _BLADE_ENTRY      = struct.Struct("!BhhBbB")   # id x_i16 y_i16 age dir owner_id
 _AIRSTRIKE_ENTRY  = struct.Struct("!BhhBB")    # id cx_i16 cy_i16 age(u8) owner_id
 _LOG_BARRIER_ENTRY = struct.Struct("!BhhBB")  # id x_i16 y_i16 hp(u8) owner_id
 _MINE_ENTRY        = struct.Struct("!BhhHB")  # id x_i16 y_i16 triggered_age_u16(65535=idle) owner_id
+_POOL_ENTRY        = struct.Struct("!BhhHB")  # id x_i16 y_i16 age_u16 owner_id
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -163,7 +164,14 @@ def pack_state(state: GameState) -> bytes:
         for m in mine_list
     )
 
-    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data
+    pool_list = list(state.poison_pools.values())
+    pool_data = bytes([len(pool_list)]) + b"".join(
+        _POOL_ENTRY.pack(p.id, int(p.x), int(p.y),
+                         min(65534, state.tick - p.spawn_tick), p.owner_id)
+        for p in pool_list
+    )
+
+    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -258,6 +266,16 @@ def unpack_state(data: bytes) -> GameState:
             m.triggered_tick = state.tick - trig_age if trig_age != 65535 else -1
             state.mines[mid] = m
             offset += _MINE_ENTRY.size
+
+    if offset < len(data):
+        pool_count = data[offset]; offset += 1
+        for _ in range(pool_count):
+            ppid, px, py, page, powner = _POOL_ENTRY.unpack(
+                data[offset: offset + _POOL_ENTRY.size])
+            pp = PoisonPool(id=ppid, owner_id=powner, x=float(px), y=float(py),
+                            spawn_tick=state.tick - page)
+            state.poison_pools[ppid] = pp
+            offset += _POOL_ENTRY.size
 
     return state
 

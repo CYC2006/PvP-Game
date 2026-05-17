@@ -49,6 +49,7 @@ class Player:
     burst_aim_x: float         = 0.0  # locked aim direction for burst
     burst_aim_y: float         = 0.0
     giant_tick: int            = -1   # tick when giant mode started (-1 = inactive)
+    in_poison: bool            = False # 本 tick 是否在毒液區域內（server-side only）
     # ── survivor1 R 技能狀態 ──────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -112,6 +113,16 @@ class AirStrike:
     cx: float
     cy: float
     spawn_tick: int
+
+
+@dataclass
+class PoisonPool:
+    id:         int
+    owner_id:   int
+    x:          float
+    y:          float
+    spawn_tick: int
+    radius:     float = 300.0
 
 
 @dataclass
@@ -202,6 +213,8 @@ class GameState:
     _next_log_id: int        = 0
     mines: dict              = field(default_factory=dict)   # mid → Mine
     _next_mine_id: int       = 0
+    poison_pools: dict       = field(default_factory=dict)   # ppid → PoisonPool
+    _next_pool_id: int       = 0
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -290,6 +303,9 @@ class GameState:
             _ga = self.tick - player.giant_tick
             if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
                 mult *= 1.5
+        # 毒液區域：移速 ×0.8（與速度提升疊加：1.2×0.8=0.96）
+        if player.in_poison:
+            mult *= 0.8
         player.move(dx, dy, speed_mult=mult)
         player.stance = stance
         # 連射期間：禁止普攻（避免與連射子彈重疊）
@@ -396,6 +412,24 @@ class GameState:
                 remaining.append((fire_tick, bullet))
         self._pending_pellets = remaining
 
+    @staticmethod
+    def _roll_damage(shooter) -> int:
+        """Roll damage from shooter stats; returns 1 if shooter is None."""
+        if shooter and shooter.damage_min < shooter.damage_max:
+            return random.randint(shooter.damage_min, shooter.damage_max)
+        return shooter.damage_min if shooter else 1
+
+    def _handle_obstacle_drop(self, obs) -> None:
+        """Spawn loot when an obstacle is destroyed."""
+        if obs.kind == "box_special":
+            self._spawn_gold(obs.x, obs.y)
+        elif obs.kind == "box_normal":
+            r = random.random()
+            if r < 0.10:
+                self._spawn_item(obs.x, obs.y, "gold")
+            elif r < 0.20:
+                self._spawn_item(obs.x, obs.y, "health")
+
     def step_bullets(self, obstacles: dict = None,
                      obstacle_hp: dict = None) -> None:
         from game.chars.assassin.shuriken_state import (
@@ -416,8 +450,8 @@ class GameState:
             hit = False
             shooter = self.players.get(bullet.owner_id)
             does_damage = not (shooter and shooter.damage_min == 0 and shooter.damage_max == 0)
-            if bullet.bullet_type in (1, 2, 5, 6, 7):
-                does_damage = False   # 閃光彈/手榴彈/迷你手雷/暈眩彈/爆炸彈不造成接觸傷害
+            if bullet.bullet_type in (1, 2, 5, 6, 7, 8):
+                does_damage = False   # 閃光彈/手榴彈/迷你手雷/暈眩彈/爆炸彈/毒液彈不造成接觸傷害
 
             # 手裡劍：碰撞半徑隨時間線性成長
             if bullet.bullet_type == 3:
@@ -443,12 +477,7 @@ class GameState:
                                   bullet.y - player.y) < PLAYER_RADIUS + coll_r:
                         key = (bid, pid)
                         if self.tick >= self._dot_cooldown.get(key, 0):
-                            if shooter and shooter.damage_min < shooter.damage_max:
-                                damage = random.randint(shooter.damage_min, shooter.damage_max)
-                            elif shooter:
-                                damage = shooter.damage_min
-                            else:
-                                damage = 1
+                            damage = self._roll_damage(shooter)
                             if bullet.bullet_scale != 1.0:
                                 damage = int(damage * bullet.bullet_scale)
                             if player.giant_tick >= 0:
@@ -469,12 +498,8 @@ class GameState:
                             damage = int(_SHURIKEN_BASE_DMG
                                          + _SHURIKEN_DMG_SCALE
                                          * (coll_r - BULLET_RADIUS))
-                        elif shooter and shooter.damage_min < shooter.damage_max:
-                            damage = random.randint(shooter.damage_min, shooter.damage_max)
-                        elif shooter:
-                            damage = shooter.damage_min
                         else:
-                            damage = 1
+                            damage = self._roll_damage(shooter)
                         if bullet.bullet_scale != 1.0:
                             damage = int(damage * bullet.bullet_scale)
                         if player.giant_tick >= 0:
@@ -486,19 +511,8 @@ class GameState:
                         hit = True
                         break
 
-            # ── 暈眩彈（type 6）vs 玩家：碰觸即加入 expired，爆炸在 expired 迴圈觸發 ──
-            if not hit and bullet.bullet_type == 6:
-                for pid, player in self.players.items():
-                    if pid == bullet.owner_id:
-                        continue
-                    if math.hypot(bullet.x - player.x,
-                                  bullet.y - player.y) < PLAYER_RADIUS + coll_r:
-                        expired.append(bid)
-                        hit = True
-                        break
-
-            # ── 爆炸彈（type 7）vs 玩家：碰觸即加入 expired，爆炸在 expired 迴圈觸發 ──
-            if not hit and bullet.bullet_type == 7:
+            # ── 暈眩彈(6)/爆炸彈(7)/毒液彈(8) vs 玩家：碰觸即加入 expired ──
+            if not hit and bullet.bullet_type in (6, 7, 8):
                 for pid, player in self.players.items():
                     if pid == bullet.owner_id:
                         continue
@@ -528,46 +542,19 @@ class GameState:
                         if obstacle_hp is not None and obs.destructible and does_damage:
                             key = (bid, -oid)  # 負 oid 與玩家 id 區分
                             if self.tick >= self._dot_cooldown.get(key, 0):
-                                if shooter and shooter.damage_min < shooter.damage_max:
-                                    obs_dmg = random.randint(shooter.damage_min,
-                                                             shooter.damage_max)
-                                elif shooter:
-                                    obs_dmg = shooter.damage_min
-                                else:
-                                    obs_dmg = 1
-                                obstacle_hp[oid] -= obs_dmg
+                                obstacle_hp[oid] -= self._roll_damage(shooter)
                                 if obstacle_hp[oid] <= 0:
                                     self.destroyed_obstacles.add(oid)
-                                    if obs.kind == "box_special":
-                                        self._spawn_gold(obs.x, obs.y)
-                                    elif obs.kind == "box_normal":
-                                        r = random.random()
-                                        if r < 0.10:
-                                            self._spawn_gold_single(obs.x, obs.y)
-                                        elif r < 0.20:
-                                            self._spawn_health_pack(obs.x, obs.y)
+                                    self._handle_obstacle_drop(obs)
                                 self._dot_cooldown[key] = self.tick + bullet.dot_interval
                         break   # 只對第一個相交的障礙物作用
                     else:
                         # 一般子彈：碰到障礙物即消失，可能破壞
                         if obstacle_hp is not None and obs.destructible and does_damage:
-                            if shooter and shooter.damage_min < shooter.damage_max:
-                                obs_dmg = random.randint(shooter.damage_min, shooter.damage_max)
-                            elif shooter:
-                                obs_dmg = shooter.damage_min
-                            else:
-                                obs_dmg = 1
-                            obstacle_hp[oid] -= obs_dmg
+                            obstacle_hp[oid] -= self._roll_damage(shooter)
                             if obstacle_hp[oid] <= 0:
                                 self.destroyed_obstacles.add(oid)
-                                if obs.kind == "box_special":
-                                    self._spawn_gold(obs.x, obs.y)
-                                elif obs.kind == "box_normal":
-                                    r = random.random()
-                                    if r < 0.10:
-                                        self._spawn_gold_single(obs.x, obs.y)
-                                    elif r < 0.20:
-                                        self._spawn_health_pack(obs.x, obs.y)
+                                self._handle_obstacle_drop(obs)
                         expired.append(bid)
                         break
 
@@ -581,10 +568,7 @@ class GameState:
                         if bullet.bullet_type in (1, 2, 3, 4, 5):
                             continue   # 投擲物/手裡劍/迷你手雷穿透
                         if does_damage and shooter:
-                            dmg = (random.randint(shooter.damage_min, shooter.damage_max)
-                                   if shooter.damage_min < shooter.damage_max
-                                   else shooter.damage_min)
-                            lb.hp -= dmg
+                            lb.hp -= self._roll_damage(shooter)
                             if lb.hp <= 0:
                                 self.log_barriers.pop(lid, None)
                         expired.append(bid)
@@ -609,6 +593,9 @@ class GameState:
             # 爆炸彈：任何原因消失都爆炸
             if b and b.bullet_type == 7:
                 self._trigger_explosion_bullet(b.x, b.y, b.owner_id)
+            # 毒液彈：命中物體（射程未耗盡）才生成毒液池
+            if b and b.bullet_type == 8 and b.distance_travelled < b.max_range:
+                self._create_poison_pool(b.x, b.y, b.owner_id)
             self.bullets.pop(bid, None)
             for k in [k for k in self._dot_cooldown if k[0] == bid]:
                 del self._dot_cooldown[k]
@@ -733,6 +720,18 @@ class GameState:
     def step_burst(self) -> None:
         from game.chars.agent.burst_state import step_burst
         step_burst(self)
+
+    def _spawn_pool_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.dancer.poison_pool_state import spawn_pool_bullet
+        spawn_pool_bullet(self, owner_id, aim_x, aim_y)
+
+    def _create_poison_pool(self, x: float, y: float, owner_id: int) -> None:
+        from game.chars.dancer.poison_pool_state import create_poison_pool
+        create_poison_pool(self, x, y, owner_id)
+
+    def step_poison_pools(self) -> None:
+        from game.chars.dancer.poison_pool_state import step_poison_pools
+        step_poison_pools(self)
 
     def _place_mine(self, owner_id: int) -> None:
         from game.chars.bear.mine_state import place_mine
