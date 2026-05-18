@@ -100,7 +100,10 @@ _SKILLS: dict = {
          "Briefly halts enemy movement, leaving them exposed to follow-up fire."),
         ("—", "SPACE", 0, "Skill under development."),
         ("—", "E",     0, "Skill under development."),
-        ("—", "R",     0, "Skill under development."),
+        ("CLONE CORPS", "R", 20,
+         "Summons two semi-transparent clones flanking your position. "
+         "For 10 seconds, every basic attack fires three parallel shots — "
+         "one from each clone — without extra ammo cost."),
     ],
     'survivor1': [
         ("BLADE STRIKE",  "RMB",   5,

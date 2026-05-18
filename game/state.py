@@ -52,6 +52,7 @@ class Player:
     speed_penalty: float       = 1.0  # 通用速度懲罰倍率（由角色技能模組每 tick 設定，預設 1.0 = 無懲罰）
     kb_vx: float               = 0.0  # 擊退速度 x（px/tick，每 tick 衰減）
     kb_vy: float               = 0.0  # 擊退速度 y
+    clone_until: int           = -1   # tick when soldier clones expire (-1 = inactive)
     # ── survivor1 R 技能狀態 ──────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -333,6 +334,9 @@ class GameState:
                 self._activate_blade_arc(player_id, aim_x, aim_y)
             else:
                 self._spawn_bullet(player_id, aim_x, aim_y)
+                # Soldier1 R：分身同步射擊（只在普攻觸發，不在技能路徑）
+                if player.clone_until > self.tick:
+                    self._spawn_clone_bullets(player_id, aim_x, aim_y)
 
     def _spawn_bullet(self, owner_id: int, aim_x: float, aim_y: float,
                       bullet_scale_override: float = 0.0,
@@ -763,6 +767,14 @@ class GameState:
                 player.kb_vx = 0.0
             if abs(player.kb_vy) < 0.3:
                 player.kb_vy = 0.0
+
+    def _activate_clones(self, owner_id: int) -> None:
+        from game.chars.soldier.clone_state import activate_clones
+        activate_clones(self, owner_id)
+
+    def _spawn_clone_bullets(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.soldier.clone_state import spawn_clone_bullets
+        spawn_clone_bullets(self, owner_id, aim_x, aim_y)
 
     def _activate_push_zone(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.robot.push_state import activate_push

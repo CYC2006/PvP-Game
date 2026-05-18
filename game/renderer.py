@@ -45,9 +45,9 @@ HP_BAR_H             = 18
 HP_PIP_GAP           = 4
 PLAYER_SPRITE_SCALE  = 1.5   # 原圖 33–54 × 43 px，放大後約 50–81 × 65 px
 
-SKILL_CIRCLE_R   = 14
+SKILL_CIRCLE_R   = 17   # 14 × 1.2 ≈ 17
 SKILL_CIRCLE_GAP = 6
-SKILL_STEP       = SKILL_CIRCLE_R * 2 + SKILL_CIRCLE_GAP   # 34 px
+SKILL_STEP       = SKILL_CIRCLE_R * 2 + SKILL_CIRCLE_GAP   # 40 px
 _SKILL_SLOTS     = ('space', 'e', 'r', 'rmb')
 _SKILL_LABELS    = ('SP', 'E', 'R', 'MB')
 
@@ -696,6 +696,10 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             new_h = max(1, int(rotated.get_height() * giant_scale))
             rotated = pygame.transform.scale(rotated, (new_w, new_h))
 
+        # ── Soldier 分身（clone_until 有效時先畫，在本體之下）──────────────
+        if player.clone_until > state.tick:
+            _draw_soldier_clones(screen, player, rotated, angle, cx, cy)
+
         screen.blit(rotated, (sx - rotated.get_width()  // 2,
                                sy - rotated.get_height() // 2))
 
@@ -711,6 +715,30 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         if player.stun_until > state.tick:
             _draw_stun_indicator(screen, sx, sy - rotated.get_height() // 2 - 8)
 
+
+
+def _draw_soldier_clones(screen, player, rotated_sprite, angle: float,
+                         cx: float, cy: float) -> None:
+    """在玩家左右各 30px、前方 10px 位置畫半透明分身。"""
+    a_rad = math.radians(angle)   # angle 是 compass bearing（0=北/上）
+    # 朝向分量（screen/world 座標，y 向下）
+    ux =  math.sin(a_rad)
+    uy = -math.cos(a_rad)
+    rx, ry = -uy, ux              # 右方向（與 _spawn_bullet 相同）
+
+    SIDE = 30.0
+    FWD  = 10.0
+
+    clone_surf = rotated_sprite.copy()
+    clone_surf.set_alpha(90)   # 半透明
+
+    for sign in (-1.0, 1.0):
+        wx = player.x + rx * sign * SIDE + ux * FWD
+        wy = player.y + ry * sign * SIDE + uy * FWD
+        sx, sy = _ws(wx, wy, cx, cy)
+        screen.blit(clone_surf,
+                    (sx - clone_surf.get_width()  // 2,
+                     sy - clone_surf.get_height() // 2))
 
 
 def _draw_stun_indicator(screen, cx: int, top_y: int) -> None:

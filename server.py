@@ -39,6 +39,7 @@ _SKILL_R: dict = {
     'survivor1': lambda s, pid, ax, ay: s._activate_r_skill(pid, ax, ay),
     'manBlue':   lambda s, pid, ax, ay: s._activate_giant(pid),
     'robot1':    lambda s, pid, ax, ay: s._activate_push_zone(pid, ax, ay),
+    'soldier1':  lambda s, pid, ax, ay: s._activate_clones(pid),
 }
 
 
