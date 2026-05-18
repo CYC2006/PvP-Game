@@ -186,6 +186,21 @@ _prev_destroyed: set = set()
 # 每筆：{'x','y','polys':[[(dx,dy),...],...],'color':(r,g,b),'outline':(r,g,b)}
 _debris: list = []
 
+
+def reset_game_state() -> None:
+    """每局遊戲開始前呼叫，清除跨局殘留的視覺狀態。"""
+    global _map_surface, _skill_bg_surf, _skill_pie_surf
+    _shake_timers.clear()
+    _prev_bullet_pos.clear()
+    _particles.clear()
+    _prev_destroyed.clear()
+    _debris.clear()
+    # 強制重建地圖底層（下一幀重新繪製）
+    _map_surface    = None
+    _skill_bg_surf  = None
+    _skill_pie_surf = None
+
+
 # 各障礙物種類的粒子顏色（同色系深淺變化）
 PARTICLE_COLORS: dict = {
     "box_normal":       [(165, 108, 52), (195, 142, 68), (145, 88, 38),

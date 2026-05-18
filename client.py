@@ -7,7 +7,7 @@ import threading
 import pygame
 
 from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left, set_cloak_ticks
-from game.renderer   import draw, handle_settings_click, LOGICAL_W, LOGICAL_H
+from game.renderer   import draw, handle_settings_click, reset_game_state, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
 import game.charselect as charselect
@@ -315,6 +315,7 @@ def run() -> None:
         init_char(my_char_key)
 
         # ── 遊戲主迴圈 ──────────────────────────────────────────────
+        reset_game_state()          # 清除上一局的殘骸、粒子、震動等視覺狀態
         state          = GameState()
         keys_held      = set()
         fullscreen     = False
