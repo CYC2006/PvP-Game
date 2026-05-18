@@ -763,6 +763,20 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             if me and smoke_fx.is_hidden_by_smoke(player, me, state):
                 continue
 
+        # ── 隱身（Sniper R）可見度 ───────────────────────────────────────────
+        _cloak_alpha = None   # None = 正常不透明；int = 套用此 alpha
+        if player.cloak_until > state.tick:
+            from game.chars.sniper.cloak_state import phase_of
+            _cloak_phase = phase_of(player.cloak_until, state.tick)
+            if pid == my_id:
+                # 自己視角：hidden = 半透明(80)，revealed = 全實體
+                _cloak_alpha = None if _cloak_phase == 'revealed' else 80
+            else:
+                # 對手視角：hidden = 完全不可見，revealed = 半透明(110)
+                if _cloak_phase == 'hidden':
+                    continue
+                _cloak_alpha = 110
+
         if pid == my_id:
             stance = my_stance
             angle  = r_dash_fx.r_skill_angle(aim_angle_deg)
@@ -810,8 +824,14 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         if player.clone_until > state.tick:
             _draw_soldier_clones(screen, player, rotated, angle, cx, cy)
 
-        screen.blit(rotated, (sx - rotated.get_width()  // 2,
-                               sy - rotated.get_height() // 2))
+        if _cloak_alpha is not None:
+            _cloak_surf = rotated.copy()
+            _cloak_surf.set_alpha(_cloak_alpha)
+            screen.blit(_cloak_surf, (sx - rotated.get_width()  // 2,
+                                      sy - rotated.get_height() // 2))
+        else:
+            screen.blit(rotated, (sx - rotated.get_width()  // 2,
+                                   sy - rotated.get_height() // 2))
 
         if pid == my_id:
             r_dash_fx.maybe_spawn_afterimage(player.x, player.y, rotated, state.tick)

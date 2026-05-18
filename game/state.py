@@ -53,6 +53,7 @@ class Player:
     kb_vx: float               = 0.0  # 擊退速度 x（px/tick，每 tick 衰減）
     kb_vy: float               = 0.0  # 擊退速度 y
     clone_until: int           = -1   # tick when soldier clones expire (-1 = inactive)
+    cloak_until: int           = -1   # tick when sniper cloak expires (-1 = inactive)
     jump_tick: int             = -1   # tick when soldier jump started (-1 = not jumping)
     jump_dx: float             = 0.0  # normalized jump direction x
     jump_dy: float             = 0.0  # normalized jump direction y
@@ -309,6 +310,15 @@ class GameState:
         if player.r_skill_phase > 0:
             if player._shoot_slow_timer > 0:
                 player._shoot_slow_timer -= 1
+            return
+        # 隱身中（Sniper R）：允許移動（速度 ×2），禁止射擊與技能
+        if player.cloak_until > self.tick:
+            mult = 2.0 * player.speed_penalty
+            if player.jump_tick < 0:
+                player.move(dx, dy, speed_mult=mult)
+            player.stance = stance
+            if math.hypot(aim_x, aim_y) > 0:
+                player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
             return
         # 射擊觸發計時器；計時器倒數中套用移動懲罰（shoot_slow 優先於 run）
         if shooting:
@@ -878,6 +888,11 @@ class GameState:
                     scale = min_dist / dist if dist > 0 else 1.0
                     player.x = lb.x + ddx * scale if dist > 0 else lb.x + min_dist
                     player.y = lb.y + ddy * scale if dist > 0 else lb.y
+
+    # ── Sniper R：幻影隱身 ───────────────────────────────────────────────────
+    def _activate_cloak(self, owner_id: int) -> None:
+        from game.chars.sniper.cloak_state import activate_cloak
+        activate_cloak(self, owner_id)
 
     # ── Soldier Space：跳躍 ──────────────────────────────────────────────────
     def _activate_jump(self, owner_id: int, aim_x: float, aim_y: float) -> None:

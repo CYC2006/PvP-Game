@@ -82,8 +82,10 @@ _SKILLS: dict = {
         ("LOG BARRIER",   "E",     10,
          "Erects wooden barriers in the aimed direction. "
          "Blocks movement and line of sight, forcing enemies to reposition."),
-        ("—",             "R",     0,
-         "Skill under development."),
+        ("PHANTOM CLOAK",  "R",    15,
+         "Vanishes for 3 seconds with 2× movement speed. "
+         "Every 0.5 s you briefly flicker into view — use those windows wisely. "
+         "Cannot shoot or use skills while cloaked, but you still take damage."),
     ],
     'robot1': [
         ("—", "RMB",   0, "Skill under development."),

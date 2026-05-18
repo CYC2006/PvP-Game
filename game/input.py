@@ -52,6 +52,9 @@ _dash_dist_remaining: float = 0.0   # > 0 時為等速衝刺模式（Rambo）
 # ── robot1 Space 印記計時 ─────────────────────────────────────────
 _robot_mark_until_ms: int = 0   # 印記有效截止時間（ms），0 = 無印記
 
+# ── sniper R 隱身狀態 ─────────────────────────────────────────────
+_cloak_ticks_left: int = 0      # 剩餘隱身 tick（> 0 = 隱身中），由 client 每幀更新
+
 # ── 技能鍵上升緣偵測 ──────────────────────────────────────────────
 _space_prev: bool = False
 _e_prev:     bool = False
@@ -65,6 +68,11 @@ def set_giant_age(age: int) -> None:
 def set_burst_shots_left(n: int) -> None:
     global _burst_shots_left
     _burst_shots_left = n
+
+
+def set_cloak_ticks(n: int) -> None:
+    global _cloak_ticks_left
+    _cloak_ticks_left = n
 
 
 def set_dash_context(player_x: float, player_y: float,
@@ -87,6 +95,7 @@ def init_char(char_key: str) -> None:
     global _char_key, _rmb_prev, _r_prev, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
     global _r_holding, _last_aim_x, _last_aim_y
     global _robot_mark_until_ms
+    global _cloak_ticks_left
 
     from game.char_data import get_stat, CHAR_STATS
 
@@ -125,6 +134,7 @@ def init_char(char_key: str) -> None:
     _dash_speed           = 0.0
     _dash_dist_remaining  = 0.0
     _robot_mark_until_ms  = 0
+    _cloak_ticks_left     = 0
     _space_prev           = False
     _e_prev          = False
     _rmb_prev        = False
@@ -145,7 +155,7 @@ def read_input(player_id: int, keys_held: set,
     """
     global _last_shot_time, _ammo, _reloading, _reload_start_ms
     global _space_prev, _e_prev, _rmb_prev, _r_prev
-    global _robot_mark_until_ms
+    global _robot_mark_until_ms, _cloak_ticks_left
     global _dash_active, _dash_dx, _dash_dy, _dash_speed, _dash_dist_remaining
     global _skill_last_ms, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
     global _r_holding, _last_aim_x, _last_aim_y
@@ -187,6 +197,9 @@ def read_input(player_id: int, keys_held: set,
 
     # ── R 技能啟動狀態（在所有技能判斷之前計算，確保完全隔離）────
     _r_skill_active = (now - _r_skill_start_ms) < 500 and _r_skill_start_ms > 0
+
+    # ── 隱身中（Sniper R）：封鎖所有技能與射擊，不記錄冷卻 ──────
+    _is_cloaked = _cloak_ticks_left > 0
 
     # ── 巨人放大 / 縮小中：凍結移動與技能 ───────────────────────
     _giant_frozen = (_giant_age >= 0 and
@@ -238,7 +251,7 @@ def read_input(player_id: int, keys_held: set,
         if pygame.K_d in keys_held or pygame.K_RIGHT in keys_held: dx += 1.0
 
         # ── 觸發衝刺（非 survivor1）或速度技能（survivor1）──────
-        if (not _r_skill_active
+        if (not _r_skill_active and not _is_cloaked
                 and space_just_pressed
                 and not _robot_recall
                 and _skill_cds_ms.get('space', -1) >= 0):
@@ -294,6 +307,7 @@ def read_input(player_id: int, keys_held: set,
     # ── E 技能（閃光彈等）────────────────────────────────────────
     use_skill_e = False
     if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
+            and not _is_cloaked
             and e_just_pressed and _skill_cds_ms.get('e', -1) >= 0):
         cd_remaining = _skill_cds_ms['e'] - (now - _skill_last_ms['e'])
         if cd_remaining <= 0:
@@ -302,7 +316,8 @@ def read_input(player_id: int, keys_held: set,
 
     # ── RMB 技能（manBlue：按住蓄力放開施放；其他角色：按下即發）──
     use_skill_rmb = False
-    if not _r_skill_active and not _giant_frozen and not _burst_shots_left and _skill_cds_ms.get('rmb', -1) >= 0:
+    if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
+            and not _is_cloaked and _skill_cds_ms.get('rmb', -1) >= 0):
         rmb_cd_ms = _skill_cds_ms['rmb']
         if _char_key == 'manBlue':
             cd_ok = (rmb_cd_ms - (now - _skill_last_ms['rmb'])) <= 0
@@ -319,7 +334,7 @@ def read_input(player_id: int, keys_held: set,
                 _skill_last_ms['rmb'] = now
 
     # ── Space 技能（survivor1：速度提升）─────────────────────────
-    if (not _r_skill_active and not _giant_frozen
+    if (not _r_skill_active and not _giant_frozen and not _is_cloaked
             and _char_key == 'survivor1'
             and space_just_pressed
             and _skill_cds_ms.get('space', -1) >= 0):
@@ -331,7 +346,8 @@ def read_input(player_id: int, keys_held: set,
 
     # ── R 技能（按下即發）────────────────────────────────────────
     use_skill_r = False
-    if not _r_skill_active and not _giant_frozen and not _burst_shots_left and _skill_cds_ms.get('r', -1) >= 0:
+    if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
+            and not _is_cloaked and _skill_cds_ms.get('r', -1) >= 0):
         if r_just_pressed and (_skill_cds_ms['r'] - (now - _skill_last_ms['r'])) <= 0:
             use_skill_r = True
             _skill_last_ms['r']  = now
@@ -340,9 +356,10 @@ def read_input(player_id: int, keys_held: set,
                 _r_skill_start_ms    = now
                 _r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
 
-    # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────
+    # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止 / 隱身中禁止）──
     shooting = False
     if (not _reloading and not _r_skill_active and not _burst_shots_left
+            and not _is_cloaked
             and pygame.mouse.get_pressed()[0]
             and (now - _last_shot_time) >= SHOOT_COOLDOWN_MS):
         shooting        = True

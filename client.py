@@ -6,7 +6,7 @@ import time
 import threading
 import pygame
 
-from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left
+from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left, set_cloak_ticks
 from game.renderer   import draw, handle_settings_click, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
@@ -399,6 +399,11 @@ def run() -> None:
             set_burst_shots_left(max(0, 3 - local_player.burst_shots_fired)
                                  if local_player and local_player.burst_next_tick >= 0
                                  else 0)
+            set_cloak_ticks(
+                max(0, local_player.cloak_until - state.tick)
+                if local_player and local_player.cloak_until > state.tick
+                else 0
+            )
 
             draw(screen, state, player_id, font_sm, obstacles,
                  effective_stance, aim_angle_deg, ammo, is_reloading,
