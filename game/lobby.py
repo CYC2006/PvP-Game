@@ -254,6 +254,8 @@ def lobby_screen(screen: pygame.Surface,
     sel_mode      = 0
     char_page_idx = 0
     map_page_idx  = 0
+    gold          = 200
+    gems          = 10
     ip_text       = ""
     cursor_on     = True
     ctime         = 0.0
@@ -354,7 +356,7 @@ def lobby_screen(screen: pygame.Surface,
         screen.fill(COL_BG)
 
         if state == "main":
-            _draw_topbar(screen, font_lg, font_sm, SFX_R, SET_R, mx, my)
+            _draw_topbar(screen, font_lg, font_sm, SFX_R, SET_R, mx, my, gold, gems)
             _draw_sidebar(screen, font_lg, font_sm, page, mx, my)
 
             if page == "game":
