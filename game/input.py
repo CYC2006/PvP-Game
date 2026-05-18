@@ -145,6 +145,7 @@ def read_input(player_id: int, keys_held: set,
     """
     global _last_shot_time, _ammo, _reloading, _reload_start_ms
     global _space_prev, _e_prev, _rmb_prev, _r_prev
+    global _robot_mark_until_ms
     global _dash_active, _dash_dx, _dash_dy, _dash_speed, _dash_dist_remaining
     global _skill_last_ms, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
     global _r_holding, _last_aim_x, _last_aim_y
