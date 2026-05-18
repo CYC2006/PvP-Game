@@ -108,7 +108,7 @@ _SKILLS: dict = {
         ("—", "E",     0, "Skill under development."),
         ("CLONE CORPS", "R", 20,
          "Summons two semi-transparent clones flanking your position. "
-         "For 10 seconds, every basic attack fires three parallel shots — "
+         "For 8 seconds, every basic attack fires three parallel shots — "
          "one from each clone — without extra ammo cost."),
     ],
     'survivor1': [

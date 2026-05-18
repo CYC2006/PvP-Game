@@ -2,7 +2,7 @@ import math
 import random
 from game.state import Bullet, PLAYER_RADIUS, BULLET_MAX_RANGE
 
-CLONE_TICKS          = 600    # 10 秒
+CLONE_TICKS          = 480    # 8 秒
 CLONE_OFFSET_SIDE    = 30.0   # 左右各 30 px
 CLONE_OFFSET_FORWARD = 10.0   # 前方 10 px
 
