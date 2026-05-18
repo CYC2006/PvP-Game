@@ -188,8 +188,7 @@ def run():
                     # 技能觸發（依 dispatch 表查角色 char_key）
                     p        = state.players.get(cmd.player_id)
                     r_active = p and p.r_skill_phase > 0
-                    _cloaked = p and p.cloak_until > state.tick
-                    if p and not r_active and not _cloaked:
+                    if p and not r_active:
                         pid, ax, ay = cmd.player_id, cmd.aim_x, cmd.aim_y
                         if cmd.use_skill_e:
                             fn = _SKILL_E.get(p.char_key)

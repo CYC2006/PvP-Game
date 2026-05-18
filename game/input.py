@@ -251,7 +251,7 @@ def read_input(player_id: int, keys_held: set,
         if pygame.K_d in keys_held or pygame.K_RIGHT in keys_held: dx += 1.0
 
         # ── 觸發衝刺（非 survivor1）或速度技能（survivor1）──────
-        if (not _r_skill_active and not _is_cloaked
+        if (not _r_skill_active
                 and space_just_pressed
                 and not _robot_recall
                 and _skill_cds_ms.get('space', -1) >= 0):
@@ -307,7 +307,6 @@ def read_input(player_id: int, keys_held: set,
     # ── E 技能（閃光彈等）────────────────────────────────────────
     use_skill_e = False
     if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
-            and not _is_cloaked
             and e_just_pressed and _skill_cds_ms.get('e', -1) >= 0):
         cd_remaining = _skill_cds_ms['e'] - (now - _skill_last_ms['e'])
         if cd_remaining <= 0:
@@ -317,7 +316,7 @@ def read_input(player_id: int, keys_held: set,
     # ── RMB 技能（manBlue：按住蓄力放開施放；其他角色：按下即發）──
     use_skill_rmb = False
     if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
-            and not _is_cloaked and _skill_cds_ms.get('rmb', -1) >= 0):
+            and _skill_cds_ms.get('rmb', -1) >= 0):
         rmb_cd_ms = _skill_cds_ms['rmb']
         if _char_key == 'manBlue':
             cd_ok = (rmb_cd_ms - (now - _skill_last_ms['rmb'])) <= 0
@@ -334,7 +333,7 @@ def read_input(player_id: int, keys_held: set,
                 _skill_last_ms['rmb'] = now
 
     # ── Space 技能（survivor1：速度提升）─────────────────────────
-    if (not _r_skill_active and not _giant_frozen and not _is_cloaked
+    if (not _r_skill_active and not _giant_frozen
             and _char_key == 'survivor1'
             and space_just_pressed
             and _skill_cds_ms.get('space', -1) >= 0):
@@ -347,7 +346,7 @@ def read_input(player_id: int, keys_held: set,
     # ── R 技能（按下即發）────────────────────────────────────────
     use_skill_r = False
     if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
-            and not _is_cloaked and _skill_cds_ms.get('r', -1) >= 0):
+            and _skill_cds_ms.get('r', -1) >= 0):
         if r_just_pressed and (_skill_cds_ms['r'] - (now - _skill_last_ms['r'])) <= 0:
             use_skill_r = True
             _skill_last_ms['r']  = now
@@ -356,10 +355,9 @@ def read_input(player_id: int, keys_held: set,
                 _r_skill_start_ms    = now
                 _r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
 
-    # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止 / 隱身中禁止）──
+    # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────
     shooting = False
     if (not _reloading and not _r_skill_active and not _burst_shots_left
-            and not _is_cloaked
             and pygame.mouse.get_pressed()[0]
             and (now - _last_shot_time) >= SHOOT_COOLDOWN_MS):
         shooting        = True

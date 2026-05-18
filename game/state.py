@@ -311,15 +311,11 @@ class GameState:
             if player._shoot_slow_timer > 0:
                 player._shoot_slow_timer -= 1
             return
-        # 隱身中（Sniper R）：允許移動（速度 ×2），禁止射擊與技能
+        # 隱身中（Sniper R）：移動速度 ×2，其他行為照常（可射擊、可用技能）
         if player.cloak_until > self.tick:
-            mult = 2.0 * player.speed_penalty
-            if player.jump_tick < 0:
-                player.move(dx, dy, speed_mult=mult)
-            player.stance = stance
-            if math.hypot(aim_x, aim_y) > 0:
-                player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
-            return
+            # 強制覆蓋 speed_mult 為 2 倍（忽略 run / shoot_slow）
+            if speed_mult == 1.0:   # 非技能位移時才覆蓋
+                speed_mult = 2.0
         # 射擊觸發計時器；計時器倒數中套用移動懲罰（shoot_slow 優先於 run）
         if shooting:
             player._shoot_slow_timer = player._shoot_slow_ticks
