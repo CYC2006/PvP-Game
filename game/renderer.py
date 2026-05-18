@@ -720,7 +720,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
             elif btype == 4:   # 煙霧彈：小灰綠色圓點
                 pygame.draw.circle(screen, (90, 120, 70), (sx, sy), 6)
             elif btype == 3:
-                shuriken_fx.draw_bullet(screen, bullet, sx, sy, color, state)
+                shuriken_fx.draw_bullet(screen, bullet, sx, sy, color, state, cx, cy)
             elif btype == 1:
                 flash_fx.draw_bullet(screen, bullet, sx, sy, color)
             elif btype == 2:
