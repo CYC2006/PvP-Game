@@ -267,6 +267,13 @@ def read_input(player_id: int, keys_held: set,
                         _dash_speed      = 18.0 - _DASH_DECEL
                         _skill_last_ms['space'] = now
                         use_skill_space  = True
+                elif _char_key == 'soldier1':
+                    # 跳躍：通知 server 起跳；本地立即補滿彈夾並取消換彈
+                    use_skill_space      = True
+                    _skill_last_ms['space'] = now
+                    _ammo                = MAGAZINE_SIZE
+                    _reloading           = False
+                    _reload_start_ms     = 0
                 else:
                     length = math.hypot(dx, dy)
                     if length > 0:

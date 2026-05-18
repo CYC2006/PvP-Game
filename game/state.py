@@ -53,6 +53,9 @@ class Player:
     kb_vx: float               = 0.0  # 擊退速度 x（px/tick，每 tick 衰減）
     kb_vy: float               = 0.0  # 擊退速度 y
     clone_until: int           = -1   # tick when soldier clones expire (-1 = inactive)
+    jump_tick: int             = -1   # tick when soldier jump started (-1 = not jumping)
+    jump_dx: float             = 0.0  # normalized jump direction x
+    jump_dy: float             = 0.0  # normalized jump direction y
     # ── survivor1 R 技能狀態 ──────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -331,7 +334,9 @@ class GameState:
                 mult *= 1.5
         # 通用速度懲罰（由技能模組設定，如毒液區域 0.8）
         mult *= player.speed_penalty
-        player.move(dx, dy, speed_mult=mult)
+        # 跳躍中：由 step_jumps 控制位置，忽略普通移動輸入
+        if player.jump_tick < 0:
+            player.move(dx, dy, speed_mult=mult)
         player.stance = stance
         # 連射期間：禁止普攻（避免與連射子彈重疊）
         if player.burst_next_tick >= 0:
@@ -501,6 +506,8 @@ class GameState:
                 for pid, player in self.players.items():
                     if pid == bullet.owner_id:
                         continue
+                    if player.jump_tick >= 0:
+                        continue  # 跳躍中：無敵，跳過傷害判定
                     if math.hypot(bullet.x - player.x,
                                   bullet.y - player.y) < PLAYER_RADIUS + coll_r:
                         key = (bid, pid)
@@ -520,6 +527,8 @@ class GameState:
                 for pid, player in self.players.items():
                     if pid == bullet.owner_id:
                         continue
+                    if player.jump_tick >= 0:
+                        continue  # 跳躍中：無敵，跳過傷害判定
                     if math.hypot(bullet.x - player.x,
                                   bullet.y - player.y) < PLAYER_RADIUS + coll_r:
                         if bullet.bullet_type == 3:
@@ -545,6 +554,8 @@ class GameState:
                 for pid, player in self.players.items():
                     if pid == bullet.owner_id:
                         continue
+                    if player.jump_tick >= 0:
+                        continue  # 跳躍中：無敵
                     if math.hypot(bullet.x - player.x,
                                   bullet.y - player.y) < PLAYER_RADIUS + coll_r:
                         expired.append(bid)
@@ -848,6 +859,8 @@ class GameState:
         if not obstacles:
             return
         for player in self.players.values():
+            if player.jump_tick >= 0:
+                continue  # 跳躍中：穿越障礙物
             for oid, obs in obstacles.items():
                 if oid in self.destroyed_obstacles:
                     continue
@@ -865,3 +878,12 @@ class GameState:
                     scale = min_dist / dist if dist > 0 else 1.0
                     player.x = lb.x + ddx * scale if dist > 0 else lb.x + min_dist
                     player.y = lb.y + ddy * scale if dist > 0 else lb.y
+
+    # ── Soldier Space：跳躍 ──────────────────────────────────────────────────
+    def _activate_jump(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.soldier.jump_state import activate_jump
+        activate_jump(self, owner_id, aim_x, aim_y)
+
+    def step_jumps(self) -> None:
+        from game.chars.soldier.jump_state import step_jumps
+        step_jumps(self)

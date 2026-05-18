@@ -101,7 +101,10 @@ _SKILLS: dict = {
         ("STUN ROUND",    "RMB",   6,
          "Fires a specialized round that stuns the target on impact. "
          "Briefly halts enemy movement, leaving them exposed to follow-up fire."),
-        ("—", "SPACE", 0, "Skill under development."),
+        ("TACTICAL JUMP",  "SPACE", 8,
+         "Leaps 150 px toward the aimed direction. "
+         "Instantly refills the magazine and cancels any reload in progress. "
+         "Invincible while airborne — can fly over obstacles and is immune to all projectiles."),
         ("—", "E",     0, "Skill under development."),
         ("CLONE CORPS", "R", 20,
          "Summons two semi-transparent clones flanking your position. "
