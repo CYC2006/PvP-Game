@@ -14,13 +14,16 @@ def spawn_shuriken(state, owner_id: int, aim_x: float, aim_y: float) -> None:
     if length == 0:
         return
     ux, uy = aim_x / length, aim_y / length
+    rx, ry = -uy, ux   # 右側垂直方向（與 _spawn_bullet 相同）
+    _BARREL_FWD   = PLAYER_RADIUS + 10   # 26 px
+    _BARREL_RIGHT = 14
     SPEED = 800 / 60
     bid = state._next_bullet_id
     state._next_bullet_id = (state._next_bullet_id + 1) % 256
     state.bullets[bid] = Bullet(
         id=bid, owner_id=owner_id,
-        x=player.x + ux * (PLAYER_RADIUS + 12),
-        y=player.y + uy * (PLAYER_RADIUS + 12),
+        x=player.x + ux * _BARREL_FWD + rx * _BARREL_RIGHT,
+        y=player.y + uy * _BARREL_FWD + ry * _BARREL_RIGHT,
         dx=ux * SPEED, dy=uy * SPEED,
         aim_angle=math.degrees(math.atan2(uy, ux)),
         max_range=float('inf'),
