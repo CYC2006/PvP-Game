@@ -309,8 +309,10 @@ def read_input(player_id: int, keys_held: set,
         if r_just_pressed and (_skill_cds_ms['r'] - (now - _skill_last_ms['r'])) <= 0:
             use_skill_r = True
             _skill_last_ms['r']  = now
-            _r_skill_start_ms    = now
-            _r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
+            # 旋轉動畫只屬於 Assassin（survivor1）的 R 技能
+            if _char_key == 'survivor1':
+                _r_skill_start_ms    = now
+                _r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
 
     # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────
     shooting = False

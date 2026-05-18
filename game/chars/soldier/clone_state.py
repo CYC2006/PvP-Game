@@ -2,9 +2,13 @@ import math
 import random
 from game.state import Bullet, PLAYER_RADIUS, BULLET_MAX_RANGE
 
-CLONE_TICKS  = 600    # 10 秒
+CLONE_TICKS          = 600    # 10 秒
 CLONE_OFFSET_SIDE    = 30.0   # 左右各 30 px
 CLONE_OFFSET_FORWARD = 10.0   # 前方 10 px
+
+# 槍口偏移量（與 _spawn_bullet 的 barrel_fwd / barrel_right 相同）
+_BARREL_FWD   = PLAYER_RADIUS + 10   # 26 px
+_BARREL_RIGHT = 14                   # px
 
 
 def activate_clones(state, owner_id: int) -> None:
@@ -32,8 +36,12 @@ def spawn_clone_bullets(state, owner_id: int, aim_x: float, aim_y: float) -> Non
     rx, ry = -uy, ux   # 右方向（與 _spawn_bullet 相同慣例）
 
     for sign in (-1.0, 1.0):   # -1 = 左分身, +1 = 右分身
-        spawn_x = player.x + rx * sign * CLONE_OFFSET_SIDE + ux * CLONE_OFFSET_FORWARD
-        spawn_y = player.y + ry * sign * CLONE_OFFSET_SIDE + uy * CLONE_OFFSET_FORWARD
+        # 分身中心
+        clone_x = player.x + rx * sign * CLONE_OFFSET_SIDE + ux * CLONE_OFFSET_FORWARD
+        clone_y = player.y + ry * sign * CLONE_OFFSET_SIDE + uy * CLONE_OFFSET_FORWARD
+        # 槍口位置（從分身中心再偏移，與本體一致）
+        spawn_x = clone_x + ux * _BARREL_FWD + rx * _BARREL_RIGHT
+        spawn_y = clone_y + uy * _BARREL_FWD + ry * _BARREL_RIGHT
 
         # 獨立 spread 偏角
         pux, puy = ux, uy
