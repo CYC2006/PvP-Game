@@ -33,6 +33,7 @@ _SKILL_RMB: dict = {
 _SKILL_SPACE: dict = {
     'survivor1': lambda s, pid, ax, ay: s._activate_speed_boost(pid),
     'manOld':    lambda s, pid, ax, ay: s._spawn_mini_grenades(pid),
+    'robot1':    lambda s, pid, ax, ay: s._activate_robot_space(pid),
 }
 
 _SKILL_R: dict = {
@@ -230,6 +231,7 @@ def run():
                 state.step_poison_pools()
                 state.step_knockback()
                 state.step_push_zones()
+                state.step_robot_marks()
 
                 payload = pack_state(state)
                 for addr in clients.values():

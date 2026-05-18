@@ -49,6 +49,9 @@ _dash_dy:             float = 0.0
 _dash_speed:          float = 0.0
 _dash_dist_remaining: float = 0.0   # > 0 時為等速衝刺模式（Rambo）
 
+# ── robot1 Space 印記計時 ─────────────────────────────────────────
+_robot_mark_until_ms: int = 0   # 印記有效截止時間（ms），0 = 無印記
+
 # ── 技能鍵上升緣偵測 ──────────────────────────────────────────────
 _space_prev: bool = False
 _e_prev:     bool = False
@@ -83,6 +86,7 @@ def init_char(char_key: str) -> None:
     global _dash_active, _dash_speed, _dash_dist_remaining, _space_prev
     global _char_key, _rmb_prev, _r_prev, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
     global _r_holding, _last_aim_x, _last_aim_y
+    global _robot_mark_until_ms
 
     from game.char_data import get_stat, CHAR_STATS
 
@@ -120,6 +124,7 @@ def init_char(char_key: str) -> None:
     _dash_active          = False
     _dash_speed           = 0.0
     _dash_dist_remaining  = 0.0
+    _robot_mark_until_ms  = 0
     _space_prev           = False
     _e_prev          = False
     _rmb_prev        = False
@@ -191,6 +196,14 @@ def read_input(player_id: int, keys_held: set,
     speed_mult      = 1.0
     use_skill_space = False
 
+    # ── robot1 印記回傳（不受冷卻影響，優先於衝刺）─────────────────
+    _robot_recall = False
+    if (_char_key == 'robot1' and space_just_pressed
+            and _robot_mark_until_ms > now):
+        use_skill_space      = True   # 通知 server：mark 存在 → 傳送
+        _robot_mark_until_ms = 0      # 清除本地印記計時
+        _robot_recall        = True   # 阻止下方衝刺觸發
+
     if _dash_active:
         if _dash_dist_remaining > 0:
             # 等速衝刺（Rambo）：障礙物碰撞 → 立即停止
@@ -226,6 +239,7 @@ def read_input(player_id: int, keys_held: set,
         # ── 觸發衝刺（非 survivor1）或速度技能（survivor1）──────
         if (not _r_skill_active
                 and space_just_pressed
+                and not _robot_recall
                 and _skill_cds_ms.get('space', -1) >= 0):
             cd_remaining = _skill_cds_ms['space'] - (now - _skill_last_ms['space'])
             if cd_remaining <= 0:
@@ -262,6 +276,10 @@ def read_input(player_id: int, keys_held: set,
                         dx, dy           = _dash_dx, _dash_dy
                         _dash_speed      = _DASH_V0 - _DASH_DECEL
                         _skill_last_ms['space'] = now
+                        # robot1：通知 server 建立印記，並設定本地倒計時
+                        if _char_key == 'robot1':
+                            use_skill_space      = True
+                            _robot_mark_until_ms = now + 3000
 
     running = shift_held and not _dash_active
 

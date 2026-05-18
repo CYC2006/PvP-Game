@@ -129,6 +129,14 @@ class PoisonPool:
 
 
 @dataclass
+class RobotMark:
+    owner_id:   int
+    x:          float
+    y:          float
+    spawn_tick: int
+
+
+@dataclass
 class PushZone:
     id:         int
     owner_id:   int
@@ -232,6 +240,7 @@ class GameState:
     _next_pool_id: int       = 0
     push_zones: dict         = field(default_factory=dict)   # pzid → PushZone
     _next_push_zone_id: int  = 0
+    robot_marks: dict        = field(default_factory=dict)   # owner_id → RobotMark（每個 robot1 最多一筆）
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -775,6 +784,14 @@ class GameState:
     def _spawn_clone_bullets(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.soldier.clone_state import spawn_clone_bullets
         spawn_clone_bullets(self, owner_id, aim_x, aim_y)
+
+    def _activate_robot_space(self, owner_id: int) -> None:
+        from game.chars.robot.mark_state import activate_robot_space
+        activate_robot_space(self, owner_id)
+
+    def step_robot_marks(self) -> None:
+        from game.chars.robot.mark_state import step_robot_marks
+        step_robot_marks(self)
 
     def _activate_push_zone(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.robot.push_state import activate_push

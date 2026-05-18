@@ -87,7 +87,10 @@ _SKILLS: dict = {
     ],
     'robot1': [
         ("—", "RMB",   0, "Skill under development."),
-        ("—", "SPACE", 0, "Skill under development."),
+        ("MARK RECALL", "SPACE", 6,
+         "Dashes in your movement direction and plants a mark at the origin. "
+         "Press Space again within 3 seconds to instantly teleport back. "
+         "A yellow timer bar above your head shows the recall window — only you can see it."),
         ("—", "E",     0, "Skill under development."),
         ("PUSH ZONE", "R", 5,
          "Projects a 160×100 px force field toward the cursor. "

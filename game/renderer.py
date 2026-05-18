@@ -22,6 +22,7 @@ from game.chars.dancer   import poison_pool_fx
 from game.chars.bear     import explosion_bullet_fx
 from game.chars.bear     import mine_fx as bear_mine_fx
 from game.chars.robot    import push_fx as robot_push_fx
+from game.chars.robot    import mark_fx as robot_mark_fx
 
 # colours
 COL_BG         = (30,  30,  30)
@@ -411,6 +412,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     poison_pool_fx.update(state)
     poison_pool_fx.draw(screen, state, cx, cy)
     robot_push_fx.draw(screen, state, my_id, cx, cy)
+    robot_mark_fx.draw(screen, state, my_id, cx, cy)
     airstrike_fx.update(state)
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
