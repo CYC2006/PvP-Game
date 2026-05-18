@@ -78,6 +78,93 @@ _skill_bg_surf: "pygame.Surface | None" = None
 # skill HUD 冷卻扇形 Surface（固定大小，每幀 fill 清空後重繪，省掉 allocation）
 _skill_pie_surf: "pygame.Surface | None" = None
 
+# ── 設定選單 HUD ─────────────────────────────────────────────────────────────
+_IC_COG_HUD      = chr(0xf013)   # fa-cog
+_IC_SIGN_OUT_HUD = chr(0xf08b)   # fa-sign-out
+_IC_VOLUME_HUD   = chr(0xf028)   # fa-volume-up
+
+_SETTINGS_BTN = pygame.Rect(SCREEN_W - 52, 10, 42, 42)
+_MENU_W       = 188
+_MENU_ITEM_H  = 44
+_MENU_GAP     = 5
+_MENU_X       = SCREEN_W - _MENU_W - 4
+_MENU_Y       = _SETTINGS_BTN.bottom + 6
+
+_MENU_ITEMS = [
+    ("sound", _IC_VOLUME_HUD,   "SOUND"),
+    ("quit",  _IC_SIGN_OUT_HUD, "QUIT GAME"),
+]
+_MENU_RS = [
+    pygame.Rect(_MENU_X, _MENU_Y + i * (_MENU_ITEM_H + _MENU_GAP), _MENU_W, _MENU_ITEM_H)
+    for i in range(len(_MENU_ITEMS))
+]
+
+_settings_open: bool = False
+
+
+def handle_settings_click(mx: int, my: int) -> "str | None":
+    """
+    MOUSEBUTTONDOWN 時由 client.py 呼叫。
+    回傳 'quit' / 'toggle_sound' / None。
+    """
+    global _settings_open
+    if _SETTINGS_BTN.collidepoint(mx, my):
+        _settings_open = not _settings_open
+        return None
+    if _settings_open:
+        for (key, _, _), r in zip(_MENU_ITEMS, _MENU_RS):
+            if r.collidepoint(mx, my):
+                _settings_open = False
+                return "quit" if key == "quit" else "toggle_sound"
+    _settings_open = False   # 點到選單外 → 收起
+    return None
+
+
+def _draw_settings_hud(screen: pygame.Surface, font: pygame.font.Font,
+                       mx: int, my: int) -> None:
+    """繪製右上角齒輪按鈕及（展開時的）下拉選單。"""
+    # ── 齒輪按鈕 ──────────────────────────────────────────────────────
+    hov = _SETTINGS_BTN.collidepoint(mx, my)
+    active = hov or _settings_open
+    bg  = (55, 65, 92) if active else (22, 28, 42)
+    bd  = (105, 138, 215) if active else (48, 60, 90)
+    pygame.draw.rect(screen, bg, _SETTINGS_BTN, border_radius=9)
+    pygame.draw.rect(screen, bd, _SETTINGS_BTN, 2, border_radius=9)
+    ic = font.render(_IC_COG_HUD, True, (195, 215, 252) if active else (95, 118, 165))
+    screen.blit(ic, (_SETTINGS_BTN.centerx - ic.get_width()  // 2,
+                     _SETTINGS_BTN.centery - ic.get_height() // 2))
+
+    if not _settings_open:
+        return
+
+    # ── 下拉面板背景 ───────────────────────────────────────────────────
+    panel_h = len(_MENU_ITEMS) * (_MENU_ITEM_H + _MENU_GAP) - _MENU_GAP + 14
+    panel_r = pygame.Rect(_MENU_X - 4, _MENU_Y - 7, _MENU_W + 8, panel_h)
+    pygame.draw.rect(screen, (18, 24, 38), panel_r, border_radius=11)
+    pygame.draw.rect(screen, (55, 72, 112), panel_r, 1, border_radius=11)
+
+    # ── 選單項目 ───────────────────────────────────────────────────────
+    for (key, icon, lbl), r in zip(_MENU_ITEMS, _MENU_RS):
+        hov_item = r.collidepoint(mx, my)
+        if key == "quit":
+            ibg = (72, 28, 28) if hov_item else (40, 18, 18)
+            ibd = (210, 75, 75) if hov_item else (95, 42, 42)
+            itc = (255, 158, 158) if hov_item else (185, 100, 100)
+        else:
+            ibg = (30, 48, 78) if hov_item else (22, 34, 54)
+            ibd = (78, 120, 210) if hov_item else (42, 65, 110)
+            itc = (185, 218, 255) if hov_item else (125, 162, 215)
+        pygame.draw.rect(screen, ibg, r, border_radius=7)
+        pygame.draw.rect(screen, ibd, r, 1, border_radius=7)
+        ic_s  = font.render(icon, True, itc)
+        lbl_s = font.render(lbl,  True, itc)
+        PAD = 12
+        screen.blit(ic_s,  (r.x + PAD,
+                             r.centery - ic_s.get_height() // 2))
+        screen.blit(lbl_s, (r.x + PAD + ic_s.get_width() + 8,
+                             r.centery - lbl_s.get_height() // 2))
+
+
 # ── 障礙物被擊中震動 ──────────────────────────────────────────────
 # {oid: (expiry, duration)}  ← perf_counter 時間戳 + 本次持續秒數
 _shake_timers: dict = {}
@@ -363,7 +450,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
          my_stance: str = "stand", aim_angle_deg: float = 0.0,
          ammo: int = MAGAZINE_SIZE, is_reloading: bool = False,
          player_chars: dict = None,
-         skill_cooldowns: dict = None) -> None:
+         skill_cooldowns: dict = None,
+         mx: int = 0, my: int = 0) -> None:
     # player_chars: {pid: char_key}，None 時全部用 hitman1
 
     if my_id not in state.players:
@@ -421,6 +509,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     _draw_low_hp_vignette(screen, me.hp, me.max_hp)
 
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns)
+    _draw_settings_hud(screen, font, mx, my)
 
 
 # ── 地圖底層 ──────────────────────────────────────────────────────────────────
@@ -696,6 +785,25 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         if giant_scale != 1.0:
             new_w = max(1, int(rotated.get_width()  * giant_scale))
             new_h = max(1, int(rotated.get_height() * giant_scale))
+            rotated = pygame.transform.scale(rotated, (new_w, new_h))
+
+        # ── 跳躍：地面陰影 + 玩家放大 ────────────────────────────────────
+        if player.jump_tick >= 0:
+            from game.chars.soldier.jump_state import JUMP_TICKS as _JUMP_TICKS
+            _j_age = state.tick - player.jump_tick
+            _j_t   = max(0.0, min(1.0, _j_age / _JUMP_TICKS))
+            # 地面陰影（原位置，半透明灰色橢圓）
+            _sh_r = int(PLAYER_RADIUS * 0.9)
+            _sh_surf = pygame.Surface((_sh_r * 4, _sh_r * 2), pygame.SRCALPHA)
+            _sh_alpha = int(120 * math.sin(math.pi * _j_t))
+            pygame.draw.ellipse(_sh_surf, (0, 0, 0, _sh_alpha),
+                                _sh_surf.get_rect())
+            screen.blit(_sh_surf,
+                        (sx - _sh_r * 2, sy - _sh_r))
+            # 跳躍時玩家放大（sin 弧線，最高 +25%）
+            _j_scale = 1.0 + 0.25 * math.sin(math.pi * _j_t)
+            new_w = max(1, int(rotated.get_width()  * _j_scale))
+            new_h = max(1, int(rotated.get_height() * _j_scale))
             rotated = pygame.transform.scale(rotated, (new_w, new_h))
 
         # ── Soldier 分身（clone_until 有效時先畫，在本體之下）──────────────

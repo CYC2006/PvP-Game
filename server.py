@@ -5,8 +5,8 @@ import sys
 from game.state    import GameState
 from game.obstacle import load_map
 from network.protocol import (
-    PKT_JOIN, PKT_CMD, PKT_CHAR_SELECT,
-    pack_joined, pack_all_joined, pack_state, pack_game_start,
+    PKT_JOIN, PKT_CMD, PKT_CHAR_SELECT, PKT_QUIT,
+    pack_joined, pack_all_joined, pack_state, pack_game_start, pack_game_over,
     unpack_command, packet_type,
 )
 
@@ -34,6 +34,7 @@ _SKILL_SPACE: dict = {
     'survivor1': lambda s, pid, ax, ay: s._activate_speed_boost(pid),
     'manOld':    lambda s, pid, ax, ay: s._spawn_mini_grenades(pid),
     'robot1':    lambda s, pid, ax, ay: s._activate_robot_space(pid),
+    'soldier1':  lambda s, pid, ax, ay: s._activate_jump(pid, ax, ay),
 }
 
 _SKILL_R: dict = {
@@ -157,6 +158,28 @@ def run():
                                 pass
                         print("[Server] Both selected — Game start!")
 
+            # ── 主動離場：重置 session，廣播 GAME_OVER ───────────
+            elif ptype == PKT_QUIT:
+                pid_who = addr_to_id.get(addr, "?")
+                print(f"[Server] Player {pid_who} quit — broadcasting GAME_OVER and resetting session")
+                for a in list(clients.values()):
+                    try:
+                        sock.sendto(pack_game_over(), a)
+                    except Exception:
+                        pass
+                clients.clear()
+                addr_to_id.clear()
+                player_chars.clear()
+                last_seen.clear()
+                game_started = False
+                paused       = False
+                state        = GameState()
+                obstacle_hp.clear()
+                obstacle_hp.update({oid: obs.hp for oid, obs in obstacles.items()})
+                next_tick = time.perf_counter()
+                print("[Server] Session reset — waiting for new players")
+                break   # 跳出本輪封包迴圈，回到外層 while True 繼續等待
+
             # ── 指令（遊戲進行中才處理）──────────────────────────
             elif ptype == PKT_CMD:
                 if addr in addr_to_id and game_started:
@@ -218,6 +241,7 @@ def run():
                 state.tick += 1
                 state.step_bullets(obstacles, obstacle_hp)
                 state.step_pending_pellets()
+                state.step_jumps()
                 state.resolve_player_collisions(obstacles)
                 state.step_gold_collection()
                 state.step_status_effects()

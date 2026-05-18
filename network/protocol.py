@@ -10,6 +10,8 @@ PKT_STATE       = 0x04
 PKT_CHAR_SELECT = 0x05   # client → server: 選好角色（2 bytes: type + char_id）
 PKT_GAME_START  = 0x06   # server → clients: 雙方都選完，遊戲開始
 PKT_ALL_JOINED  = 0x07   # server → clients: 所有玩家都已連線，可進入選角
+PKT_QUIT        = 0x08   # client → server: 玩家主動離開
+PKT_GAME_OVER   = 0x09   # server → clients: 一方離開，遊戲結束
 
 # PKT_STATE 格式:
 #   | type(1) | tick(I) |
@@ -23,7 +25,7 @@ PKT_ALL_JOINED  = 0x07   # server → clients: 所有玩家都已連線，可進
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBffH")  # +H: speed_mult×1000
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks
+_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age
 _BULLET_ENTRY  = struct.Struct("!BBffhBB")    # id owner x y angle_i16 bullet_type bullet_scale_u8(×10)
 _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
 _SMOKE_ENTRY   = struct.Struct("!BffHI")     # id x y radius*10 spawn_tick
@@ -106,6 +108,7 @@ def pack_state(state: GameState) -> bytes:
             min(255, p.stun_until - state.tick) if p.stun_until > state.tick else 0,
             max(0, 6 - p.burst_shots_fired) if p.burst_next_tick >= 0 else 0,
             min(255, p.clone_until - state.tick) if p.clone_until > state.tick else 0,
+            min(254, state.tick - p.jump_tick) if p.jump_tick >= 0 else 255,
         )
         for p in players
     )
@@ -201,7 +204,7 @@ def unpack_state(data: bytes) -> GameState:
 
     p_count = data[offset]; offset += 1
     for _ in range(p_count):
-        pid, x, y, hp, max_hp, aim_i16, stance_u8, gold, flash, giant_age, stun_b, burst_b, clone_b = _PLAYER_ENTRY.unpack(
+        pid, x, y, hp, max_hp, aim_i16, stance_u8, gold, flash, giant_age, stun_b, burst_b, clone_b, jump_age = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
         p = Player(id=pid, x=x, y=y, hp=hp, max_hp=max_hp,
@@ -210,6 +213,7 @@ def unpack_state(data: bytes) -> GameState:
         p.clone_until = tick + clone_b if clone_b > 0 else -1
         p.stun_until       = tick + stun_b if stun_b > 0 else -1
         p.burst_shots_fired = 6 - burst_b   # used client-side only to detect active burst
+        p.jump_tick   = tick - jump_age if jump_age != 255 else -1
         state.players[pid] = p
         state.gold_counts[pid] = gold
         offset += _PLAYER_ENTRY.size
@@ -349,6 +353,16 @@ def unpack_game_start(data: bytes) -> dict:
         chars[data[i]] = data[i + 1]
         i += 2
     return chars
+
+
+def pack_quit(player_id: int) -> bytes:
+    """client → server: 主動離場通知。"""
+    return bytes([PKT_QUIT, player_id & 0xFF])
+
+
+def pack_game_over() -> bytes:
+    """server → clients: 廣播遊戲結束。"""
+    return bytes([PKT_GAME_OVER])
 
 
 def packet_type(data: bytes) -> int:
