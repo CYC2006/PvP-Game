@@ -55,6 +55,7 @@ def connect_screen(sock: socket.socket, server_addr: tuple,
     dot_count  = 0
     dot_timer  = 0.0
     CX, CY     = LOGICAL_W // 2, LOGICAL_H // 2
+    BACK_R     = pygame.Rect(CX - 80, CY + 110, 160, 44)
 
     while True:
         dt       = clock.tick(FPS) / 1000.0
@@ -64,11 +65,16 @@ def connect_screen(sock: socket.socket, server_addr: tuple,
             dot_timer  = 0.0
             dot_count  = (dot_count + 1) % 4
 
+        mx, my = pygame.mouse.get_pos()
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return None
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 return None
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if BACK_R.collidepoint(mx, my):
+                    return None
 
         # 每秒發一次 JOIN
         if now_perf - last_sent >= 1.0:
@@ -93,8 +99,18 @@ def connect_screen(sock: socket.socket, server_addr: tuple,
         screen.blit(t, (CX - t.get_width() // 2, CY - 30))
         s = font_sm.render(f"{server_addr[0]}:{server_addr[1]}", True, COL_HINT)
         screen.blit(s, (CX - s.get_width() // 2, CY + 15))
-        e = font_sm.render("ESC to cancel", True, COL_HINT)
-        screen.blit(e, (CX - e.get_width() // 2, CY + 50))
+
+        # BACK 按鈕
+        hov = BACK_R.collidepoint(mx, my)
+        pygame.draw.rect(screen, (36, 46, 68) if hov else (24, 30, 46),
+                         BACK_R, border_radius=9)
+        pygame.draw.rect(screen, (72, 92, 138) if hov else (48, 62, 95),
+                         BACK_R, 2, border_radius=9)
+        lbl = font_sm.render("← BACK", True,
+                              (200, 215, 248) if hov else (130, 150, 195))
+        screen.blit(lbl, (BACK_R.centerx - lbl.get_width()  // 2,
+                          BACK_R.centery - lbl.get_height() // 2))
+
         pygame.display.flip()
 
 
@@ -112,6 +128,7 @@ def wait_for_all_players(sock: socket.socket,
     dot_count = 0
     dot_timer = 0.0
     CX, CY    = LOGICAL_W // 2, LOGICAL_H // 2
+    BACK_R    = pygame.Rect(CX - 80, CY + 80, 160, 44)
 
     while True:
         dt = clock.tick(FPS) / 1000.0
@@ -120,11 +137,16 @@ def wait_for_all_players(sock: socket.socket,
             dot_timer  = 0.0
             dot_count  = (dot_count + 1) % 4
 
+        mx, my = pygame.mouse.get_pos()
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return False
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 return False
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if BACK_R.collidepoint(mx, my):
+                    return False
 
         try:
             data, _ = sock.recvfrom(BUF_SIZE)
@@ -137,6 +159,20 @@ def wait_for_all_players(sock: socket.socket,
         dots = "." * dot_count
         t = font_lg.render(f"Waiting for player{dots}", True, COL_TEXT)
         screen.blit(t, (CX - t.get_width() // 2, CY - 20))
+        hint = font_sm.render("Share your IP with the other player", True, COL_HINT)
+        screen.blit(hint, (CX - hint.get_width() // 2, CY + 20))
+
+        # BACK 按鈕
+        hov = BACK_R.collidepoint(mx, my)
+        pygame.draw.rect(screen, (36, 46, 68) if hov else (24, 30, 46),
+                         BACK_R, border_radius=9)
+        pygame.draw.rect(screen, (72, 92, 138) if hov else (48, 62, 95),
+                         BACK_R, 2, border_radius=9)
+        lbl = font_sm.render("← BACK", True,
+                              (200, 215, 248) if hov else (130, 150, 195))
+        screen.blit(lbl, (BACK_R.centerx - lbl.get_width()  // 2,
+                          BACK_R.centery - lbl.get_height() // 2))
+
         pygame.display.flip()
 
 
