@@ -1066,14 +1066,18 @@ def _draw_hp_bar(screen, state, my_id, font):
     pygame.draw.rect(screen, COL_HP_BORDER,
                      (HP_BAR_X, bar_y, HP_BAR_W, HP_BAR_H), 2, border_radius=4)
 
-    label = font.render(f"HP  {hp} / {max_hp}", True, COL_TEXT)
-    screen.blit(label, (HP_BAR_X, bar_y - 18))
+    # HP 標籤：置左 "HP"，置右 "x / max"
+    lbl_left  = font.render("HP", True, COL_TEXT)
+    lbl_right = font.render(f"{hp} / {max_hp}", True, COL_TEXT)
+    label_y   = bar_y - 18
+    screen.blit(lbl_left,  (HP_BAR_X, label_y))
+    screen.blit(lbl_right, (HP_BAR_X + HP_BAR_W - lbl_right.get_width(), label_y))
 
     # ── 護盾血條（Soldier E，在 HP 條右方）────────────────────────────────
     shield = state.shields.get(my_id)
     if shield is not None and shield.broken_tick < 0:
-        sh_x = HP_BAR_X + HP_BAR_W + 20
-        sh_ratio = max(0.0, shield.hp / shield.max_hp) if shield.max_hp > 0 else 0.0
+        sh_x      = HP_BAR_X + HP_BAR_W + 20
+        sh_ratio  = max(0.0, shield.hp / shield.max_hp) if shield.max_hp > 0 else 0.0
         COL_SH_BG     = (40, 40, 50)
         COL_SH_FILL   = (190, 200, 220)
         COL_SH_BORDER = (150, 160, 180)
@@ -1085,8 +1089,11 @@ def _draw_hp_bar(screen, state, my_id, font):
                              (sh_x, bar_y, sh_fill_w, HP_BAR_H), border_radius=4)
         pygame.draw.rect(screen, COL_SH_BORDER,
                          (sh_x, bar_y, HP_BAR_W, HP_BAR_H), 2, border_radius=4)
-        sh_label = font.render(f"SHIELD  {shield.hp} / {shield.max_hp}", True, COL_SH_FILL)
-        screen.blit(sh_label, (sh_x, bar_y - 18))
+        # 護盾標籤：置左 "SHIELD"，置右 "x / max"
+        sh_lbl_left  = font.render("SHIELD", True, COL_SH_FILL)
+        sh_lbl_right = font.render(f"{shield.hp} / {shield.max_hp}", True, COL_SH_FILL)
+        screen.blit(sh_lbl_left,  (sh_x, label_y))
+        screen.blit(sh_lbl_right, (sh_x + HP_BAR_W - sh_lbl_right.get_width(), label_y))
 
 
 def _draw_waiting(screen, font):

@@ -9,7 +9,7 @@
 import math
 import random
 
-SHIELD_HP               = 120
+SHIELD_HP               = 80
 SHIELD_DURATION         = 300    # 5 s × 60 fps
 SHIELD_RADIUS           = 60     # px
 SHIELD_LINGER           = 8      # 破壞後繼續留在 state 的 tick 數（供 client FX 偵測）

@@ -112,7 +112,7 @@ _SKILLS: dict = {
          "Instantly refills the magazine and cancels any reload in progress. "
          "Invincible while airborne — can fly over obstacles and is immune to all projectiles."),
         ("FORCE SHIELD", "E", 12,
-         "Surrounds yourself with a 60 px shield that absorbs 120 HP of incoming damage for 5 seconds. "
+         "Surrounds yourself with a 60 px shield that absorbs 80 HP of incoming damage for 5 seconds. "
          "Damage never overflows to your HP — the excess is fully blocked. "
          "When the shield breaks or expires, it releases a shockwave ring (60→250 px in 0.5 s): "
          "the first enemy caught by the expanding ring takes 10–15 damage, "

@@ -375,7 +375,7 @@ def unpack_state(data: bytes) -> GameState:
         for _ in range(shield_count):
             sowner, shp, sstatus = _SHIELD_ENTRY.unpack(
                 data[offset: offset + _SHIELD_ENTRY.size])
-            sh = Shield(owner_id=sowner, hp=shp, max_hp=120)
+            sh = Shield(owner_id=sowner, hp=shp, max_hp=80)
             sh.broken_tick = 0 if sstatus == 1 else -1
             state.shields[sowner] = sh
             offset += _SHIELD_ENTRY.size
