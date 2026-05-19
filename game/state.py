@@ -160,6 +160,17 @@ class Mine:
 
 
 @dataclass
+class Turret:
+    id:             int
+    owner_id:       int
+    x:              float
+    y:              float
+    hp:             int   = 180
+    _passive_timer: int   = 0    # 被動扣血計時
+    _fire_timer:    int   = 0    # 射擊冷卻計時（初始為 0 → 第一次偵測立即射擊）
+
+
+@dataclass
 class LogBarrier:
     id:       int
     owner_id: int
@@ -240,6 +251,8 @@ class GameState:
     _next_log_id: int        = 0
     mines: dict              = field(default_factory=dict)   # mid → Mine
     _next_mine_id: int       = 0
+    turrets: dict            = field(default_factory=dict)   # tid → Turret
+    _next_turret_id: int     = 0
     poison_pools: dict       = field(default_factory=dict)   # ppid → PoisonPool
     _next_pool_id: int       = 0
     push_zones: dict         = field(default_factory=dict)   # pzid → PushZone
@@ -621,6 +634,27 @@ class GameState:
                         expired.append(bid)
                         break
 
+            # ── 子彈 vs 機槍台（敵方普攻命中扣血）────────────────────────
+            if not hit:
+                from game.chars.bear.turret_state import TURRET_HITBOX_R
+                for tid in list(self.turrets):
+                    turret = self.turrets.get(tid)
+                    if turret is None:
+                        continue
+                    # 只有敵方子彈才傷害機槍台
+                    if bullet.owner_id == turret.owner_id:
+                        continue
+                    if bullet.bullet_type in (1, 2, 3, 4, 5):
+                        continue   # 投擲物/手裡劍/迷你手雷穿透
+                    if math.hypot(bullet.x - turret.x, bullet.y - turret.y) < TURRET_HITBOX_R + coll_r:
+                        if does_damage and shooter:
+                            turret.hp -= self._roll_damage(shooter)
+                            if turret.hp <= 0:
+                                self.turrets.pop(tid, None)
+                        expired.append(bid)
+                        hit = True
+                        break
+
         for bid in expired:
             b = self.bullets.get(bid)
             # 投擲物 linger 結束時爆炸
@@ -774,6 +808,14 @@ class GameState:
     def step_mines(self) -> None:
         from game.chars.bear.mine_state import step_mines
         step_mines(self)
+
+    def _place_turret(self, owner_id: int) -> None:
+        from game.chars.bear.turret_state import place_turret
+        place_turret(self, owner_id)
+
+    def step_turrets(self, obstacles: dict = None, obstacle_hp: dict = None) -> None:
+        from game.chars.bear.turret_state import step_turrets
+        step_turrets(self, obstacles, obstacle_hp)
 
     def step_knockback(self) -> None:
         """每 tick 執行：套用並衰減所有玩家的擊退速度（kb_vx / kb_vy）。
