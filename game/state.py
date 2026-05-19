@@ -862,8 +862,10 @@ class GameState:
         shield = self.shields.get(player_id)
         if shield is not None and shield.broken_tick < 0:
             if damage >= shield.hp:
-                # 護盾破壞，傷害不溢出
+                # 護盾破壞，傷害不溢出；觸發衝擊波效果
                 shield.broken_tick = self.tick
+                from game.chars.soldier.shield_state import _apply_shockwave_effects
+                _apply_shockwave_effects(self, player_id)
             else:
                 shield.hp -= damage
             return   # 無論如何，玩家本體不受傷
