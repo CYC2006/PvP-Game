@@ -241,6 +241,56 @@ def _draw_join(screen, font_lg, font_sm, ip_text, cursor_on, back_r, conn_r, mx,
     cx(screen, font_sm, "ESC to go back", CX, LOGICAL_H - 26, (52, 65, 90))
 
 
+# ── Quit confirm dialog ───────────────────────────────────────────────────────
+
+def _draw_quit_dialog(screen: pygame.Surface,
+                      font_lg: pygame.font.Font,
+                      font_sm: pygame.font.Font,
+                      confirm_r: pygame.Rect,
+                      cancel_r:  pygame.Rect,
+                      mx: int, my: int) -> None:
+    """半透明遮罩 + 確認離開對話框。"""
+    # 半透明暗色遮罩
+    overlay = pygame.Surface((LOGICAL_W, LOGICAL_H), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 155))
+    screen.blit(overlay, (0, 0))
+
+    # 對話框面板
+    CX  = LOGICAL_W // 2
+    PW, PH = 400, 190
+    panel = pygame.Rect(CX - PW // 2, LOGICAL_H // 2 - PH // 2, PW, PH)
+    pygame.draw.rect(screen, (18, 22, 34), panel, border_radius=14)
+    pygame.draw.rect(screen, (58, 72, 108), panel, 2, border_radius=14)
+
+    # 標題
+    title = font_lg.render("Exit Game?", True, (220, 225, 242))
+    screen.blit(title, (CX - title.get_width() // 2, panel.y + 26))
+
+    # 提示文字
+    sub = font_sm.render("Are you sure you want to quit?", True, (88, 105, 145))
+    screen.blit(sub, (CX - sub.get_width() // 2, panel.y + 62))
+
+    # CANCEL 按鈕
+    hov_c = cancel_r.collidepoint(mx, my)
+    pygame.draw.rect(screen, COL_BTN_HOV if hov_c else COL_BTN,
+                     cancel_r, border_radius=9)
+    pygame.draw.rect(screen, COL_BTN_BD, cancel_r, 2, border_radius=9)
+    cs = font_sm.render("CANCEL", True,
+                        (210, 220, 245) if hov_c else COL_BTN_TXT)
+    screen.blit(cs, (cancel_r.centerx - cs.get_width()  // 2,
+                     cancel_r.centery - cs.get_height() // 2))
+
+    # YES, QUIT 按鈕
+    hov_q = confirm_r.collidepoint(mx, my)
+    pygame.draw.rect(screen, (185, 45, 45) if hov_q else (130, 30, 30),
+                     confirm_r, border_radius=9)
+    pygame.draw.rect(screen, (235, 90, 90) if hov_q else (175, 55, 55),
+                     confirm_r, 2, border_radius=9)
+    qs = font_sm.render("YES, QUIT", True, (255, 205, 205))
+    screen.blit(qs, (confirm_r.centerx - qs.get_width()  // 2,
+                     confirm_r.centery - qs.get_height() // 2))
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 
 def lobby_screen(screen: pygame.Surface,
@@ -259,6 +309,7 @@ def lobby_screen(screen: pygame.Surface,
     ip_text       = ""
     cursor_on     = True
     ctime         = 0.0
+    confirm_quit  = False     # ESC on main → 顯示確認對話框
 
     local_ip = _get_local_ip()
     pub_ip   = ["fetching..."]
@@ -267,6 +318,12 @@ def lobby_screen(screen: pygame.Surface,
     # Top-right icon buttons
     SFX_R  = pygame.Rect(LOGICAL_W - 26 - 46 - 10 - 46, 11, 46, 46)
     SET_R  = pygame.Rect(LOGICAL_W - 26 - 46,            11, 46, 46)
+
+    # Quit confirm dialog buttons
+    _DCX    = LOGICAL_W // 2
+    _DY     = LOGICAL_H // 2 - 190 // 2   # panel top
+    DCANCEL_R  = pygame.Rect(_DCX - 186,      _DY + 120, 170, 44)
+    DCONFIRM_R = pygame.Rect(_DCX + 16,       _DY + 120, 170, 44)
 
     # Sub-screen buttons
     CX      = LOGICAL_W // 2
@@ -291,10 +348,12 @@ def lobby_screen(screen: pygame.Surface,
             if event.type == pygame.KEYDOWN:
                 k = event.key
                 if k == pygame.K_ESCAPE:
-                    if state != "main":
+                    if confirm_quit:
+                        confirm_quit = False          # ESC 取消對話框
+                    elif state != "main":
                         state = "main"; ip_text = ""
                     else:
-                        return None, None
+                        confirm_quit = True           # main 頁按 ESC → 彈出確認框
 
                 elif state == "join":
                     if k == pygame.K_RETURN:
@@ -313,6 +372,13 @@ def lobby_screen(screen: pygame.Surface,
                         return "host", None
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if confirm_quit:
+                    if DCONFIRM_R.collidepoint(mx, my):
+                        return None, None             # 確認離開
+                    elif DCANCEL_R.collidepoint(mx, my):
+                        confirm_quit = False          # 取消
+                    continue                          # 對話框開著時攔截所有點擊
+
                 if state == "main":
                     # Sidebar tab switching
                     for (pg, _, _lbl), r in zip(SIDEBAR_TABS, TAB_RS):
@@ -380,5 +446,9 @@ def lobby_screen(screen: pygame.Surface,
         elif state == "join":
             _draw_join(screen, font_lg, font_sm,
                        ip_text, cursor_on, BACK_R, CONN_R, mx, my)
+
+        if confirm_quit:
+            _draw_quit_dialog(screen, font_lg, font_sm,
+                              DCONFIRM_R, DCANCEL_R, mx, my)
 
         pygame.display.flip()
