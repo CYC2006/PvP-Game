@@ -550,6 +550,8 @@ class GameState:
                         continue
                     if player.jump_tick >= 0:
                         continue  # 跳躍中：無敵，跳過傷害判定
+                    if player.r_skill_phase > 0:
+                        continue  # Assassin R 衝刺中：無敵，跳過傷害判定
                     if math.hypot(bullet.x - player.x,
                                   bullet.y - player.y) < PLAYER_RADIUS + coll_r:
                         key = (bid, pid)
@@ -569,6 +571,8 @@ class GameState:
                         continue
                     if player.jump_tick >= 0:
                         continue  # 跳躍中：無敵，跳過傷害判定
+                    if player.r_skill_phase > 0:
+                        continue  # Assassin R 衝刺中：無敵，跳過傷害判定
                     if math.hypot(bullet.x - player.x,
                                   bullet.y - player.y) < PLAYER_RADIUS + coll_r:
                         if bullet.bullet_type == 3:
@@ -594,6 +598,8 @@ class GameState:
                         continue
                     if player.jump_tick >= 0:
                         continue  # 跳躍中：無敵
+                    if player.r_skill_phase > 0:
+                        continue  # Assassin R 衝刺中：無敵
                     if math.hypot(bullet.x - player.x,
                                   bullet.y - player.y) < PLAYER_RADIUS + coll_r:
                         expired.append(bid)
@@ -857,6 +863,10 @@ class GameState:
         player = self.players.get(player_id)
         if player is None:
             return
+        # Assassin R 衝刺中：完全無敵
+        if player.r_skill_phase > 0:
+            return
+
         shield = self.shields.get(player_id)
         if shield is not None and shield.broken_tick < 0:
             if damage >= shield.hp:
