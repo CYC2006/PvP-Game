@@ -146,7 +146,8 @@ def init_char(char_key: str) -> None:
 
 def read_input(player_id: int, keys_held: set,
                logical_mouse: tuple,
-               shift_held: bool) -> tuple:
+               shift_held: bool,
+               suppress_lmb: bool = False) -> tuple:
     """
     回傳 (PlayerCommand, effective_stance, ammo, is_reloading, skill_cooldowns)
 
@@ -357,7 +358,8 @@ def read_input(player_id: int, keys_held: set,
 
     # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────
     shooting = False
-    if (not _reloading and not _r_skill_active and not _burst_shots_left
+    if (not suppress_lmb
+            and not _reloading and not _r_skill_active and not _burst_shots_left
             and pygame.mouse.get_pressed()[0]
             and (now - _last_shot_time) >= SHOOT_COOLDOWN_MS):
         shooting        = True

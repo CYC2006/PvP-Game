@@ -7,7 +7,7 @@ import threading
 import pygame
 
 from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left, set_cloak_ticks
-from game.renderer   import draw, handle_settings_click, reset_game_state, LOGICAL_W, LOGICAL_H
+from game.renderer   import draw, handle_settings_click, reset_game_state, settings_blocks_click, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
 import game.charselect as charselect
@@ -362,8 +362,9 @@ def run() -> None:
             logical_mouse = pygame.mouse.get_pos()
             mx, my_pos    = logical_mouse
             shift_held    = (pygame.K_LSHIFT in keys_held or pygame.K_RSHIFT in keys_held)
+            suppress_lmb  = settings_blocks_click(mx, my_pos)
             cmd, effective_stance, ammo, is_reloading, skill_cooldowns = read_input(
-                player_id, keys_held, logical_mouse, shift_held)
+                player_id, keys_held, logical_mouse, shift_held, suppress_lmb)
             aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
 
             try:

@@ -352,6 +352,10 @@ def lobby_screen(screen: pygame.Surface,
                         if ip:
                             return "join", ip
 
+            if (event.type == pygame.MOUSEWHEEL
+                    and state == "main" and page == "missions"):
+                missions_page.handle_scroll(event)
+
         # ── Render ────────────────────────────────────────────────────────
         screen.fill(COL_BG)
 
@@ -368,7 +372,7 @@ def lobby_screen(screen: pygame.Surface,
             elif page == "shop":
                 shop_page.draw(screen, font_lg, font_sm)
             elif page == "missions":
-                missions_page.draw(screen, font_lg, font_sm)
+                missions_page.draw(screen, font_lg, font_sm, mx, my)
 
         elif state == "host":
             _draw_host(screen, font_lg, font_sm,
