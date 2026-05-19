@@ -613,23 +613,16 @@ class GameState:
                     if bullet.bullet_type in (1, 2, 3, 4, 5):
                         continue   # 投擲物 / 手裡劍 / 迷你手雷無視障礙物
                     if bullet.dot_interval > 0:
-                        # DoT 子彈（毒氣泡）：撞牆時停住，不消失，持續傷害障礙物
+                        # DoT 子彈（毒氣泡）：撞牆時停住，不消失，不傷障礙物
                         if bullet.dx != 0.0 or bullet.dy != 0.0:
                             bullet.dx = 0.0
                             bullet.dy = 0.0   # 停在障礙物旁，觸發 linger 倒數
-                        if obstacle_hp is not None and obs.destructible and does_damage:
-                            key = (bid, -oid)  # 負 oid 與玩家 id 區分
-                            if self.tick >= self._dot_cooldown.get(key, 0):
-                                obstacle_hp[oid] -= self._roll_damage(shooter)
-                                if obstacle_hp[oid] <= 0:
-                                    self.destroyed_obstacles.add(oid)
-                                    self._handle_obstacle_drop(obs)
-                                self._dot_cooldown[key] = self.tick + bullet.dot_interval
-                                self._dot_keys_by_bid.setdefault(bid, set()).add(key)
                         break   # 只對第一個相交的障礙物作用
                     else:
                         # 一般子彈：碰到障礙物即消失，可能破壞
-                        if obstacle_hp is not None and obs.destructible and does_damage:
+                        # 毒液彈（type 8）不對障礙物造成傷害
+                        if obstacle_hp is not None and obs.destructible and does_damage \
+                                and bullet.bullet_type != 8:
                             obstacle_hp[oid] -= self._roll_damage(shooter)
                             if obstacle_hp[oid] <= 0:
                                 self.destroyed_obstacles.add(oid)
