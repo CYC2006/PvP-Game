@@ -7,17 +7,14 @@
     - 衝擊波圓環「掃過」對手時才觸發：10~15 傷害 + 擊退 + 短暈眩
 """
 import math
-import random
 
 SHIELD_HP               = 80
 SHIELD_DURATION         = 300    # 5 s × 60 fps
 SHIELD_RADIUS           = 60     # px
 SHIELD_LINGER           = 8      # 破壞後繼續留在 state 的 tick 數（供 client FX 偵測）
 
-SHOCKWAVE_RADIUS        = 250    # 衝擊波最大半徑（與 shield_fx 同步）
+SHOCKWAVE_RADIUS        = 350    # 衝擊波最大半徑（與 shield_fx 同步）
 SHOCKWAVE_DURATION_TICKS = 30   # 0.5 s × 60 fps
-SHOCKWAVE_DMG_MIN       = 10
-SHOCKWAVE_DMG_MAX       = 15
 SHOCKWAVE_KB_FORCE      = 10.0   # px/tick（robot 為 18）
 SHOCKWAVE_STUN_TICKS    = 30     # 0.5 s（robot 為 60 = 1 s）
 
@@ -62,10 +59,7 @@ def step_shockwaves(state) -> None:
         if dist > ring_r:
             continue   # 圓環還沒掃到對手
 
-        # 圓環掃到對手 → 施加效果
-        damage = random.randint(SHOCKWAVE_DMG_MIN, SHOCKWAVE_DMG_MAX)
-        state.apply_damage(opponent_id, damage)
-
+        # 圓環掃到對手 → 施加控制效果（無傷害）
         if dist > 0:
             ux = (opp.x - sw['cx']) / dist
             uy = (opp.y - sw['cy']) / dist
