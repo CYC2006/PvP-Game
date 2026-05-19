@@ -1,6 +1,6 @@
 import struct
 from game.command import PlayerCommand
-from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool, PushZone, RobotMark, Turret
+from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool, PushZone, RobotMark, Turret, BarrageStrike
 
 # --- Packet types ---
 PKT_JOIN        = 0x01
@@ -37,6 +37,7 @@ _POOL_ENTRY        = struct.Struct("!BhhHB")  # id x_i16 y_i16 age_u16 owner_id
 _PUSH_ENTRY        = struct.Struct("!BhhHhB") # id x_i16 y_i16 age_u16 angle_i16 owner_id
 _ROBOT_MARK_ENTRY  = struct.Struct("!BhhH")  # owner_id x_i16 y_i16 age_u16
 _TURRET_ENTRY      = struct.Struct("!BhhHB")  # id x_i16 y_i16 hp_u16 owner_id
+_BARRAGE_ENTRY     = struct.Struct("!BhhBB")  # id x_i16 y_i16 age_u8 owner_id
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -202,7 +203,14 @@ def pack_state(state: GameState) -> bytes:
         for t in turret_list
     )
 
-    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data + mark_data + turret_data
+    barrage_list = list(state.barrage_strikes.values())
+    barrage_data = bytes([len(barrage_list)]) + b"".join(
+        _BARRAGE_ENTRY.pack(s.id, int(s.x), int(s.y),
+                            min(255, state.tick - s.spawn_tick), s.owner_id)
+        for s in barrage_list
+    )
+
+    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data + mark_data + turret_data + barrage_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -343,6 +351,16 @@ def unpack_state(data: bytes) -> GameState:
             state.turrets[tid] = Turret(
                 id=tid, owner_id=towner, x=float(tx), y=float(ty), hp=thp)
             offset += _TURRET_ENTRY.size
+
+    if offset < len(data):
+        barrage_count = data[offset]; offset += 1
+        for _ in range(barrage_count):
+            sid, bx, by, bage, bowner = _BARRAGE_ENTRY.unpack(
+                data[offset: offset + _BARRAGE_ENTRY.size])
+            state.barrage_strikes[sid] = BarrageStrike(
+                id=sid, owner_id=bowner, x=float(bx), y=float(by),
+                spawn_tick=state.tick - bage)
+            offset += _BARRAGE_ENTRY.size
 
     return state
 

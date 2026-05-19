@@ -18,7 +18,6 @@ _SKILL_E: dict = {
     'manBlue':  lambda s, pid, ax, ay: s._spawn_grenade(pid, ax, ay),
     'survivor1': lambda s, pid, ax, ay: s._spawn_smoke_grenade(pid, ax, ay),
     'manOld':   lambda s, pid, ax, ay: s._activate_log_barriers(pid, ax, ay),
-    'soldier1': lambda s, pid, ax, ay: s._place_mine(pid),
     'manBrown': lambda s, pid, ax, ay: s._place_turret(pid),
 }
 
@@ -44,6 +43,7 @@ _SKILL_R: dict = {
     'robot1':    lambda s, pid, ax, ay: s._activate_push_zone(pid, ax, ay),
     'soldier1':  lambda s, pid, ax, ay: s._activate_clones(pid),
     'manOld':    lambda s, pid, ax, ay: s._activate_cloak(pid),
+    'manBrown':  lambda s, pid, ax, ay: s._activate_barrage(pid, ax, ay),
 }
 
 
@@ -255,6 +255,7 @@ def run():
                 state.step_burst()
                 state.step_mines()
                 state.step_turrets(obstacles, obstacle_hp)
+                state.step_barrage()
                 state.step_poison_pools()
                 state.step_knockback()
                 state.step_push_zones()

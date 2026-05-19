@@ -171,6 +171,15 @@ class Turret:
 
 
 @dataclass
+class BarrageStrike:
+    id:         int
+    owner_id:   int
+    x:          float
+    y:          float
+    spawn_tick: int   # tick when the shrink ring starts
+
+
+@dataclass
 class LogBarrier:
     id:       int
     owner_id: int
@@ -253,6 +262,9 @@ class GameState:
     _next_mine_id: int       = 0
     turrets: dict            = field(default_factory=dict)   # tid → Turret
     _next_turret_id: int     = 0
+    barrage_strikes: dict    = field(default_factory=dict)   # sid → BarrageStrike
+    _next_barrage_id: int    = 0
+    _pending_barrage: list   = field(default_factory=list)   # server-only queue
     poison_pools: dict       = field(default_factory=dict)   # ppid → PoisonPool
     _next_pool_id: int       = 0
     push_zones: dict         = field(default_factory=dict)   # pzid → PushZone
@@ -816,6 +828,14 @@ class GameState:
     def step_turrets(self, obstacles: dict = None, obstacle_hp: dict = None) -> None:
         from game.chars.bear.turret_state import step_turrets
         step_turrets(self, obstacles, obstacle_hp)
+
+    def _activate_barrage(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.bear.barrage_state import activate_barrage
+        activate_barrage(self, owner_id, aim_x, aim_y)
+
+    def step_barrage(self) -> None:
+        from game.chars.bear.barrage_state import step_barrage
+        step_barrage(self)
 
     def step_knockback(self) -> None:
         """每 tick 執行：套用並衰減所有玩家的擊退速度（kb_vx / kb_vy）。

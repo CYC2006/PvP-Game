@@ -22,6 +22,7 @@ from game.chars.dancer   import poison_pool_fx
 from game.chars.bear     import explosion_bullet_fx
 from game.chars.bear     import mine_fx as bear_mine_fx
 from game.chars.bear     import turret_fx as bear_turret_fx
+from game.chars.bear     import barrage_fx as bear_barrage_fx
 from game.chars.robot    import push_fx as robot_push_fx
 from game.chars.robot    import mark_fx as robot_mark_fx
 
@@ -514,6 +515,9 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     bear_mine_fx.draw(screen, state, cx, cy, my_id)
     bear_mine_fx.draw_explosions(screen, cx, cy)
     bear_turret_fx.draw(screen, state, my_id, cx, cy)
+    bear_barrage_fx.update(state)
+    bear_barrage_fx.draw(screen, state, cx, cy)
+    bear_barrage_fx.draw_explosions(screen, cx, cy)
     poison_pool_fx.update(state)
     poison_pool_fx.draw(screen, state, cx, cy)
     robot_push_fx.draw(screen, state, my_id, cx, cy)

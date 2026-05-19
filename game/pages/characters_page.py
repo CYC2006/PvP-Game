@@ -69,11 +69,13 @@ _SKILLS: dict = {
          "Skill under development."),
         ("AUTO TURRET",   "E",     10,
          "Deploys a stationary turret at your position. "
-         "It fires automatically at any enemy within 150 px, matching your gun's damage and fire rate. "
+         "It fires automatically at any enemy within 250 px, matching your gun's damage and fire rate. "
          "The turret has 180 HP — loses 1 HP per shot and 1 HP every 0.5 s passively. "
          "Enemy bullets also damage it. Only you can see the detection radius."),
-        ("—",             "R",     0,
-         "Skill under development."),
+        ("ROLLING BARRAGE","R",    10,
+         "Calls in 18 airstrikes toward the cursor in rapid succession (~3 s). "
+         "Strikes land from 60 px to 230 px ahead, randomly spread ±100 px left/right. "
+         "Each strike shows a shrinking targeting circle before detonating in an 80 px radius."),
     ],
     'manOld': [
         ("—",             "RMB",   0,
@@ -109,10 +111,7 @@ _SKILLS: dict = {
          "Leaps 150 px toward the aimed direction. "
          "Instantly refills the magazine and cancels any reload in progress. "
          "Invincible while airborne — can fly over obstacles and is immune to all projectiles."),
-        ("PROXIMITY MINE","E",     10,
-         "Places a hidden mine at your current position. "
-         "Triggers automatically when an enemy steps within detection range. "
-         "0.5 s fuse after triggering — then it explodes in a 120 px radius."),
+        ("—", "E", 0, "Skill under development."),
         ("CLONE CORPS", "R", 20,
          "Summons two semi-transparent clones flanking your position. "
          "For 8 seconds, every basic attack fires three parallel shots — "
