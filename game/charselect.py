@@ -91,7 +91,7 @@ def _load_sprite(char: dict) -> pygame.Surface:
     key = char["char_key"]
     if key not in _sprite_cache:
         path = os.path.join("assets", "Player", char["folder"],
-                            f"{char['char_key']}_stand.png")
+                            f"{char['folder']}_stand.png")
         try:
             img   = pygame.image.load(path).convert_alpha()
             ratio = _SPRITE_H / img.get_height()
