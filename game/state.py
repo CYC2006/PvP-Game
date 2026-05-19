@@ -275,6 +275,7 @@ class GameState:
     _next_barrage_id: int    = 0
     _pending_barrage: list   = field(default_factory=list)   # server-only queue
     shields: dict            = field(default_factory=dict)   # owner_id → Shield
+    _pending_shockwaves: list = field(default_factory=list)  # server-only expanding ring list
     poison_pools: dict       = field(default_factory=dict)   # ppid → PoisonPool
     _next_pool_id: int       = 0
     push_zones: dict         = field(default_factory=dict)   # pzid → PushZone
@@ -852,6 +853,10 @@ class GameState:
         from game.chars.soldier.shield_state import step_shields
         step_shields(self)
 
+    def step_shockwaves(self) -> None:
+        from game.chars.soldier.shield_state import step_shockwaves
+        step_shockwaves(self)
+
     def apply_damage(self, player_id: int, damage: int) -> None:
         """所有對玩家的傷害應透過此方法，使防護罩優先吸收。
         防護罩規則：傷害先扣護盾；護盾 HP 歸零即破壞；不溢傷到玩家血量。
@@ -862,10 +867,10 @@ class GameState:
         shield = self.shields.get(player_id)
         if shield is not None and shield.broken_tick < 0:
             if damage >= shield.hp:
-                # 護盾破壞，傷害不溢出；觸發衝擊波效果
+                # 護盾破壞，傷害不溢出；啟動衝擊波環
                 shield.broken_tick = self.tick
-                from game.chars.soldier.shield_state import _apply_shockwave_effects
-                _apply_shockwave_effects(self, player_id)
+                from game.chars.soldier.shield_state import _start_shockwave
+                _start_shockwave(self, player_id)
             else:
                 shield.hp -= damage
             return   # 無論如何，玩家本體不受傷

@@ -259,6 +259,7 @@ def run():
                 state.step_barrage()
                 state.step_poison_pools()
                 state.step_shields()
+                state.step_shockwaves()
                 state.step_knockback()
                 state.step_push_zones()
                 state.step_robot_marks()

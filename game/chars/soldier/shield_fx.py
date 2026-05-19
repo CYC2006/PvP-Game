@@ -1,7 +1,7 @@
 """Soldier E — 防護罩視覺效果
 
 活躍期間：以玩家為圓心的白色漸層圓（外緣較不透明，內部透明）。
-消失時（破壞或到期）：從 60px 擴散至 200px 的半透明白色衝擊波，歷時 0.5 秒。
+消失時（破壞或到期）：從 60px 擴散至 250px 的半透明白色衝擊波，歷時 0.5 秒。
 """
 
 import time
@@ -9,7 +9,7 @@ import pygame
 from game.render_utils import ws, SCREEN_W, SCREEN_H
 
 SHIELD_RADIUS      = 60      # px（與 shield_state 同步）
-SHOCKWAVE_MAX_R    = 200     # 衝擊波最大半徑
+SHOCKWAVE_MAX_R    = 250     # 衝擊波最大半徑
 SHOCKWAVE_DURATION = 0.5     # 秒
 # {owner_id: was_broken_status}  ← 追蹤上一幀的狀態，偵測消失
 _known:      dict = {}
