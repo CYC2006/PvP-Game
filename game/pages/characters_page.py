@@ -28,7 +28,7 @@ _RATINGS: dict = {
     'soldier1':   (3, 4, 4, 2),
     'survivor1':  (3, 5, 1, 4),
     'womanGreen': (2, 3, 2, 5),
-    'zoimbie1':   (3, 3, 4, 1),
+    'zombie1':   (3, 3, 4, 1),
 }
 
 # ── Skill data: fixed order → RMB / SPACE / E / R ────────────────────────────
@@ -143,7 +143,7 @@ _SKILLS: dict = {
         ("—", "E",     0, "Skill under development."),
         ("—", "R",     0, "Skill under development."),
     ],
-    'zoimbie1': [
+    'zombie1': [
         ("—", "RMB",   0, "Skill under development."),
         ("—", "SPACE", 0, "Skill under development."),
         ("—", "E",     0, "Skill under development."),

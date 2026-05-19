@@ -7,4 +7,4 @@ robot1,Robot,Robot 1,160,190,Laser,20,25,infinity,0.4,0,1000,,3,,,infinity,infin
 soldier1,Soldier,Soldier 1,220,210,Rifle,10,15,25,0.08,3,800,,12,,,500,480,0.8,6,6,8,12,20
 survivor1,Assassin,Survivor 1,120,250,Shuriken,10,15,infinity,1,0,700,,4,5,3,400,380,0.2,12,5,10,8,7
 womanGreen,Science,Woman Green,170,180,Poison,2,3,100,0.05,5,300,260,15,,,,,0.7,6,9,0,0,0
-zoimbie1,Zombie,Zombie 1,200,200,Hand,8,12,infinity,0.5,0,,,0,,,,,1.0,0,0,0,0,0
+zombie1,Zombie,Zombie 1,200,200,Hand,8,12,infinity,0.5,0,,,0,,,,,1.0,0,0,0,0,0
