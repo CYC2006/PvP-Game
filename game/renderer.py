@@ -66,7 +66,7 @@ COL_SKILL_FILL         = ( 25,  25,  38)
 # 角色定義：char_key → (資料夾名稱, 檔名前綴)
 # folder 來自 chars.csv，不在此處維護
 from game.char_data import CHAR_STATS as _CHAR_STATS
-CHAR_DIR: dict = {key: (s['folder'], key) for key, s in _CHAR_STATS.items()}
+CHAR_DIR: dict = {key: (s['folder'], s['folder']) for key, s in _CHAR_STATS.items()}
 
 # 障礙物圖片快取：(kind, w, h) → Surface（未旋轉原始縮放圖）
 _sprite_cache: dict = {}
@@ -422,7 +422,7 @@ def _get_player_sprite(char_key: str, stance: str) -> pygame.Surface:
     """載入並快取角色 sprite（按 PLAYER_SPRITE_SCALE 放大，保持原始比例）。"""
     key = (char_key, stance)
     if key not in _player_cache:
-        folder, prefix = CHAR_DIR.get(char_key, ("Hitman 1", "hitman1"))
+        folder, prefix = CHAR_DIR.get(char_key, ("agent", "agent"))
         path = os.path.join("assets", "Player", folder, f"{prefix}_{stance}.png")
         try:
             img = pygame.image.load(path).convert_alpha()
