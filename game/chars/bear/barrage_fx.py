@@ -12,8 +12,8 @@ from game.chars.bear.barrage_state import BARRAGE_FUSE
 
 EXPL_MAX_R    = 110
 EXPL_DURATION = 0.5   # 秒
-_X_SIZE       = 14    # X 標誌的半臂長（px）
-_X_WIDTH      = 3     # X 線寬（px）
+_PLUS_SIZE    = 8     # + 標誌的半臂長（px）
+_PLUS_WIDTH   = 2     # + 線寬（px）
 
 _known:      dict = {}   # sid → (wx, wy, owner_id, explode_t_or_None)
 _explosions: list = []   # [(wx, wy, owner_id, start_t)]
@@ -45,24 +45,20 @@ def update(state) -> None:
 
 
 def draw(screen, state, cx: float, cy: float) -> None:
-    """繪製 X 標誌（age < BARRAGE_FUSE 期間）。"""
+    """繪製 + 標誌（age < BARRAGE_FUSE 期間，固定顯示不閃爍）。"""
     for sid, strike in state.barrage_strikes.items():
         age = state.tick - strike.spawn_tick
         if age < 0 or age >= BARRAGE_FUSE:
             continue
 
         sx, sy = ws(strike.x, strike.y, cx, cy)
-        if sx < -_X_SIZE * 2 or sx > SCREEN_W + _X_SIZE * 2:
-            continue
-
-        # 後半段閃爍提示即將爆炸
-        if age >= BARRAGE_FUSE * 0.6 and (age // 3) % 2 == 0:
+        if sx < -_PLUS_SIZE * 2 or sx > SCREEN_W + _PLUS_SIZE * 2:
             continue
 
         color = COL_BULLET.get(strike.owner_id, (255, 200, 100))
-        d = _X_SIZE
-        pygame.draw.line(screen, color, (sx - d, sy - d), (sx + d, sy + d), _X_WIDTH)
-        pygame.draw.line(screen, color, (sx + d, sy - d), (sx - d, sy + d), _X_WIDTH)
+        d = _PLUS_SIZE
+        pygame.draw.line(screen, color, (sx - d, sy),      (sx + d, sy),      _PLUS_WIDTH)
+        pygame.draw.line(screen, color, (sx,      sy - d), (sx,      sy + d), _PLUS_WIDTH)
 
 
 def draw_explosions(screen, cx: float, cy: float) -> None:

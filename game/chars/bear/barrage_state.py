@@ -15,6 +15,7 @@ BARRAGE_LINGER   = 60     # 爆炸後 strike 繼續留在 state 的 tick（供 c
 BARRAGE_START_D  = 60     # 第一枚距玩家的前向距離（px）
 BARRAGE_STEP_D   = 60     # 每枚遞增的前向距離（px）
 BARRAGE_HALF_W   = 100    # 橫向隨機偏移範圍 ±px
+BARRAGE_PER_WAVE = 3      # 每波同時落下的空襲數
 BARRAGE_EXPL_R   = 80     # 爆炸傷害半徑（px）
 BARRAGE_DMG_MIN  = 10     # 邊緣最低傷害
 BARRAGE_DMG_MAX  = 35     # 中心最高傷害（公式算出）
@@ -32,21 +33,20 @@ def activate_barrage(state, owner_id: int, aim_x: float, aim_y: float) -> None:
     rx, ry = -uy, ux   # 右方向向量（垂直於前進方向）
 
     for i in range(BARRAGE_COUNT):
-        forward  = BARRAGE_START_D + i * BARRAGE_STEP_D
-        lateral  = random.uniform(-BARRAGE_HALF_W, BARRAGE_HALF_W)
-        x = player.x + ux * forward + rx * lateral
-        y = player.y + uy * forward + ry * lateral
-        # 限制在地圖邊界內
-        x = max(20.0, min(float(MAP_WIDTH  - 20), x))
-        y = max(20.0, min(float(MAP_HEIGHT - 20), y))
-
-        sid = state._next_barrage_id
-        state._next_barrage_id = (state._next_barrage_id + 1) % 256
-        strike = BarrageStrike(
-            id=sid, owner_id=owner_id, x=x, y=y,
-            spawn_tick=state.tick + i * BARRAGE_INTERVAL,
-        )
-        state._pending_barrage.append(strike)
+        forward    = BARRAGE_START_D + i * BARRAGE_STEP_D
+        spawn_tick = state.tick + i * BARRAGE_INTERVAL
+        for _ in range(BARRAGE_PER_WAVE):
+            lateral = random.uniform(-BARRAGE_HALF_W, BARRAGE_HALF_W)
+            x = player.x + ux * forward + rx * lateral
+            y = player.y + uy * forward + ry * lateral
+            x = max(20.0, min(float(MAP_WIDTH  - 20), x))
+            y = max(20.0, min(float(MAP_HEIGHT - 20), y))
+            sid = state._next_barrage_id
+            state._next_barrage_id = (state._next_barrage_id + 1) % 256
+            state._pending_barrage.append(
+                BarrageStrike(id=sid, owner_id=owner_id, x=x, y=y,
+                              spawn_tick=spawn_tick)
+            )
 
 
 def step_barrage(state) -> None:

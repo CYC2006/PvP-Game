@@ -11,7 +11,7 @@ import math
 import random
 from game.state import Bullet
 
-TURRET_RANGE          = 250.0    # 偵測半徑（px）
+TURRET_RANGE          = 200.0    # 偵測半徑（px）
 TURRET_MAX_HP         = 180
 TURRET_HITBOX_R       = 14.0     # 機槍台碰撞半徑（px）
 TURRET_PASSIVE_DRAIN  = 30       # 被動扣血間隔（tick）
