@@ -11,8 +11,6 @@ from game.render_utils import ws, SCREEN_W, SCREEN_H
 SHIELD_RADIUS      = 80      # px（與 shield_state 同步）
 SHOCKWAVE_MAX_R    = 400     # 衝擊波最大半徑
 SHOCKWAVE_DURATION = 0.5     # 秒
-_RING_STEPS        = 6       # 漸層圓環數（由內到外透明→不透明）
-
 # {owner_id: was_broken_status}  ← 追蹤上一幀的狀態，偵測消失
 _known:      dict = {}
 # [(wx, wy, start_t)]  ← 衝擊波列表
@@ -55,7 +53,7 @@ def update(state) -> None:
 
 
 def draw(screen, state, cx: float, cy: float) -> None:
-    """繪製活躍護盾的漸層白色圓（由外到內逐漸透明）。"""
+    """繪製活躍護盾：單一輪廓圓 + 極淡填充。"""
     for oid, shield in state.shields.items():
         if shield.broken_tick >= 0:
             continue   # 已破壞，不再繪製圓形
@@ -66,19 +64,19 @@ def draw(screen, state, cx: float, cy: float) -> None:
         if sx < -SHIELD_RADIUS - 10 or sx > SCREEN_W + SHIELD_RADIUS + 10:
             continue
 
-        # 依 HP 比例顯示護盾強度（顏色稍暗淡）
         hp_ratio = max(0.0, shield.hp / shield.max_hp)
+        r = SHIELD_RADIUS
 
-        # 漸層環：外圈 alpha 大（可見），內圈 alpha 小（透明）
-        for i in range(_RING_STEPS, 0, -1):
-            frac  = i / _RING_STEPS          # 1.0 → 外圈，1/_RING_STEPS → 內圈
-            r     = max(1, int(SHIELD_RADIUS * frac))
-            alpha = int(140 * frac * hp_ratio)
-            width = max(1, SHIELD_RADIUS // _RING_STEPS + 1)
-            surf = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
-            pygame.draw.circle(surf, (220, 230, 255, alpha),
-                               (r + 2, r + 2), r, width)
-            screen.blit(surf, (sx - r - 2, sy - r - 2))
+        # 極淡填充（幾乎透明的內部）
+        fill_surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+        pygame.draw.circle(fill_surf, (200, 215, 255, int(22 * hp_ratio)), (r, r), r)
+        screen.blit(fill_surf, (sx - r, sy - r))
+
+        # 單一清晰輪廓
+        ring_surf = pygame.Surface((r * 2 + 6, r * 2 + 6), pygame.SRCALPHA)
+        pygame.draw.circle(ring_surf, (220, 235, 255, int(170 * hp_ratio)),
+                           (r + 3, r + 3), r, 3)
+        screen.blit(ring_surf, (sx - r - 3, sy - r - 3))
 
 
 def draw_shockwaves(screen, cx: float, cy: float) -> None:
