@@ -10,7 +10,7 @@ from game.state import BarrageStrike, MAP_WIDTH, MAP_HEIGHT
 
 BARRAGE_COUNT    = 18     # 總空襲枚數
 BARRAGE_INTERVAL = 10     # 每枚間隔 tick
-BARRAGE_FUSE     = 20     # 縮小圓圈持續 tick，到期後爆炸
+BARRAGE_FUSE     = 30     # X 標誌顯示持續 tick，到期後爆炸
 BARRAGE_LINGER   = 60     # 爆炸後 strike 繼續留在 state 的 tick（供 client FX）
 BARRAGE_START_D  = 60     # 第一枚距玩家的前向距離（px）
 BARRAGE_STEP_D   = 60     # 每枚遞增的前向距離（px）
