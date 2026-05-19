@@ -48,8 +48,6 @@ def step_air_strikes(state) -> None:
                         dmg = random.randint(DMG_MIN, DMG_MAX)
                         if opponent.giant_tick >= 0:
                             dmg = int(dmg * 0.8)
-                        opponent.hp -= dmg
-                        if opponent.hp <= 0:
-                            opponent.respawn()
+                        state.apply_damage(opponent_id, dmg)
     for aid in to_remove:
         state.air_strikes.pop(aid, None)

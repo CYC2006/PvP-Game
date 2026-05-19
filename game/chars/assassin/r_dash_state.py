@@ -46,10 +46,8 @@ def step_r_skill(state) -> None:
         opponent    = state.players.get(opponent_id)
         if opponent and not (player.r_skill_dmg_done & dmg_flag):
             if math.hypot(player.x - opponent.x, player.y - opponent.y) < PLAYER_RADIUS * 2 + 4:
-                opponent.hp -= R_DAMAGE
+                state.apply_damage(opponent_id, R_DAMAGE)
                 player.r_skill_dmg_done |= dmg_flag
-                if opponent.hp <= 0:
-                    opponent.respawn()
 
         player.r_skill_tick += 1
         if player.r_skill_tick >= R_PHASE_TICKS:

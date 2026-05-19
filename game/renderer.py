@@ -23,6 +23,7 @@ from game.chars.bear     import explosion_bullet_fx
 from game.chars.bear     import mine_fx as bear_mine_fx
 from game.chars.bear     import turret_fx as bear_turret_fx
 from game.chars.bear     import barrage_fx as bear_barrage_fx
+from game.chars.soldier  import shield_fx as soldier_shield_fx
 from game.chars.robot    import push_fx as robot_push_fx
 from game.chars.robot    import mark_fx as robot_mark_fx
 
@@ -102,6 +103,17 @@ _MENU_RS = [
 ]
 
 _settings_open: bool = False
+
+
+def settings_blocks_click(mx: int, my: int) -> bool:
+    """回傳 True 表示該位置屬於設定 UI，點擊應被消耗（不觸發遊戲輸入）。"""
+    if _SETTINGS_BTN.collidepoint(mx, my):
+        return True
+    if _settings_open:
+        for r in _MENU_RS:
+            if r.collidepoint(mx, my):
+                return True
+    return False
 
 
 def handle_settings_click(mx: int, my: int) -> "str | None":
@@ -505,12 +517,15 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _draw_trees(screen, obstacles, state.destroyed_obstacles,
                     cx, cy, me.x, me.y)
 
+    soldier_shield_fx.update(state)
+    soldier_shield_fx.draw(screen, state, cx, cy)
     smoke_fx.draw_patches(screen, state, cx, cy, my_id)
     flash_fx.draw_explosions(screen, cx, cy)
     grenade_fx.draw_explosions(screen, cx, cy)
     mini_grenade_fx.draw_explosions(screen, cx, cy)
     stun_bullet_fx.draw_explosions(screen, cx, cy)
     explosion_bullet_fx.draw_explosions(screen, cx, cy)
+    soldier_shield_fx.draw_shockwaves(screen, cx, cy)
     bear_mine_fx.update(state, my_id)
     bear_mine_fx.draw(screen, state, cx, cy, my_id)
     bear_mine_fx.draw_explosions(screen, cx, cy)
@@ -1053,6 +1068,25 @@ def _draw_hp_bar(screen, state, my_id, font):
 
     label = font.render(f"HP  {hp} / {max_hp}", True, COL_TEXT)
     screen.blit(label, (HP_BAR_X, bar_y - 18))
+
+    # ── 護盾血條（Soldier E，在 HP 條右方）────────────────────────────────
+    shield = state.shields.get(my_id)
+    if shield is not None and shield.broken_tick < 0:
+        sh_x = HP_BAR_X + HP_BAR_W + 20
+        sh_ratio = max(0.0, shield.hp / shield.max_hp) if shield.max_hp > 0 else 0.0
+        COL_SH_BG     = (40, 40, 50)
+        COL_SH_FILL   = (190, 200, 220)
+        COL_SH_BORDER = (150, 160, 180)
+        pygame.draw.rect(screen, COL_SH_BG,
+                         (sh_x, bar_y, HP_BAR_W, HP_BAR_H), border_radius=4)
+        sh_fill_w = int(HP_BAR_W * sh_ratio)
+        if sh_fill_w > 0:
+            pygame.draw.rect(screen, COL_SH_FILL,
+                             (sh_x, bar_y, sh_fill_w, HP_BAR_H), border_radius=4)
+        pygame.draw.rect(screen, COL_SH_BORDER,
+                         (sh_x, bar_y, HP_BAR_W, HP_BAR_H), 2, border_radius=4)
+        sh_label = font.render(f"SHIELD  {shield.hp} / {shield.max_hp}", True, COL_SH_FILL)
+        screen.blit(sh_label, (sh_x, bar_y - 18))
 
 
 def _draw_waiting(screen, font):

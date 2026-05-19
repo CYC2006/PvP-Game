@@ -34,9 +34,7 @@ def step_mines(state) -> None:
                                      + (EXPL_DMG_MAX - EXPL_DMG_MIN) * (1 - t) * (1 - t))
                         if opp.giant_tick >= 0:
                             damage = int(damage * 0.8)
-                        opp.hp -= damage
-                        if opp.hp <= 0:
-                            opp.respawn()
+                        state.apply_damage(opponent_id, damage)
                 to_remove.append(mid)
         else:
             if opp:

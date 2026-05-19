@@ -40,10 +40,9 @@ def trigger_stun_explosion(state, x: float, y: float, owner_id: int) -> None:
         dist = math.hypot(player.x - x, player.y - y)
         if dist <= STUN_RADIUS:
             dmg = int(STUN_DMG * 0.8) if player.giant_tick >= 0 else STUN_DMG
-            player.hp -= dmg
+            state.apply_damage(pid, dmg)
+            # 暈眩效果：無論護盾是否吸收傷害，暈眩照常施加
             player.stun_until = max(
                 player.stun_until if player.stun_until > state.tick else state.tick,
                 state.tick + STUN_TICKS,
             )
-            if player.hp <= 0:
-                player.respawn()

@@ -1,6 +1,6 @@
 import struct
 from game.command import PlayerCommand
-from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool, PushZone, RobotMark, Turret, BarrageStrike
+from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool, PushZone, RobotMark, Turret, BarrageStrike, Shield
 
 # --- Packet types ---
 PKT_JOIN        = 0x01
@@ -38,6 +38,7 @@ _PUSH_ENTRY        = struct.Struct("!BhhHhB") # id x_i16 y_i16 age_u16 angle_i16
 _ROBOT_MARK_ENTRY  = struct.Struct("!BhhH")  # owner_id x_i16 y_i16 age_u16
 _TURRET_ENTRY      = struct.Struct("!BhhHB")  # id x_i16 y_i16 hp_u16 owner_id
 _BARRAGE_ENTRY     = struct.Struct("!BhhBB")  # id x_i16 y_i16 age_u8 owner_id
+_SHIELD_ENTRY      = struct.Struct("!BHB")    # owner_id hp_u16 status_u8(0=active,1=broken)
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -210,7 +211,14 @@ def pack_state(state: GameState) -> bytes:
         for s in barrage_list
     )
 
-    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data + mark_data + turret_data + barrage_data
+    shield_list = list(state.shields.values())
+    shield_data = bytes([len(shield_list)]) + b"".join(
+        _SHIELD_ENTRY.pack(sh.owner_id, max(0, sh.hp),
+                           1 if sh.broken_tick >= 0 else 0)
+        for sh in shield_list
+    )
+
+    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data + mark_data + turret_data + barrage_data + shield_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -361,6 +369,16 @@ def unpack_state(data: bytes) -> GameState:
                 id=sid, owner_id=bowner, x=float(bx), y=float(by),
                 spawn_tick=state.tick - bage)
             offset += _BARRAGE_ENTRY.size
+
+    if offset < len(data):
+        shield_count = data[offset]; offset += 1
+        for _ in range(shield_count):
+            sowner, shp, sstatus = _SHIELD_ENTRY.unpack(
+                data[offset: offset + _SHIELD_ENTRY.size])
+            sh = Shield(owner_id=sowner, hp=shp, max_hp=120)
+            sh.broken_tick = 0 if sstatus == 1 else -1
+            state.shields[sowner] = sh
+            offset += _SHIELD_ENTRY.size
 
     return state
 

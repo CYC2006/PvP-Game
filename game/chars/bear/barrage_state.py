@@ -76,9 +76,7 @@ def step_barrage(state) -> None:
                     damage = int(BARRAGE_DMG_MIN + (BARRAGE_DMG_MAX - BARRAGE_DMG_MIN) * ratio ** 2)
                     if enemy.giant_tick >= 0:
                         damage = int(damage * 0.8)
-                    enemy.hp -= damage
-                    if enemy.hp <= 0:
-                        enemy.respawn()
+                    state.apply_damage(enemy_id, damage)
 
         # 超過 LINGER 時間後移除
         if age >= BARRAGE_FUSE + BARRAGE_LINGER:

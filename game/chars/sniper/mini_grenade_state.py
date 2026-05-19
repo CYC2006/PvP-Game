@@ -44,6 +44,4 @@ def trigger_mini_grenade_explosion(state, x: float, y: float, owner_id: int) -> 
             damage = int(MINI_DMG_MIN + 20 * (1 - dist / 120) ** 2)
             if player.giant_tick >= 0:
                 damage = int(damage * 0.8)
-            player.hp -= damage
-            if player.hp <= 0:
-                player.respawn()
+            state.apply_damage(pid, damage)

@@ -171,6 +171,15 @@ class Turret:
 
 
 @dataclass
+class Shield:
+    owner_id:    int
+    hp:          int   = 120
+    max_hp:      int   = 120
+    spawn_tick:  int   = 0
+    broken_tick: int   = -1   # -1 = 活躍中；>= 0 = 破壞/到期的 tick
+
+
+@dataclass
 class BarrageStrike:
     id:         int
     owner_id:   int
@@ -265,6 +274,7 @@ class GameState:
     barrage_strikes: dict    = field(default_factory=dict)   # sid → BarrageStrike
     _next_barrage_id: int    = 0
     _pending_barrage: list   = field(default_factory=list)   # server-only queue
+    shields: dict            = field(default_factory=dict)   # owner_id → Shield
     poison_pools: dict       = field(default_factory=dict)   # ppid → PoisonPool
     _next_pool_id: int       = 0
     push_zones: dict         = field(default_factory=dict)   # pzid → PushZone
@@ -548,9 +558,7 @@ class GameState:
                                 damage = int(damage * bullet.bullet_scale)
                             if player.giant_tick >= 0:
                                 damage = int(damage * 0.8)
-                            player.hp -= damage
-                            if player.hp <= 0:
-                                player.respawn()
+                            self.apply_damage(pid, damage)
                             self._dot_cooldown[key] = self.tick + bullet.dot_interval
                             self._dot_keys_by_bid.setdefault(bid, set()).add(key)
             elif does_damage:
@@ -573,9 +581,7 @@ class GameState:
                             damage = int(damage * bullet.bullet_scale)
                         if player.giant_tick >= 0:
                             damage = int(damage * 0.8)
-                        player.hp -= damage
-                        if player.hp <= 0:
-                            player.respawn()
+                        self.apply_damage(pid, damage)
                         expired.append(bid)
                         hit = True
                         break
@@ -836,6 +842,35 @@ class GameState:
     def step_barrage(self) -> None:
         from game.chars.bear.barrage_state import step_barrage
         step_barrage(self)
+
+    # ── Soldier E：防護罩 ──────────────────────────────────────────────────────
+    def _activate_shield(self, owner_id: int) -> None:
+        from game.chars.soldier.shield_state import activate_shield
+        activate_shield(self, owner_id)
+
+    def step_shields(self) -> None:
+        from game.chars.soldier.shield_state import step_shields
+        step_shields(self)
+
+    def apply_damage(self, player_id: int, damage: int) -> None:
+        """所有對玩家的傷害應透過此方法，使防護罩優先吸收。
+        防護罩規則：傷害先扣護盾；護盾 HP 歸零即破壞；不溢傷到玩家血量。
+        """
+        player = self.players.get(player_id)
+        if player is None:
+            return
+        shield = self.shields.get(player_id)
+        if shield is not None and shield.broken_tick < 0:
+            if damage >= shield.hp:
+                # 護盾破壞，傷害不溢出
+                shield.broken_tick = self.tick
+            else:
+                shield.hp -= damage
+            return   # 無論如何，玩家本體不受傷
+        # 無護盾：直接扣血
+        player.hp -= damage
+        if player.hp <= 0:
+            player.respawn()
 
     def step_knockback(self) -> None:
         """每 tick 執行：套用並衰減所有玩家的擊退速度（kb_vx / kb_vy）。

@@ -67,9 +67,7 @@ def step_poison_pools(state) -> None:
                     dmg = random.randint(DOT_MIN, DOT_MAX)
                     if opp.giant_tick >= 0:
                         dmg = int(dmg * 0.8)
-                    opp.hp -= dmg
-                    if opp.hp <= 0:
-                        opp.respawn()
+                    state.apply_damage(opponent_id, dmg)
 
     for ppid in to_remove:
         state.poison_pools.pop(ppid, None)
