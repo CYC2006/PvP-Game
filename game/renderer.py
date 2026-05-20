@@ -49,11 +49,11 @@ HP_BAR_H             = 18
 HP_PIP_GAP           = 4
 PLAYER_SPRITE_SCALE  = 1.5   # 原圖 33–54 × 43 px，放大後約 50–81 × 65 px
 
-SKILL_CIRCLE_R   = 17   # 14 × 1.2 ≈ 17
-SKILL_CIRCLE_GAP = 6
-SKILL_STEP       = SKILL_CIRCLE_R * 2 + SKILL_CIRCLE_GAP   # 40 px
-_SKILL_SLOTS     = ('space', 'e', 'r', 'rmb')
-_SKILL_LABELS    = ('SP', 'E', 'R', 'MB')
+SKILL_CIRCLE_R   = 34   # 17 × 2
+SKILL_CIRCLE_GAP = 10
+SKILL_STEP       = SKILL_CIRCLE_R * 2 + SKILL_CIRCLE_GAP   # 78 px
+_SKILL_SLOTS     = ('rmb', 'space', 'e', 'r')
+_SKILL_LABELS    = ('MB', 'SP', 'E', 'R')
 
 COL_SKILL_READY_BORDER = (220, 220, 255)
 COL_SKILL_CD_BORDER    = ( 80,  80,  80)
@@ -984,13 +984,12 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
 
 
 def _draw_skill_hud(screen, font, skill_cooldowns: dict) -> None:
-    """血條上方四個技能冷卻圓圈。"""
-    bar_y = SCREEN_H - HP_BAR_Y_FROM_BOTTOM
-    # 圓圈中心 y：血條頂端往上 18px（HP label）再往上 5px + 圓半徑
-    cy = bar_y - 18 - 5 - SKILL_CIRCLE_R   # ≈ 633
+    """畫面中下方四個技能冷卻圓圈（MB / SP / E / R）。"""
+    cy = SCREEN_H - SKILL_CIRCLE_R - 10   # 距離底部 10 px
+    x0 = SCREEN_W // 2 - (3 * SKILL_STEP) // 2   # 水平居中起點
 
     for i, (slot, label) in enumerate(zip(_SKILL_SLOTS, _SKILL_LABELS)):
-        cx = HP_BAR_X + SKILL_CIRCLE_R + i * SKILL_STEP
+        cx = x0 + i * SKILL_STEP
 
         remaining_ms, max_ms = skill_cooldowns.get(slot, (-1, -1))
 

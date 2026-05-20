@@ -246,7 +246,7 @@ def run():
                 state.step_bullets(obstacles, obstacle_hp)
                 state.step_pending_pellets()
                 state.step_jumps()
-                state.step_vince_dash()
+                state.step_vince_dash(obstacles)
                 state.resolve_player_collisions(obstacles)
                 state.step_gold_collection()
                 state.step_status_effects()

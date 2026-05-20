@@ -261,15 +261,8 @@ def read_input(player_id: int, keys_held: set,
                 if _char_name == 'Assassin':
                     pass   # 冷卻由下方 use_skill_space 區塊統一記錄
                 elif _char_name == 'Vince':
-                    aim_len = math.hypot(aim_x, aim_y)
-                    if aim_len > 0:
-                        _dash_active          = True
-                        _dash_dx              = aim_x / aim_len
-                        _dash_dy              = aim_y / aim_len
-                        speed_mult            = _RAMBO_DASH_SPEED / max(_player_speed, 0.001)
-                        dx, dy                = _dash_dx, _dash_dy
-                        _dash_dist_remaining  = 200.0
-                        _skill_last_ms['space'] = now
+                    use_skill_space         = True
+                    _skill_last_ms['space'] = now
                 elif _char_name == 'Hunter':
                     aim_len = math.hypot(aim_x, aim_y)
                     if aim_len > 0:

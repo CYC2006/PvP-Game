@@ -1020,6 +1020,6 @@ class GameState:
         from game.chars.vince.dash_state import activate_dash
         activate_dash(self, owner_id, aim_x, aim_y)
 
-    def step_vince_dash(self) -> None:
+    def step_vince_dash(self, obstacles: dict = None) -> None:
         from game.chars.vince.dash_state import step_vince_dash
-        step_vince_dash(self)
+        step_vince_dash(self, obstacles)

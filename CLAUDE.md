@@ -119,8 +119,8 @@ particles, shake timers, and the map surface cache.
   `pygame.quit()` mid-loop; only call it after the outer `while app_running` exits.
 - Module-level `pygame.Rect` objects in `renderer.py` and `pages/` are safe to
   define before `pygame.init()` — `Rect` is a pure data struct.
-- Skill cooldown HUD uses `SKILL_CIRCLE_R = 17` (1.2× the original 14 px).
-- `_SKILL_SLOTS = ('space', 'e', 'r', 'rmb')` — order matches HUD left-to-right.
+- Skill cooldown HUD uses `SKILL_CIRCLE_R = 34`; positioned center-bottom of the game screen.
+- `_SKILL_SLOTS = ('rmb', 'space', 'e', 'r')` — order matches HUD left-to-right (MB / SP / E / R).
 
 ---
 
