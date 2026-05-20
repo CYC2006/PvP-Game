@@ -8,8 +8,8 @@ import pygame
 from game.render_utils import ws, SCREEN_W
 
 _START_R  = 60
-_END_R    = 500
-_DURATION = 0.8   # 秒
+_END_R    = 600
+_DURATION = 1.0   # 秒
 
 # {player_id: was_active}  ← 偵測 inactive→active 轉換
 _prev_active: dict = {}

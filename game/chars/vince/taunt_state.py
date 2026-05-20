@@ -7,9 +7,9 @@
 from game.state import GameState
 
 _SW_START_R   = 60
-_SW_END_R     = 500
-_SW_DUR_TICKS = 48    # 0.8 s × 60 fps
-_SW_STUN      = 30    # 0.5 s × 60 fps
+_SW_END_R     = 600
+_SW_DUR_TICKS = 60    # 1.0 s × 60 fps
+_SW_STUN      = 48    # 0.8 s × 60 fps
 _PULL_SPEED   = 2.0   # 120 px/s ÷ 60 fps = 2.0 px/tick
 
 
