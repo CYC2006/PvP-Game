@@ -6,7 +6,7 @@ POOL_RADIUS         = 150.0
 POOL_TICKS          = 300    # 5s
 DOT_INTERVAL        = 30     # 每 0.5s
 DOT_MIN             = 3
-DOT_MAX             = 5
+DOT_MAX             = 3
 POOL_BULLET_SPEED   = 10.0   # px/tick（600 px/s）
 POOL_BULLET_RANGE   = 1200.0
 
