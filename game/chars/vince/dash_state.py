@@ -57,6 +57,6 @@ def step_vince_dash(state: GameState, obstacles: dict = None) -> None:
             if other_id == pid:
                 continue
             if math.hypot(player.x - other.x, player.y - other.y) <= PLAYER_RADIUS * 2:
-                other.stun_until = state.tick + STUN_TICKS
+                state.apply_stun(other_id, STUN_TICKS)
                 player.vince_dash_tick = -1
                 break

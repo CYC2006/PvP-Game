@@ -48,10 +48,7 @@ def step_r_skill(state) -> None:
         if opponent and not (player.r_skill_dmg_done & dmg_flag):
             if math.hypot(player.x - opponent.x, player.y - opponent.y) < PLAYER_RADIUS * 2 + 4:
                 state.apply_damage(opponent_id, R_DAMAGE)
-                opponent.stun_until = max(
-                    opponent.stun_until if opponent.stun_until > state.tick else state.tick,
-                    state.tick + R_STUN_TICKS,
-                )
+                state.apply_stun(opponent_id, R_STUN_TICKS)
                 player.r_skill_dmg_done |= dmg_flag
 
         player.r_skill_tick += 1

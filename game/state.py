@@ -894,6 +894,16 @@ class GameState:
         from game.chars.pioneer.shield_state import step_shockwaves
         step_shockwaves(self)
 
+    def apply_stun(self, player_id: int, ticks: int) -> None:
+        """Apply stun to a player. Extends duration if already stunned."""
+        player = self.players.get(player_id)
+        if player is None:
+            return
+        player.stun_until = max(
+            player.stun_until if player.stun_until > self.tick else self.tick,
+            self.tick + ticks,
+        )
+
     def apply_damage(self, player_id: int, damage: int) -> None:
         """所有對玩家的傷害應透過此方法，使防護罩優先吸收。
         防護罩規則：傷害先扣護盾；護盾 HP 歸零即破壞；不溢傷到玩家血量。

@@ -106,10 +106,7 @@ def step_shockwaves(state) -> None:
             opp.kb_vx = ux * kb_force
             opp.kb_vy = uy * kb_force
 
-        opp.stun_until = max(
-            opp.stun_until if opp.stun_until > state.tick else state.tick,
-            state.tick + stun_ticks,
-        )
+        state.apply_stun(opponent_id, stun_ticks)
         sw['hit_done'] = True
 
     state._pending_shockwaves = still_active

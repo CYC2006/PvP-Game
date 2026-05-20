@@ -70,4 +70,4 @@ def _apply_push_effect(state, zone) -> None:
     if _in_rect(opp.x, opp.y, zone.x, zone.y, fwd_x, fwd_y, right_x, right_y):
         opp.kb_vx = fwd_x * KB_FORCE
         opp.kb_vy = fwd_y * KB_FORCE
-        opp.stun_until = state.tick + STUN_TICKS
+        state.apply_stun(opponent_id, STUN_TICKS)
