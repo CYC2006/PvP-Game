@@ -19,13 +19,13 @@ _player_speed: float = 3.0
 
 _skill_cds_ms:  dict = {'space': -1, 'e': -1, 'r': -1, 'rmb': -1}
 _skill_last_ms: dict = {'space':  0, 'e':  0, 'r':  0, 'rmb':  0}
-_char_key:            str   = ""
+_char_name:            str   = ""
 _rmb_prev:            bool  = False
 _r_prev:              bool  = False
 _speed_boost_end_ms:  int   = 0     # 速度提升到期時間（ms），供 renderer 粒子使用
 _r_skill_start_ms:    int   = 0     # R 大招啟動時間（ms），供 renderer 旋轉使用
 _r_skill_start_angle: float = 0.0   # R 大招啟動時的瞄準角度（度）
-_r_holding:           bool  = False  # manBlue R 按住中（未施放）
+_r_holding:           bool  = False  # Vince R 按住中（未施放）
 _last_aim_x:          float = 0.0   # 上幀瞄準偏移（world 座標，供 airstrike_fx 使用）
 _last_aim_y:          float = 0.0
 _giant_age:           int   = -1    # 巨人模式年齡（-1 = 未啟動），由 client 每幀更新
@@ -49,7 +49,7 @@ _dash_dy:             float = 0.0
 _dash_speed:          float = 0.0
 _dash_dist_remaining: float = 0.0   # > 0 時為等速衝刺模式（Rambo）
 
-# ── robot1 Space 印記計時 ─────────────────────────────────────────
+# ── Robot Space 印記計時 ──────────────────────────────────────────
 _robot_mark_until_ms: int = 0   # 印記有效截止時間（ms），0 = 無印記
 
 # ── sniper R 隱身狀態 ─────────────────────────────────────────────
@@ -84,7 +84,7 @@ def set_dash_context(player_x: float, player_y: float,
     _dash_destroyed = destroyed
 
 
-def init_char(char_key: str) -> None:
+def init_char(char_name: str) -> None:
     """
     遊戲開始後呼叫，依選擇角色設定射速 / 彈夾 / 換彈時間，並重置所有狀態。
     """
@@ -92,25 +92,25 @@ def init_char(char_key: str) -> None:
     global _ammo, _reloading, _reload_start_ms, _last_shot_time
     global _player_speed, _skill_cds_ms, _skill_last_ms
     global _dash_active, _dash_speed, _dash_dist_remaining, _space_prev
-    global _char_key, _rmb_prev, _r_prev, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
+    global _char_name, _rmb_prev, _r_prev, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
     global _r_holding, _last_aim_x, _last_aim_y
     global _robot_mark_until_ms
     global _cloak_ticks_left
 
     from game.char_data import get_stat, CHAR_STATS
 
-    interval = get_stat(char_key, "fire_interval")
+    interval = get_stat(char_name, "fire_interval")
     SHOOT_COOLDOWN_MS = int(interval * 1000) if interval and interval > 0 else 9999
 
-    mag_str = get_stat(char_key, "mag")
+    mag_str = get_stat(char_name, "mag")
     MAGAZINE_SIZE = int(mag_str) if mag_str and str(mag_str).strip().isdigit() else 9999
 
-    reload_s = get_stat(char_key, "reload_time")
+    reload_s = get_stat(char_name, "reload_time")
     RELOAD_TIME_MS = int(reload_s * 1000) if reload_s and reload_s > 0 else 99999
 
-    _player_speed = float(CHAR_STATS.get(char_key, {}).get('speed', 3.0))
+    _player_speed = float(CHAR_STATS.get(char_name, {}).get('speed', 3.0))
 
-    cfg = CHAR_STATS.get(char_key, {})
+    cfg = CHAR_STATS.get(char_name, {})
     def _cd(key: str) -> int:
         v = float(cfg.get(key, 0))
         return int(v * 1000) if v > 0 else -1
@@ -122,7 +122,7 @@ def init_char(char_key: str) -> None:
     }
     _skill_last_ms = {'space': 0, 'e': 0, 'r': 0, 'rmb': 0}
 
-    _char_key             = char_key
+    _char_name             = char_name
     _speed_boost_end_ms   = 0
     _r_skill_start_ms     = 0
     _r_skill_start_angle  = 0.0
@@ -211,9 +211,9 @@ def read_input(player_id: int, keys_held: set,
     speed_mult      = 1.0
     use_skill_space = False
 
-    # ── robot1 印記回傳（不受冷卻影響，優先於衝刺）─────────────────
+    # ── Robot 印記回傳（不受冷卻影響，優先於衝刺）──────────────────
     _robot_recall = False
-    if (_char_key == 'robot1' and space_just_pressed
+    if (_char_name == 'Robot' and space_just_pressed
             and _robot_mark_until_ms > now):
         use_skill_space      = True   # 通知 server：mark 存在 → 傳送
         _robot_mark_until_ms = 0      # 清除本地印記計時
@@ -251,16 +251,16 @@ def read_input(player_id: int, keys_held: set,
         if pygame.K_a in keys_held or pygame.K_LEFT  in keys_held: dx -= 1.0
         if pygame.K_d in keys_held or pygame.K_RIGHT in keys_held: dx += 1.0
 
-        # ── 觸發衝刺（非 survivor1）或速度技能（survivor1）──────
+        # ── 觸發衝刺（非 Assassin）或速度技能（Assassin）────────
         if (not _r_skill_active
                 and space_just_pressed
                 and not _robot_recall
                 and _skill_cds_ms.get('space', -1) >= 0):
             cd_remaining = _skill_cds_ms['space'] - (now - _skill_last_ms['space'])
             if cd_remaining <= 0:
-                if _char_key == 'survivor1':
+                if _char_name == 'Assassin':
                     pass   # 冷卻由下方 use_skill_space 區塊統一記錄
-                elif _char_key == 'manBlue':
+                elif _char_name == 'Vince':
                     aim_len = math.hypot(aim_x, aim_y)
                     if aim_len > 0:
                         _dash_active          = True
@@ -270,7 +270,7 @@ def read_input(player_id: int, keys_held: set,
                         dx, dy                = _dash_dx, _dash_dy
                         _dash_dist_remaining  = 200.0
                         _skill_last_ms['space'] = now
-                elif _char_key == 'manOld':
+                elif _char_name == 'Hunter':
                     aim_len = math.hypot(aim_x, aim_y)
                     if aim_len > 0:
                         _dash_active     = True
@@ -281,7 +281,7 @@ def read_input(player_id: int, keys_held: set,
                         _dash_speed      = 18.0 - _DASH_DECEL
                         _skill_last_ms['space'] = now
                         use_skill_space  = True
-                elif _char_key == 'soldier1':
+                elif _char_name == 'Pioneer':
                     # 跳躍：通知 server 起跳；本地立即補滿彈夾並取消換彈
                     use_skill_space      = True
                     _skill_last_ms['space'] = now
@@ -298,8 +298,8 @@ def read_input(player_id: int, keys_held: set,
                         dx, dy           = _dash_dx, _dash_dy
                         _dash_speed      = _DASH_V0 - _DASH_DECEL
                         _skill_last_ms['space'] = now
-                        # robot1：通知 server 建立印記，並設定本地倒計時
-                        if _char_key == 'robot1':
+                        # Robot：通知 server 建立印記，並設定本地倒計時
+                        if _char_name == 'Robot':
                             use_skill_space      = True
                             _robot_mark_until_ms = now + 3000
 
@@ -314,12 +314,12 @@ def read_input(player_id: int, keys_held: set,
             use_skill_e = True
             _skill_last_ms['e'] = now
 
-    # ── RMB 技能（manBlue：按住蓄力放開施放；其他角色：按下即發）──
+    # ── RMB 技能（Vince：按住蓄力放開施放；其他角色：按下即發）────
     use_skill_rmb = False
     if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
             and _skill_cds_ms.get('rmb', -1) >= 0):
         rmb_cd_ms = _skill_cds_ms['rmb']
-        if _char_key == 'manBlue':
+        if _char_name == 'Vince':
             cd_ok = (rmb_cd_ms - (now - _skill_last_ms['rmb'])) <= 0
             if rmb_just_pressed and cd_ok:
                 _r_holding = True
@@ -333,9 +333,9 @@ def read_input(player_id: int, keys_held: set,
                 use_skill_rmb = True
                 _skill_last_ms['rmb'] = now
 
-    # ── Space 技能（survivor1：速度提升）─────────────────────────
+    # ── Space 技能（Assassin：速度提升）──────────────────────────
     if (not _r_skill_active and not _giant_frozen
-            and _char_key == 'survivor1'
+            and _char_name == 'Assassin'
             and space_just_pressed
             and _skill_cds_ms.get('space', -1) >= 0):
         cd_elapsed = now - _skill_last_ms['space']
@@ -351,8 +351,8 @@ def read_input(player_id: int, keys_held: set,
         if r_just_pressed and (_skill_cds_ms['r'] - (now - _skill_last_ms['r'])) <= 0:
             use_skill_r = True
             _skill_last_ms['r']  = now
-            # 旋轉動畫只屬於 Assassin（survivor1）的 R 技能
-            if _char_key == 'survivor1':
+            # 旋轉動畫只屬於 Assassin 的 R 技能
+            if _char_name == 'Assassin':
                 _r_skill_start_ms    = now
                 _r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
 

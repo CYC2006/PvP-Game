@@ -207,10 +207,10 @@ def char_select_loop(sock, server_addr, screen,
                 if packet_type(data) == PKT_GAME_START:
                     raw_chars = unpack_game_start(data)
                     from game.charselect import CHARACTERS
-                    player_chars = {pid: CHARACTERS[cid]["char_key"]
+                    player_chars = {pid: CHARACTERS[cid]["name"]
                                     for pid, cid in raw_chars.items()
                                     if 0 <= cid < len(CHARACTERS)}
-                    return player_chars, charselect.selected_char()["char_key"]
+                    return player_chars, charselect.selected_char()["name"]
             except (BlockingIOError, ConnectionResetError, OSError):
                 break
 
@@ -304,7 +304,7 @@ def run() -> None:
         obstacles = load_map(MAP_PATH)
 
         # ── 選角 ────────────────────────────────────────────────────
-        player_chars, my_char_key = char_select_loop(
+        player_chars, my_char_name = char_select_loop(
             sock, server_addr, screen, font_lg, font_sm, clock)
         if player_chars is None:
             sock.close()
@@ -312,7 +312,7 @@ def run() -> None:
             continue
 
         from game.input import init_char
-        init_char(my_char_key)
+        init_char(my_char_name)
 
         # ── 遊戲主迴圈 ──────────────────────────────────────────────
         reset_game_state()          # 清除上一局的殘骸、粒子、震動等視覺狀態

@@ -63,16 +63,16 @@ COL_SKILL_CD_TEXT      = (180, 180, 180)
 COL_SKILL_NONE_TEXT    = ( 70,  70,  70)
 COL_SKILL_FILL         = ( 25,  25,  38)
 
-# 角色定義：char_key → (資料夾名稱, 檔名前綴)
+# 角色定義：char name → (資料夾名稱, 檔名前綴)
 # folder 來自 chars.csv，不在此處維護
 from game.char_data import CHAR_STATS as _CHAR_STATS
-CHAR_DIR: dict = {key: (s['folder'], s['folder']) for key, s in _CHAR_STATS.items()}
+CHAR_DIR: dict = {name: (s['folder'], s['folder']) for name, s in _CHAR_STATS.items()}
 
 # 障礙物圖片快取：(kind, w, h) → Surface（未旋轉原始縮放圖）
 _sprite_cache: dict = {}
 # 預旋轉障礙物快取：(kind, w, h, angle_deg_int) → Surface
 _rotated_cache: dict = {}
-# 角色圖片快取：(char_key, stance) → Surface（原尺寸 × PLAYER_SPRITE_SCALE）
+# 角色圖片快取：(char_name, stance) → Surface（原尺寸 × PLAYER_SPRITE_SCALE）
 _player_cache: dict = {}
 # 靜態地圖底層（背景 + 網格），在 pygame 初始化後第一次 draw() 時建立
 _map_surface: "pygame.Surface | None" = None
@@ -418,11 +418,11 @@ def _draw_particles(screen, cx: float, cy: float) -> None:
     _particles[:] = alive
 
 
-def _get_player_sprite(char_key: str, stance: str) -> pygame.Surface:
+def _get_player_sprite(char_name: str, stance: str) -> pygame.Surface:
     """載入並快取角色 sprite（按 PLAYER_SPRITE_SCALE 放大，保持原始比例）。"""
-    key = (char_key, stance)
+    key = (char_name, stance)
     if key not in _player_cache:
-        folder, prefix = CHAR_DIR.get(char_key, ("agent", "agent"))
+        folder, prefix = CHAR_DIR.get(char_name, ("agent", "agent"))
         path = os.path.join("assets", "Player", folder, f"{prefix}_{stance}.png")
         try:
             img = pygame.image.load(path).convert_alpha()
@@ -481,7 +481,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
          player_chars: dict = None,
          skill_cooldowns: dict = None,
          mx: int = 0, my: int = 0) -> None:
-    # player_chars: {pid: char_key}，None 時全部用 hitman1
+    # player_chars: {pid: char_name}，None 時全部用 Agent
 
     if my_id not in state.players:
         screen.fill(COL_BG)
@@ -492,7 +492,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     me = state.players[my_id]
     cx, cy = _camera(me)
 
-    my_char = (player_chars or {}).get(my_id, "hitman1")
+    my_char = (player_chars or {}).get(my_id, "Agent")
 
     _draw_map(screen, cx, cy)
     r_dash_fx.draw_r_trail(screen, cx, cy)
@@ -671,27 +671,27 @@ def _rot_pts(cx, cy, pts, angle_rad):
              cy + x * sin_a + y * cos_a) for x, y in pts]
 
 
-def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float,
+def _draw_bullet_shape(screen, char_name: str, color, sx, sy, angle_deg: float,
                        bullet_scale: float = 1.0):
     """依角色繪製不同形狀的子彈，color 為玩家顏色（藍/紅）。"""
     a = math.radians(angle_deg)   # 飛行方向（標準數學角，0=右，90=下）
 
-    if char_key == "manBrown":          # Bear — 短矩形彈殼（10×4）
+    if char_name == "Marksman":         # 短矩形彈殼（10×4）
         pts = [(-5, -2), (5, -2), (5, 2), (-5, 2)]
         pygame.draw.polygon(screen, color, _rot_pts(sx, sy, pts, a))
 
-    elif char_key == "manOld":          # Sniper — 細長針形（24×2），前白後漸暗
+    elif char_name == "Hunter":         # Sniper — 細長針形（24×2），前白後漸暗
         tip  = [(-12, 0), (12, -1), (12, 1)]          # 針尖三角
         body = [(-12, -1), (4, -1), (4, 1), (-12, 1)] # 針身矩形
         dim  = tuple(max(0, c - 60) for c in color)
         pygame.draw.polygon(screen, dim,   _rot_pts(sx, sy, body, a))
         pygame.draw.polygon(screen, color, _rot_pts(sx, sy, tip,  a))
 
-    elif char_key == "soldier1":        # Soldier — 與 Machine Gun 相同的短矩形彈殼（10×4）
+    elif char_name == "Pioneer":        # 與 Machine Gun 相同的短矩形彈殼（10×4）
         pts = [(-5, -2), (5, -2), (5, 2), (-5, 2)]
         pygame.draw.polygon(screen, color, _rot_pts(sx, sy, pts, a))
 
-    elif char_key == "survivor1":       # Assassin — 旋轉手裡劍（4角星）
+    elif char_name == "Assassin":       # 旋轉手裡劍（4角星）
         spin = math.radians(time.perf_counter() * 540 % 360)  # 1.5轉/秒
         outer, inner = 8, 4
         pts = []
@@ -701,9 +701,9 @@ def _draw_bullet_shape(screen, char_key: str, color, sx, sy, angle_deg: float,
             pts.append((r * math.cos(ang), r * math.sin(ang)))
         pygame.draw.polygon(screen, color, [(sx + x, sy + y) for x, y in pts])
 
-    # womanGreen 改在 _draw_bullets 直接處理（需要 bid 與時間資訊）
+    # Poisoner 改在 _draw_bullets 直接處理（需要 bid 與時間資訊）
 
-    elif char_key == "manBlue":          # Rambo — 散彈圓點（巨人模式等比放大）
+    elif char_name == "Vince":          # 散彈圓點（巨人模式等比放大）
         pygame.draw.circle(screen, color, (sx, sy), max(1, int(4 * bullet_scale)))
 
     else:                               # Agent（Pistol）& 其他 — 標準圓形
@@ -729,7 +729,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
         btype  = getattr(bullet, 'bullet_type', 0)
         if -60 <= sx <= SCREEN_W + 60 and -60 <= sy <= SCREEN_H + 60:
             color    = COL_BULLET.get(bullet.owner_id, (255, 255, 200))
-            char_key = player_chars.get(bullet.owner_id, "hitman1")
+            char_name = player_chars.get(bullet.owner_id, "Agent")
 
             if btype == 9:   # Laser：黃色線狀矩形
                 a = math.radians(bullet.aim_angle)
@@ -761,15 +761,15 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
                 flash_fx.draw_bullet(screen, bullet, sx, sy, color)
             elif btype == 2:
                 grenade_fx.draw_bullet(screen, bullet, sx, sy, color)
-            elif char_key == "womanGreen":
+            elif char_name == "Poisoner":
                 bubble_fx.draw_bullet(screen, bullet, sx, sy, color, now)
             else:
                 bscale = getattr(bullet, 'bullet_scale', 1.0)
                 # Agent burst 子彈（scale > 1）加殘影
-                if char_key == "hitman1" and bscale > 1.0:
+                if char_name == "Agent" and bscale > 1.0:
                     burst_bullet_fx.track(bullet)
                     burst_bullet_fx.draw_trail(screen, bullet, cx, cy, color)
-                _draw_bullet_shape(screen, char_key, color, sx, sy, bullet.aim_angle, bscale)
+                _draw_bullet_shape(screen, char_name, color, sx, sy, bullet.aim_angle, bscale)
 
 
 
@@ -822,8 +822,8 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             stance = player.stance
             angle  = player.aim_angle
 
-        char_key = player_chars.get(pid, "hitman1")
-        sprite   = _get_player_sprite(char_key, stance)
+        char_name = player_chars.get(pid, "Agent")
+        sprite    = _get_player_sprite(char_name, stance)
         rotated = pygame.transform.rotate(sprite, 90 - angle)
 
         # 巨人縮放

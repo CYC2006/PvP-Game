@@ -5,7 +5,7 @@
 
 ---
 
-## Agent（hitman1）
+## Agent
 
 ### Space — 衝刺 Dash　`cd = 3s`
 **行為**  
@@ -68,7 +68,7 @@
 
 ### RMB — 強化單發 Power Shot　`cd = 5s`
 **行為**  
-射出一發強化手槍子彈，子彈為普攻 2 倍大、2 倍傷害、0 散佈，並帶有殘影拖尾效果。
+射出一發強化手槍子彈，子彈為普攻 2 倍大、2 倍傷害、0 散佈，命中敵人時施加擊退效果，並帶有殘影拖尾效果。
 
 **子彈參數**  
 - 子彈尺寸：`BULLET_RADIUS × 2 = 10 px`（視覺與碰撞半徑同比放大）  
@@ -77,6 +77,10 @@
 - 射程：同普攻（780–800 px），因 scale=2 實際飛行距離 1560–1600 px  
 - 射出方向為按下 RMB 時的瞄準方向，不鎖定後續滑鼠輸入
 
+**擊退效果**  
+- 命中時沿子彈飛行方向施加擊退：初速 10 px/tick，衰減係數 0.78/tick  
+- 與 Soldier E 衝擊波擊退效果相同強度，但**不附加暈眩**
+
 **殘影效果**  
 - 每 10 ms 記錄一個位置，最多保留 10 個殘影點  
 - 由舊到新 alpha 從幾乎全透明漸增至 ~110，繪製在子彈本體圓之後  
@@ -84,7 +88,7 @@
 
 ---
 
-## Rambo（manBlue）
+## Vince
 
 ### Space — 衝鋒 Charge　`cd = 6s`
 **行為**  
@@ -163,7 +167,7 @@
 
 ---
 
-## Bear（manBrown）
+## Marksman
 
 ### Space — 未設計　`cd = 0`
 > **草稿**：翻滾
@@ -241,7 +245,7 @@
 
 ---
 
-## Sniper（manOld）
+## Hunter
 
 ### Space — 後撤雷陣 Backdash Mine　`cd = 4s`
 **行為**  
@@ -302,7 +306,7 @@
 
 ---
 
-## Robot（robot1）
+## Robot
 
 ### 普攻 — 雷射 Laser
 - 子彈速度：1000 px/s；傷害：20–25；射程：無限
@@ -356,7 +360,7 @@
 
 ---
 
-## Soldier（soldier1）
+## Pioneer
 
 ### Space — 戰術跳躍 Tactical Jump　`cd = 8s`
 **行為**  
@@ -436,7 +440,7 @@
 
 ---
 
-## Assassin（survivor1）
+## Assassin
 
 ### Space — 速度提升 Speed Boost　`cd = 4s`
 **行為**  
@@ -515,7 +519,7 @@
 
 ---
 
-## Science（womanGreen）
+## Poisoner
 
 ### Space — 未設計　`cd = 0`
 > **草稿**：優雅側移（有 i-frame 無敵幀）
@@ -550,7 +554,7 @@
 
 ---
 
-## Zombie（zoimbie1）
+## Zombie
 
 ### Space — 未設計　`cd = 0`
 > **草稿**：撲擊跳躍（落點 AoE 擊退）

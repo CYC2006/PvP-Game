@@ -8,14 +8,14 @@ chars.csv 速度欄位說明：
   cd_rmb/cd_space/cd_e/cd_r  各技能冷卻（秒）；0 = 技能未實作
 
 角色專屬子彈屬性（不通用，不放 CSV，在 _CHAR_EXTRA 硬寫）：
-  bullet_lifetime  子彈存活時間（秒，用於 womanGreen 毒氣泡）
+  bullet_lifetime  子彈存活時間（秒，用於 Poisoner 毒氣泡）
   bullet_linger    子彈停止後殘留秒數
   dot_interval     DoT 每 N tick 傷害一次
 
 對外介面：
-  CHAR_STATS   dict[char_key → stat dict]
-  CHAR_ORDER   list[char_key]（依 CSV 行序）
-  get_stat(char_key, stat, level=0)
+  CHAR_STATS   dict[name → stat dict]
+  CHAR_ORDER   list[name]（依 CSV 行序）
+  get_stat(name, stat, level=0)
 """
 
 import csv
@@ -28,7 +28,7 @@ _BSPEED_DENOM = _BULLET_BASE * _TICK_RATE   # 480：px/s → 乘數 換算基底
 
 # 不通用的子彈屬性，不放 CSV，按角色硬寫
 _CHAR_EXTRA: dict = {
-    'womanGreen': {
+    'Poisoner': {
         'bullet_lifetime': 1.0,   # 秒
         'bullet_linger':   1.0,   # 秒（停止後殘留）
         'dot_interval':    30,    # tick
@@ -45,7 +45,7 @@ def _load() -> tuple[dict, list]:
         lines = [l for l in f if not l.startswith('#')]
 
     for row in csv.DictReader(lines):
-        key = row['char_key'].strip()
+        key = row['name'].strip()
         order.append(key)
 
         def f(col: str, default: float = 0.0) -> float:
@@ -60,7 +60,7 @@ def _load() -> tuple[dict, list]:
             return row.get(col, '').strip()
 
         d: dict = {
-            'name':         s('name'),
+            'name':         key,
             'folder':       s('folder'),
             'hp':           i('hp'),
             'speed':        f('speed_pxs') / _TICK_RATE,        # px/s → px/tick
@@ -124,7 +124,7 @@ def reload() -> None:
     CHAR_STATS, CHAR_ORDER = _load()
 
 
-def get_stat(char_key: str, stat: str, level: int = 0):
+def get_stat(name: str, stat: str, level: int = 0):
     """
     取得角色在指定等級的數值。
 
@@ -132,7 +132,7 @@ def get_stat(char_key: str, stat: str, level: int = 0):
     - 若數值為 list，回傳 list[min(level, len-1)]（超出上限取最後一級）。
     - 未來升級系統只需把 scalar 換成 list，呼叫端無需修改。
     """
-    val = CHAR_STATS[char_key][stat]
+    val = CHAR_STATS[name][stat]
     if isinstance(val, list):
         return val[min(level, len(val) - 1)]
     return val

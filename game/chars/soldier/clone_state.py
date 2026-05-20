@@ -67,7 +67,7 @@ def spawn_clone_bullets(state, owner_id: int, aim_x: float, aim_y: float) -> Non
 
         bid = state._next_bullet_id
         state._next_bullet_id = (state._next_bullet_id + 1) % 256
-        # 分身子彈：char_key 仍是 soldier1 → bullet_type = 0（在 _spawn_bullet 的 _btype 邏輯之外）
+        # 分身子彈：char_name 仍是 Pioneer → bullet_type = 0（在 _spawn_bullet 的 _btype 邏輯之外）
         state.bullets[bid] = Bullet(
             id=bid, owner_id=owner_id,
             x=spawn_x, y=spawn_y,

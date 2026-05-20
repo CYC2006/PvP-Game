@@ -11,40 +11,41 @@ from network.protocol import (
 )
 
 
-# ── 技能 dispatch 表（char_key → callable(state, pid, aim_x, aim_y)）────────
+# ── 技能 dispatch 表（char name → callable(state, pid, aim_x, aim_y)）────────
 # 新增角色時只需在對應欄位加一行，不用改動 run() 本體
 _SKILL_E: dict = {
-    'hitman1':  lambda s, pid, ax, ay: s._spawn_flash_grenade(pid, ax, ay),
-    'manBlue':  lambda s, pid, ax, ay: s._spawn_grenade(pid, ax, ay),
-    'survivor1': lambda s, pid, ax, ay: s._spawn_smoke_grenade(pid, ax, ay),
-    'manOld':   lambda s, pid, ax, ay: s._activate_log_barriers(pid, ax, ay),
-    'manBrown': lambda s, pid, ax, ay: s._place_turret(pid),
-    'soldier1': lambda s, pid, ax, ay: s._activate_shield(pid),
+    'Agent':    lambda s, pid, ax, ay: s._spawn_flash_grenade(pid, ax, ay),
+    'Vince':    lambda s, pid, ax, ay: s._spawn_grenade(pid, ax, ay),
+    'Assassin': lambda s, pid, ax, ay: s._spawn_smoke_grenade(pid, ax, ay),
+    'Hunter':   lambda s, pid, ax, ay: s._activate_log_barriers(pid, ax, ay),
+    'Marksman': lambda s, pid, ax, ay: s._place_turret(pid),
+    'Pioneer':  lambda s, pid, ax, ay: s._activate_shield(pid),
 }
 
 _SKILL_RMB: dict = {
-    'hitman1':   lambda s, pid, ax, ay: s._activate_burst(pid, ax, ay),
-    'survivor1': lambda s, pid, ax, ay: s._spawn_shuriken(pid, ax, ay),
-    'manBlue':   lambda s, pid, ax, ay: s._activate_airstrike(pid, ax, ay),
-    'soldier1':  lambda s, pid, ax, ay: s._spawn_stun_bullet(pid, ax, ay),
-    'manBrown':  lambda s, pid, ax, ay: s._spawn_explosion_bullet(pid, ax, ay),
-    'womanGreen': lambda s, pid, ax, ay: s._spawn_pool_bullet(pid, ax, ay),
+    'Agent':    lambda s, pid, ax, ay: s._activate_burst(pid, ax, ay),
+    'Assassin': lambda s, pid, ax, ay: s._spawn_shuriken(pid, ax, ay),
+    'Vince':    lambda s, pid, ax, ay: s._activate_airstrike(pid, ax, ay),
+    'Pioneer':  lambda s, pid, ax, ay: s._spawn_stun_bullet(pid, ax, ay),
+    'Marksman': lambda s, pid, ax, ay: s._spawn_explosion_bullet(pid, ax, ay),
+    'Poisoner': lambda s, pid, ax, ay: s._spawn_pool_bullet(pid, ax, ay),
 }
 
 _SKILL_SPACE: dict = {
-    'survivor1': lambda s, pid, ax, ay: s._activate_speed_boost(pid),
-    'manOld':    lambda s, pid, ax, ay: s._spawn_mini_grenades(pid),
-    'robot1':    lambda s, pid, ax, ay: s._activate_robot_space(pid),
-    'soldier1':  lambda s, pid, ax, ay: s._activate_jump(pid, ax, ay),
+    'Assassin': lambda s, pid, ax, ay: s._activate_speed_boost(pid),
+    'Hunter':   lambda s, pid, ax, ay: s._spawn_mini_grenades(pid),
+    'Robot':    lambda s, pid, ax, ay: s._activate_robot_space(pid),
+    'Pioneer':  lambda s, pid, ax, ay: s._activate_jump(pid, ax, ay),
+    'Vince':    lambda s, pid, ax, ay: s._activate_vince_dash(pid, ax, ay),
 }
 
 _SKILL_R: dict = {
-    'survivor1': lambda s, pid, ax, ay: s._activate_r_skill(pid, ax, ay),
-    'manBlue':   lambda s, pid, ax, ay: s._activate_giant(pid),
-    'robot1':    lambda s, pid, ax, ay: s._activate_push_zone(pid, ax, ay),
-    'soldier1':  lambda s, pid, ax, ay: s._activate_clones(pid),
-    'manOld':    lambda s, pid, ax, ay: s._activate_cloak(pid),
-    'manBrown':  lambda s, pid, ax, ay: s._activate_barrage(pid, ax, ay),
+    'Assassin': lambda s, pid, ax, ay: s._activate_r_skill(pid, ax, ay),
+    'Vince':    lambda s, pid, ax, ay: s._activate_giant(pid),
+    'Robot':    lambda s, pid, ax, ay: s._activate_push_zone(pid, ax, ay),
+    'Pioneer':  lambda s, pid, ax, ay: s._activate_clones(pid),
+    'Hunter':   lambda s, pid, ax, ay: s._activate_cloak(pid),
+    'Marksman': lambda s, pid, ax, ay: s._activate_barrage(pid, ax, ay),
 }
 
 
@@ -150,9 +151,9 @@ def run():
                         from game.char_data import CHAR_ORDER, reload
                         reload()   # 每局開始重新讀取 chars.csv
                         for p_id, c_id in player_chars.items():
-                            char_key = CHAR_ORDER[c_id]
-                            state.apply_char_stats(p_id, char_key)
-                            print(f"[Server] Player {p_id} → {char_key}")
+                            char_name = CHAR_ORDER[c_id]
+                            state.apply_char_stats(p_id, char_name)
+                            print(f"[Server] Player {p_id} → {char_name}")
                         payload = pack_game_start(player_chars)
                         for a in clients.values():
                             try:
@@ -187,27 +188,27 @@ def run():
             elif ptype == PKT_CMD:
                 if addr in addr_to_id and game_started:
                     cmd = unpack_command(data)
-                    # 技能觸發（依 dispatch 表查角色 char_key）
+                    # 技能觸發（依 dispatch 表查角色名稱）
                     p        = state.players.get(cmd.player_id)
                     r_active = p and p.r_skill_phase > 0
                     if p and not r_active:
                         pid, ax, ay = cmd.player_id, cmd.aim_x, cmd.aim_y
                         if cmd.use_skill_e:
-                            fn = _SKILL_E.get(p.char_key)
+                            fn = _SKILL_E.get(p.char_name)
                             if fn:
                                 fn(state, pid, ax, ay)
                         _bursting = p.burst_next_tick >= 0
                         if cmd.use_skill_rmb:
-                            fn = _SKILL_RMB.get(p.char_key)
+                            fn = _SKILL_RMB.get(p.char_name)
                             if fn:
                                 fn(state, pid, ax, ay)
                         if not _bursting:
                             if cmd.use_skill_space:
-                                fn = _SKILL_SPACE.get(p.char_key)
+                                fn = _SKILL_SPACE.get(p.char_name)
                                 if fn:
                                     fn(state, pid, ax, ay)
                             if cmd.use_skill_r:
-                                fn = _SKILL_R.get(p.char_key)
+                                fn = _SKILL_R.get(p.char_name)
                                 if fn:
                                     fn(state, pid, ax, ay)
                     state.apply_command(
@@ -245,6 +246,7 @@ def run():
                 state.step_bullets(obstacles, obstacle_hp)
                 state.step_pending_pellets()
                 state.step_jumps()
+                state.step_vince_dash()
                 state.resolve_player_collisions(obstacles)
                 state.step_gold_collection()
                 state.step_status_effects()

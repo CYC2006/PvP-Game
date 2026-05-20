@@ -39,10 +39,10 @@ class Player:
     aim_angle: float        = 0.0   # 瞄準角度（度），0=上, 90=右；同步給對手
     stance: str             = "stand"  # "stand" | "machine" | "hold" | "reload"
     flash_ticks: int        = 0     # >0：被閃光彈影響，倒數至 0
-    speed_boost_ticks: int  = 0     # >0：速度提升中，倒數至 0（survivor1 space）
+    speed_boost_ticks: int  = 0     # >0：速度提升中，倒數至 0（Assassin space）
     speed_boost_mult: float = 1.0   # 速度提升倍率
-    char_key: str           = ""    # 角色 key，由 apply_char_stats 設定，不同步至 client
-    # ── manBlue R 技能狀態（巨大化）─────────────────────────────────
+    char_name: str          = ""    # 角色名稱，由 apply_char_stats 設定，不同步至 client
+    # ── Vince R 技能狀態（巨大化）────────────────────────────────────
     stun_until: int            = -1   # tick when stun ends (-1 = not stunned)
     burst_next_tick: int       = -1   # tick to fire next burst shot (-1 = inactive)
     burst_shots_fired: int     = 0    # shots fired so far in current burst
@@ -57,7 +57,11 @@ class Player:
     jump_tick: int             = -1   # tick when soldier jump started (-1 = not jumping)
     jump_dx: float             = 0.0  # normalized jump direction x
     jump_dy: float             = 0.0  # normalized jump direction y
-    # ── survivor1 R 技能狀態 ──────────────────────────────────────
+    # ── Vince Space 技能狀態（前衝）─────────────────────────────────
+    vince_dash_tick: int      = -1   # tick when dash started (-1 = inactive)
+    vince_dash_dx: float      = 0.0  # normalized dash direction x
+    vince_dash_dy: float      = 0.0  # normalized dash direction y
+    # ── Assassin R 技能狀態 ───────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
     r_skill_dx: float         = 0.0  # 第一段滑動方向 x（單位向量）
@@ -280,7 +284,7 @@ class GameState:
     _next_pool_id: int       = 0
     push_zones: dict         = field(default_factory=dict)   # pzid → PushZone
     _next_push_zone_id: int  = 0
-    robot_marks: dict        = field(default_factory=dict)   # owner_id → RobotMark（每個 robot1 最多一筆）
+    robot_marks: dict        = field(default_factory=dict)   # owner_id → RobotMark（每個 Robot 最多一筆）
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -289,22 +293,22 @@ class GameState:
                                          x=float(spawn_x), y=float(spawn_y))
         return self.players[player_id]
 
-    def apply_char_stats(self, player_id: int, char_key: str) -> None:
+    def apply_char_stats(self, player_id: int, char_name: str) -> None:
         """遊戲開始後由 server 呼叫，將角色數值套用到 Player。"""
         from game.char_data import get_stat, CHAR_STATS
         if player_id not in self.players:
             return
         p = self.players[player_id]
-        p.char_key     = char_key
-        p.max_hp       = get_stat(char_key, "hp")
+        p.char_name    = char_name
+        p.max_hp       = get_stat(char_name, "hp")
         p.hp           = p.max_hp
-        p.speed        = float(get_stat(char_key, "speed"))
-        p.damage_min   = get_stat(char_key, "damage_min")
-        p.damage_max   = get_stat(char_key, "damage_max")
-        p.bullet_speed = float(get_stat(char_key, "bullet_speed")) * BULLET_SPEED
-        p.spread       = float(get_stat(char_key, "spread"))
+        p.speed        = float(get_stat(char_name, "speed"))
+        p.damage_min   = get_stat(char_name, "damage_min")
+        p.damage_max   = get_stat(char_name, "damage_max")
+        p.bullet_speed = float(get_stat(char_name, "bullet_speed")) * BULLET_SPEED
+        p.spread       = float(get_stat(char_name, "spread"))
         # 特殊武器專屬欄位（其他角色無此欄位時取預設值）
-        char_cfg           = CHAR_STATS.get(char_key, {})
+        char_cfg           = CHAR_STATS.get(char_name, {})
         p.pellet_count     = int(char_cfg.get("pellet_count", 1))
         p.bullet_range     = float(char_cfg.get("bullet_range", BULLET_MAX_RANGE))
         p.bullet_range_min = float(char_cfg.get("bullet_range_min", 0))
@@ -365,7 +369,7 @@ class GameState:
             mult = 1.2                 # 跑步：速度 ×1.2
         else:
             mult = 1.0
-        # 速度提升技能（survivor1 space）：與 shoot_slow 疊加
+        # 速度提升技能（Assassin space）：與 shoot_slow 疊加
         if player.speed_boost_ticks > 0 and speed_mult == 1.0:
             mult *= player.speed_boost_mult
         # 巨大化主動階段：移速 ×1.5
@@ -376,8 +380,8 @@ class GameState:
                 mult *= 1.5
         # 通用速度懲罰（由技能模組設定，如毒液區域 0.8）
         mult *= player.speed_penalty
-        # 跳躍中：由 step_jumps 控制位置，忽略普通移動輸入
-        if player.jump_tick < 0:
+        # 跳躍 / Vince 衝刺中：由各自 step 控制位置，忽略普通移動輸入
+        if player.jump_tick < 0 and player.vince_dash_tick < 0:
             player.move(dx, dy, speed_mult=mult)
         player.stance = stance
         # 連射期間：禁止普攻（避免與連射子彈重疊）
@@ -386,7 +390,7 @@ class GameState:
         if math.hypot(aim_x, aim_y) > 0:
             player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
         if shooting:
-            if player.char_key == 'zombie1':
+            if player.char_name == 'Zombie':
                 self._activate_blade_arc(player_id, aim_x, aim_y)
             else:
                 self._spawn_bullet(player_id, aim_x, aim_y)
@@ -452,7 +456,7 @@ class GameState:
                 pellet_range = player.bullet_range * _bscale
             bid = self._next_bullet_id
             self._next_bullet_id = (self._next_bullet_id + 1) % 256
-            _btype = 9 if player.char_key == 'robot1' else 0
+            _btype = 9 if player.char_name == 'Robot' else 0
             bullet = Bullet(
                 id=bid, owner_id=owner_id,
                 x=spawn_x, y=spawn_y,
@@ -587,6 +591,12 @@ class GameState:
                         if player.giant_tick >= 0:
                             damage = int(damage * 0.8)
                         self.apply_damage(pid, damage)
+                        # Agent RMB 放大子彈（bullet_scale > 1）：施加擊退
+                        if bullet.bullet_scale > 1.0:
+                            spd = math.hypot(bullet.dx, bullet.dy)
+                            if spd > 0:
+                                player.kb_vx = (bullet.dx / spd) * 10.0
+                                player.kb_vy = (bullet.dy / spd) * 10.0
                         expired.append(bid)
                         hit = True
                         break
@@ -1005,3 +1015,11 @@ class GameState:
     def step_jumps(self) -> None:
         from game.chars.soldier.jump_state import step_jumps
         step_jumps(self)
+
+    def _activate_vince_dash(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.vince.dash_state import activate_dash
+        activate_dash(self, owner_id, aim_x, aim_y)
+
+    def step_vince_dash(self) -> None:
+        from game.chars.vince.dash_state import step_vince_dash
+        step_vince_dash(self)

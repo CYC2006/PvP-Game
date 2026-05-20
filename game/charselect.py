@@ -16,18 +16,17 @@ LOGICAL_H = 720
 # ── 角色清單（從 char_data 自動建構，不在此處維護數值）─────────────────────
 CHARACTERS = [
     {
-        "char_key":    key,
-        "folder":      CHAR_STATS[key]["folder"],
-        "name":        get_stat(key, "name"),
-        "hp":          get_stat(key, "hp"),
-        "speed":       round(get_stat(key, "speed") * 60),  # px/tick → px/s
-        "gun":         get_stat(key, "gun"),
-        "damage":      get_stat(key, "damage"),
-        "ammo":        get_stat(key, "mag"),
-        "reload_time":   get_stat(key, "reload_time"),
-        "fire_interval": get_stat(key, "fire_interval"),
+        "name":          name,
+        "folder":        CHAR_STATS[name]["folder"],
+        "hp":            get_stat(name, "hp"),
+        "speed":         round(get_stat(name, "speed") * 60),  # px/tick → px/s
+        "gun":           get_stat(name, "gun"),
+        "damage":        get_stat(name, "damage"),
+        "ammo":          get_stat(name, "mag"),
+        "reload_time":   get_stat(name, "reload_time"),
+        "fire_interval": get_stat(name, "fire_interval"),
     }
-    for key in CHAR_ORDER
+    for name in CHAR_ORDER
 ]
 N = len(CHARACTERS)
 
@@ -88,7 +87,7 @@ _SPRITE_H = 148
 
 
 def _load_sprite(char: dict) -> pygame.Surface:
-    key = char["char_key"]
+    key = char["name"]
     if key not in _sprite_cache:
         path = os.path.join("assets", "Player", char["folder"],
                             f"{char['folder']}_stand.png")

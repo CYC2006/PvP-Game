@@ -20,24 +20,24 @@ IC_CLOCK = chr(0xf017)   # fa-clock-o (cooldown)
 
 # ── Per-character ratings (ATK, AGI, DEF, UTL) out of 5 ──────────────────────
 _RATINGS: dict = {
-    'hitman1':    (3, 3, 2, 4),
-    'manBlue':    (4, 1, 5, 3),
-    'manBrown':   (4, 2, 3, 2),
-    'manOld':     (5, 3, 1, 3),
-    'robot1':     (3, 2, 3, 2),
-    'soldier1':   (3, 4, 4, 2),
-    'survivor1':  (3, 5, 1, 4),
-    'womanGreen': (2, 3, 2, 5),
-    'zombie1':   (3, 3, 4, 1),
+    'Agent':    (3, 3, 2, 4),
+    'Vince':    (4, 1, 5, 3),
+    'Marksman': (4, 2, 3, 2),
+    'Hunter':   (5, 3, 1, 3),
+    'Robot':    (3, 2, 3, 2),
+    'Pioneer':  (3, 4, 4, 2),
+    'Assassin': (3, 5, 1, 4),
+    'Poisoner': (2, 3, 2, 5),
+    'Zombie':   (3, 3, 4, 1),
 }
 
 # ── Skill data: fixed order → RMB / SPACE / E / R ────────────────────────────
 # (skill_name, key_label, cooldown_secs, description)
 _SKILLS: dict = {
-    'hitman1': [
+    'Agent': [
         ("POWER SHOT",    "RMB",   5,
          "Fire a single enhanced bullet — twice the normal size, double damage, "
-         "and zero spread. A glowing afterimage trail marks its path through the air."),
+         "zero spread, and a knockback on hit. A glowing afterimage trail marks its path."),
         ("DASH",          "SPACE", 3,
          "Lunge in the current movement direction for a rapid burst of speed. "
          "Requires an active movement input to trigger; no direction, no dash."),
@@ -47,7 +47,7 @@ _SKILLS: dict = {
         ("—",             "R",     0,
          "Skill under development."),
     ],
-    'manBlue': [
+    'Vince': [
         ("AIRSTRIKE",     "RMB",   5,
          "Calls a sequence of bombs along the aimed trajectory. "
          "Impacts land in a line with a short delay, covering a wide zone."),
@@ -61,7 +61,7 @@ _SKILLS: dict = {
          "Transforms into a massive giant for a limited time. "
          "Greatly increases body size, armor thickness, and raw damage output."),
     ],
-    'manBrown': [
+    'Marksman': [
         ("IMPACT ROUND",  "RMB",   4,
          "Fires an explosive bullet that detonates on contact. "
          "Deals burst damage to everything in a small radius around the point of impact."),
@@ -77,7 +77,7 @@ _SKILLS: dict = {
          "Strikes land from 60 px to 230 px ahead, randomly spread ±100 px left/right. "
          "Each strike shows a shrinking targeting circle before detonating in an 80 px radius."),
     ],
-    'manOld': [
+    'Hunter': [
         ("—",             "RMB",   0,
          "Skill under development."),
         ("MINI GRENADES", "SPACE", 4,
@@ -91,7 +91,7 @@ _SKILLS: dict = {
          "You can still shoot and use all skills while invisible. "
          "Every 0.5 s you briefly flicker into view — and you still take damage."),
     ],
-    'robot1': [
+    'Robot': [
         ("—", "RMB",   0, "Skill under development."),
         ("MARK RECALL", "SPACE", 6,
          "Dashes in your movement direction and plants a mark at the origin. "
@@ -103,7 +103,7 @@ _SKILLS: dict = {
          "Enemies caught inside are launched away and stunned for 1 second. "
          "Only you see the targeting rectangle before it fires."),
     ],
-    'soldier1': [
+    'Pioneer': [
         ("STUN ROUND",    "RMB",   6,
          "Fires a specialized round that stuns the target on impact. "
          "Briefly halts enemy movement, leaving them exposed to follow-up fire."),
@@ -121,7 +121,7 @@ _SKILLS: dict = {
          "For 8 seconds, every basic attack fires three parallel shots — "
          "one from each clone — without extra ammo cost."),
     ],
-    'survivor1': [
+    'Assassin': [
         ("BLADE STRIKE",  "RMB",   5,
          "Hurls a powered shuriken in the aimed direction. "
          "Deals concentrated damage and cuts through any enemy in its path."),
@@ -135,7 +135,7 @@ _SKILLS: dict = {
          "Dashes swiftly toward the cursor, releasing a spinning blade arc "
          "upon arrival that strikes any enemy caught in the sweep."),
     ],
-    'womanGreen': [
+    'Poisoner': [
         ("POISON POOL", "RMB", 9,
          "Fires a toxic projectile that splashes on contact, creating a poison zone. "
          "Enemies caught inside take continuous damage and move 20% slower."),
@@ -143,7 +143,7 @@ _SKILLS: dict = {
         ("—", "E",     0, "Skill under development."),
         ("—", "R",     0, "Skill under development."),
     ],
-    'zombie1': [
+    'Zombie': [
         ("—", "RMB",   0, "Skill under development."),
         ("—", "SPACE", 0, "Skill under development."),
         ("—", "E",     0, "Skill under development."),
@@ -206,7 +206,7 @@ def draw(screen: pygame.Surface,
          char_idx: int) -> None:
 
     char     = _CHAR_LIST[char_idx]
-    char_key = char["char_key"]
+    char_name = char["name"]
 
     DET_Y = _TB + 12
     DET_H = _STRIP_Y - DET_Y - 8
@@ -298,7 +298,7 @@ def draw(screen: pygame.Surface,
     sy += 8
 
     # Star ratings
-    atk, agi, dfs, utl = _RATINGS.get(char_key, (3, 3, 3, 3))
+    atk, agi, dfs, utl = _RATINGS.get(char_name, (3, 3, 3, 3))
     rating_rows = [
         ("ATTACK",  atk, (255, 198,  52)),
         ("DEFENSE", dfs, (102, 172, 248)),
@@ -324,7 +324,7 @@ def draw(screen: pygame.Surface,
     SK_W   = (RW - SK_GAP) // 2
     SK_H   = (DET_H - SK_GAP) // 2
 
-    skills = _SKILLS.get(char_key, [("—", k, 0, "Skill under development.")
+    skills = _SKILLS.get(char_name, [("—", k, 0, "Skill under development.")
                                      for k in ("RMB", "SPACE", "E", "R")])
     BADGE_W = 54
 
