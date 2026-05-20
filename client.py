@@ -393,7 +393,7 @@ def run() -> None:
                                  obstacles, state.destroyed_obstacles)
             if local_player:
                 gt = local_player.giant_tick
-                from game.chars.rambo.giant_state import TOTAL_TICKS
+                from game.chars.vince.giant_state import TOTAL_TICKS
                 age = state.tick - gt if gt >= 0 else -1
                 set_giant_age(age if 0 <= age < TOTAL_TICKS else -1)
             else:

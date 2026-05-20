@@ -8,7 +8,7 @@
 import time
 import pygame
 from game.render_utils import ws, SCREEN_W, COL_BULLET
-from game.chars.bear.barrage_state import BARRAGE_FUSE
+from game.chars.marksman.barrage_state import BARRAGE_FUSE
 
 EXPL_MAX_R    = 110
 EXPL_DURATION = 0.5   # 秒

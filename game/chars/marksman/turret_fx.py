@@ -11,7 +11,7 @@
 import math
 import pygame
 from game.render_utils import ws, SCREEN_W, SCREEN_H
-from game.chars.bear.turret_state import TURRET_RANGE, TURRET_MAX_HP
+from game.chars.marksman.turret_state import TURRET_RANGE, TURRET_MAX_HP
 
 # 顏色
 _COL_BASE       = (70,  70,  70)     # 底座

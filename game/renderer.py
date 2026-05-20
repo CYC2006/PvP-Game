@@ -11,20 +11,20 @@ from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _w
 
 from game.chars.agent    import flash_fx
 from game.chars.agent    import burst_bullet_fx
-from game.chars.rambo    import grenade_fx, airstrike_fx
-from game.chars.soldier  import stun_bullet_fx
-from game.chars.rambo.giant_state import get_scale as _giant_get_scale, GROW_TICKS, ACTIVE_TICKS, TOTAL_TICKS
-from game.chars.sniper   import mini_grenade_fx
+from game.chars.vince    import grenade_fx, airstrike_fx
+from game.chars.pioneer  import stun_bullet_fx
+from game.chars.vince.giant_state import get_scale as _giant_get_scale, GROW_TICKS, ACTIVE_TICKS, TOTAL_TICKS
+from game.chars.hunter   import mini_grenade_fx
 from game.chars.zombie   import blade_fx
 from game.chars.zombie   import jump_fx as zombie_jump_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
-from game.chars.dancer   import bubble_fx
-from game.chars.dancer   import poison_pool_fx
-from game.chars.bear     import explosion_bullet_fx
-from game.chars.bear     import mine_fx as bear_mine_fx
-from game.chars.bear     import turret_fx as bear_turret_fx
-from game.chars.bear     import barrage_fx as bear_barrage_fx
-from game.chars.soldier  import shield_fx as soldier_shield_fx
+from game.chars.poisoner   import bubble_fx
+from game.chars.poisoner   import poison_pool_fx
+from game.chars.marksman     import explosion_bullet_fx
+from game.chars.marksman     import mine_fx as marksman_mine_fx
+from game.chars.marksman     import turret_fx as marksman_turret_fx
+from game.chars.marksman     import barrage_fx as marksman_barrage_fx
+from game.chars.pioneer  import shield_fx as pioneer_shield_fx
 from game.chars.robot    import push_fx as robot_push_fx
 from game.chars.robot    import mark_fx as robot_mark_fx
 
@@ -518,24 +518,24 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _draw_trees(screen, obstacles, state.destroyed_obstacles,
                     cx, cy, me.x, me.y)
 
-    soldier_shield_fx.update(state)
-    soldier_shield_fx.draw(screen, state, cx, cy)
+    pioneer_shield_fx.update(state)
+    pioneer_shield_fx.draw(screen, state, cx, cy)
     smoke_fx.draw_patches(screen, state, cx, cy, my_id)
     flash_fx.draw_explosions(screen, cx, cy)
     grenade_fx.draw_explosions(screen, cx, cy)
     mini_grenade_fx.draw_explosions(screen, cx, cy)
     stun_bullet_fx.draw_explosions(screen, cx, cy)
     explosion_bullet_fx.draw_explosions(screen, cx, cy)
-    soldier_shield_fx.draw_shockwaves(screen, cx, cy)
+    pioneer_shield_fx.draw_shockwaves(screen, cx, cy)
     zombie_jump_fx.update(state)
     zombie_jump_fx.draw_landing_shockwaves(screen, cx, cy)
-    bear_mine_fx.update(state, my_id)
-    bear_mine_fx.draw(screen, state, cx, cy, my_id)
-    bear_mine_fx.draw_explosions(screen, cx, cy)
-    bear_turret_fx.draw(screen, state, my_id, cx, cy)
-    bear_barrage_fx.update(state)
-    bear_barrage_fx.draw(screen, state, cx, cy)
-    bear_barrage_fx.draw_explosions(screen, cx, cy)
+    marksman_mine_fx.update(state, my_id)
+    marksman_mine_fx.draw(screen, state, cx, cy, my_id)
+    marksman_mine_fx.draw_explosions(screen, cx, cy)
+    marksman_turret_fx.draw(screen, state, my_id, cx, cy)
+    marksman_barrage_fx.update(state)
+    marksman_barrage_fx.draw(screen, state, cx, cy)
+    marksman_barrage_fx.draw_explosions(screen, cx, cy)
     poison_pool_fx.update(state)
     poison_pool_fx.draw(screen, state, cx, cy)
     robot_push_fx.draw(screen, state, my_id, cx, cy)
@@ -805,7 +805,7 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         # ── 隱身（Sniper R）可見度 ───────────────────────────────────────────
         _cloak_alpha = None   # None = 正常不透明；int = 套用此 alpha
         if player.cloak_until > state.tick:
-            from game.chars.sniper.cloak_state import phase_of
+            from game.chars.hunter.cloak_state import phase_of
             _cloak_phase = phase_of(player.cloak_until, state.tick)
             if pid == my_id:
                 # 自己視角：hidden = 半透明(80)，revealed = 全實體
@@ -842,7 +842,7 @@ def _draw_players(screen, state, my_id, cx, cy, font,
 
         # ── 跳躍：地面陰影 + 玩家放大（Soldier/Pioneer jump_tick）─────────
         if player.jump_tick >= 0:
-            from game.chars.soldier.jump_state import JUMP_TICKS as _JUMP_TICKS
+            from game.chars.pioneer.jump_state import JUMP_TICKS as _JUMP_TICKS
             _j_age = state.tick - player.jump_tick
             _j_t   = max(0.0, min(1.0, _j_age / _JUMP_TICKS))
             # 地面陰影（原位置，半透明灰色橢圓）

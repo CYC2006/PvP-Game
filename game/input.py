@@ -1,7 +1,7 @@
 import math
 import pygame
 from game.command import PlayerCommand
-from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS, SHRINK_TICKS, TOTAL_TICKS
+from game.chars.vince.giant_state import GROW_TICKS, ACTIVE_TICKS, SHRINK_TICKS, TOTAL_TICKS
 
 # 預設值（連線前 / 未選角時的 fallback）
 SHOOT_COOLDOWN_MS = 333

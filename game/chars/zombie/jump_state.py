@@ -47,7 +47,7 @@ def step_zombie_jumps(state: GameState) -> None:
             # 落地：記錄落點座標，然後清除跳躍狀態，再觸發衝擊波
             lx, ly = player.x, player.y
             player.zombie_jump_tick = -1
-            from game.chars.soldier.shield_state import _start_shockwave
+            from game.chars.pioneer.shield_state import _start_shockwave
             _start_shockwave(state, player.id,
                              start_r=_SW_START_R,
                              end_r=_SW_END_R,

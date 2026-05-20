@@ -343,7 +343,7 @@ class GameState:
             return
         # 巨大化進行中
         if player.giant_tick >= 0:
-            from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
+            from game.chars.vince.giant_state import GROW_TICKS, ACTIVE_TICKS
             _giant_age = self.tick - player.giant_tick
             if _giant_age < GROW_TICKS or _giant_age >= GROW_TICKS + ACTIVE_TICKS:
                 # 放大 / 縮小階段：原地不動，不接受任何輸入
@@ -378,7 +378,7 @@ class GameState:
             mult *= player.speed_boost_mult
         # 巨大化主動階段：移速 ×1.5
         if player.giant_tick >= 0 and speed_mult == 1.0:
-            from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
+            from game.chars.vince.giant_state import GROW_TICKS, ACTIVE_TICKS
             _ga = self.tick - player.giant_tick
             if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
                 mult *= 1.5
@@ -419,7 +419,7 @@ class GameState:
         else:
             _bscale = 1.0
             if player.giant_tick >= 0:
-                from game.chars.rambo.giant_state import GROW_TICKS, ACTIVE_TICKS
+                from game.chars.vince.giant_state import GROW_TICKS, ACTIVE_TICKS
                 _ga = self.tick - player.giant_tick
                 if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
                     _bscale = 2.0
@@ -668,7 +668,7 @@ class GameState:
 
             # ── 子彈 vs 機槍台（敵方普攻命中扣血）────────────────────────
             if not hit:
-                from game.chars.bear.turret_state import TURRET_HITBOX_R
+                from game.chars.marksman.turret_state import TURRET_HITBOX_R
                 for tid in list(self.turrets):
                     turret = self.turrets.get(tid)
                     if turret is None:
@@ -701,7 +701,7 @@ class GameState:
                     self._trigger_mini_grenade_explosion(b.x, b.y, b.owner_id)
             # 暈眩彈：任何原因消失都爆炸（包含射程耗盡、碰到玩家/障礙物）
             if b and b.bullet_type == 6:
-                from game.chars.soldier.stun_bullet_state import trigger_stun_explosion
+                from game.chars.pioneer.stun_bullet_state import trigger_stun_explosion
                 trigger_stun_explosion(self, b.x, b.y, b.owner_id)
             # 爆炸彈：任何原因消失都爆炸
             if b and b.bullet_type == 7:
@@ -778,31 +778,31 @@ class GameState:
         step_smoke_patches(self)
 
     def _activate_airstrike(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        from game.chars.rambo.airstrike_state import activate_airstrike
+        from game.chars.vince.airstrike_state import activate_airstrike
         activate_airstrike(self, owner_id, aim_x, aim_y)
 
     def _spawn_mini_grenades(self, owner_id: int) -> None:
-        from game.chars.sniper.mini_grenade_state import spawn_mini_grenades
+        from game.chars.hunter.mini_grenade_state import spawn_mini_grenades
         spawn_mini_grenades(self, owner_id)
 
     def _trigger_mini_grenade_explosion(self, x: float, y: float, owner_id: int) -> None:
-        from game.chars.sniper.mini_grenade_state import trigger_mini_grenade_explosion
+        from game.chars.hunter.mini_grenade_state import trigger_mini_grenade_explosion
         trigger_mini_grenade_explosion(self, x, y, owner_id)
 
     def _activate_log_barriers(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        from game.chars.sniper.log_barrier_state import activate_log_barriers
+        from game.chars.hunter.log_barrier_state import activate_log_barriers
         activate_log_barriers(self, owner_id, aim_x, aim_y)
 
     def _activate_giant(self, owner_id: int) -> None:
-        from game.chars.rambo.giant_state import activate_giant
+        from game.chars.vince.giant_state import activate_giant
         activate_giant(self, owner_id)
 
     def step_giant(self) -> None:
-        from game.chars.rambo.giant_state import step_giant
+        from game.chars.vince.giant_state import step_giant
         step_giant(self)
 
     def step_air_strikes(self) -> None:
-        from game.chars.rambo.airstrike_state import step_air_strikes
+        from game.chars.vince.airstrike_state import step_air_strikes
         step_air_strikes(self)
 
     def _activate_blade_arc(self, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -822,52 +822,52 @@ class GameState:
         step_burst(self)
 
     def _spawn_pool_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        from game.chars.dancer.poison_pool_state import spawn_pool_bullet
+        from game.chars.poisoner.poison_pool_state import spawn_pool_bullet
         spawn_pool_bullet(self, owner_id, aim_x, aim_y)
 
     def _create_poison_pool(self, x: float, y: float, owner_id: int) -> None:
-        from game.chars.dancer.poison_pool_state import create_poison_pool
+        from game.chars.poisoner.poison_pool_state import create_poison_pool
         create_poison_pool(self, x, y, owner_id)
 
     def step_poison_pools(self) -> None:
-        from game.chars.dancer.poison_pool_state import step_poison_pools
+        from game.chars.poisoner.poison_pool_state import step_poison_pools
         step_poison_pools(self)
 
     def _place_mine(self, owner_id: int) -> None:
-        from game.chars.bear.mine_state import place_mine
+        from game.chars.marksman.mine_state import place_mine
         place_mine(self, owner_id)
 
     def step_mines(self) -> None:
-        from game.chars.bear.mine_state import step_mines
+        from game.chars.marksman.mine_state import step_mines
         step_mines(self)
 
     def _place_turret(self, owner_id: int) -> None:
-        from game.chars.bear.turret_state import place_turret
+        from game.chars.marksman.turret_state import place_turret
         place_turret(self, owner_id)
 
     def step_turrets(self, obstacles: dict = None, obstacle_hp: dict = None) -> None:
-        from game.chars.bear.turret_state import step_turrets
+        from game.chars.marksman.turret_state import step_turrets
         step_turrets(self, obstacles, obstacle_hp)
 
     def _activate_barrage(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        from game.chars.bear.barrage_state import activate_barrage
+        from game.chars.marksman.barrage_state import activate_barrage
         activate_barrage(self, owner_id, aim_x, aim_y)
 
     def step_barrage(self) -> None:
-        from game.chars.bear.barrage_state import step_barrage
+        from game.chars.marksman.barrage_state import step_barrage
         step_barrage(self)
 
     # ── Soldier E：防護罩 ──────────────────────────────────────────────────────
     def _activate_shield(self, owner_id: int) -> None:
-        from game.chars.soldier.shield_state import activate_shield
+        from game.chars.pioneer.shield_state import activate_shield
         activate_shield(self, owner_id)
 
     def step_shields(self) -> None:
-        from game.chars.soldier.shield_state import step_shields
+        from game.chars.pioneer.shield_state import step_shields
         step_shields(self)
 
     def step_shockwaves(self) -> None:
-        from game.chars.soldier.shield_state import step_shockwaves
+        from game.chars.pioneer.shield_state import step_shockwaves
         step_shockwaves(self)
 
     def apply_damage(self, player_id: int, damage: int) -> None:
@@ -886,7 +886,7 @@ class GameState:
             if damage >= shield.hp:
                 # 護盾破壞，傷害不溢出；啟動衝擊波環
                 shield.broken_tick = self.tick
-                from game.chars.soldier.shield_state import _start_shockwave
+                from game.chars.pioneer.shield_state import _start_shockwave
                 _start_shockwave(self, player_id)
             else:
                 shield.hp -= damage
@@ -916,11 +916,11 @@ class GameState:
                 player.kb_vy = 0.0
 
     def _activate_clones(self, owner_id: int) -> None:
-        from game.chars.soldier.clone_state import activate_clones
+        from game.chars.pioneer.clone_state import activate_clones
         activate_clones(self, owner_id)
 
     def _spawn_clone_bullets(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        from game.chars.soldier.clone_state import spawn_clone_bullets
+        from game.chars.pioneer.clone_state import spawn_clone_bullets
         spawn_clone_bullets(self, owner_id, aim_x, aim_y)
 
     def _activate_robot_space(self, owner_id: int) -> None:
@@ -940,23 +940,23 @@ class GameState:
         step_push_zones(self)
 
     def _spawn_stun_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        from game.chars.soldier.stun_bullet_state import spawn_stun_bullet
+        from game.chars.pioneer.stun_bullet_state import spawn_stun_bullet
         spawn_stun_bullet(self, owner_id, aim_x, aim_y)
 
     def _spawn_explosion_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        from game.chars.bear.explosion_bullet_state import spawn_explosion_bullet
+        from game.chars.marksman.explosion_bullet_state import spawn_explosion_bullet
         spawn_explosion_bullet(self, owner_id, aim_x, aim_y)
 
     def _trigger_explosion_bullet(self, x: float, y: float, owner_id: int) -> None:
-        from game.chars.bear.explosion_bullet_state import trigger_explosion
+        from game.chars.marksman.explosion_bullet_state import trigger_explosion
         trigger_explosion(self, x, y, owner_id)
 
     def _spawn_grenade(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        from game.chars.rambo.grenade_state import spawn_grenade
+        from game.chars.vince.grenade_state import spawn_grenade
         spawn_grenade(self, owner_id, aim_x, aim_y)
 
     def _trigger_grenade_explosion(self, x: float, y: float, owner_id: int) -> None:
-        from game.chars.rambo.grenade_state import trigger_grenade_explosion
+        from game.chars.vince.grenade_state import trigger_grenade_explosion
         trigger_grenade_explosion(self, x, y, owner_id)
 
     def step_status_effects(self) -> None:
@@ -1008,16 +1008,16 @@ class GameState:
 
     # ── Sniper R：幻影隱身 ───────────────────────────────────────────────────
     def _activate_cloak(self, owner_id: int) -> None:
-        from game.chars.sniper.cloak_state import activate_cloak
+        from game.chars.hunter.cloak_state import activate_cloak
         activate_cloak(self, owner_id)
 
     # ── Soldier Space：跳躍 ──────────────────────────────────────────────────
     def _activate_jump(self, owner_id: int, aim_x: float, aim_y: float) -> None:
-        from game.chars.soldier.jump_state import activate_jump
+        from game.chars.pioneer.jump_state import activate_jump
         activate_jump(self, owner_id, aim_x, aim_y)
 
     def step_jumps(self) -> None:
-        from game.chars.soldier.jump_state import step_jumps
+        from game.chars.pioneer.jump_state import step_jumps
         step_jumps(self)
 
     def _activate_vince_dash(self, owner_id: int, aim_x: float, aim_y: float) -> None:
