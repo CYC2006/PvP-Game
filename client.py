@@ -258,8 +258,9 @@ def run() -> None:
 
     _font_bold = os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf")
     _font_reg  = os.path.join("assets", "fonts", "MapleMono-NF-Regular.ttf")
-    font_lg = pygame.font.Font(_font_bold, 22)
-    font_sm = pygame.font.Font(_font_reg,  15)
+    font_lg  = pygame.font.Font(_font_bold, 24)
+    font_sm  = pygame.font.Font(_font_reg,  15)
+    font_hud = pygame.font.Font(_font_bold, 24)
     clock   = pygame.time.Clock()
 
     _server_started = False   # server daemon 只啟動一次
@@ -412,7 +413,7 @@ def run() -> None:
             draw(screen, state, player_id, font_sm, obstacles,
                  effective_stance, aim_angle_deg, ammo, is_reloading,
                  player_chars, skill_cooldowns,
-                 mx=mx, my=my_pos)
+                 mx=mx, my=my_pos, font_hud=font_hud)
             pygame.display.flip()
             clock.tick(FPS)
 

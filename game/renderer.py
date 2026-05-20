@@ -45,9 +45,9 @@ COL_HP_BORDER  = (180, 180, 180)
 
 GRID_SIZE            = 120
 HP_BAR_X             = 20
-HP_BAR_Y_FROM_BOTTOM = 50
-HP_BAR_W             = 160
-HP_BAR_H             = 18
+HP_BAR_Y_FROM_BOTTOM = 62
+HP_BAR_W             = 220
+HP_BAR_H             = 26
 HP_PIP_GAP           = 4
 PLAYER_SPRITE_SCALE  = 1.5   # 原圖 33–54 × 43 px，放大後約 50–81 × 65 px
 
@@ -490,7 +490,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
          ammo: int = MAGAZINE_SIZE, is_reloading: bool = False,
          player_chars: dict = None,
          skill_cooldowns: dict = None,
-         mx: int = 0, my: int = 0) -> None:
+         mx: int = 0, my: int = 0,
+         font_hud: pygame.font.Font = None) -> None:
     # player_chars: {pid: char_name}，None 時全部用 Agent
 
     if my_id not in state.players:
@@ -558,7 +559,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     # ── 殘血紅色暈邊（HUD 之前，保持 UI 在最上層）
     _draw_low_hp_vignette(screen, me.hp, me.max_hp)
 
-    _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns)
+    _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns,
+              font_hud=font_hud or font)
     _draw_settings_hud(screen, font, mx, my)
 
 
@@ -965,29 +967,31 @@ def _draw_opponent_hp_bar(screen, hp: int, max_hp: int, cx: int, y: int):
 
 def _draw_hud(screen, state, my_id, font, my_stance="stand",
               ammo: int = MAGAZINE_SIZE, is_reloading: bool = False,
-              skill_cooldowns: dict = None):
+              skill_cooldowns: dict = None, font_hud=None):
+    if font_hud is None:
+        font_hud = font
     if my_id in state.players:
         me = state.players[my_id]
         screen.blit(font.render(f"Tick {state.tick}", True, COL_TEXT), (8, 8))
         screen.blit(font.render(f"P{my_id}  ({int(me.x)}, {int(me.y)})", True, COL_TEXT), (8, 26))
         stance_col = COL_STANCE.get(my_stance, COL_TEXT)
         screen.blit(font.render(f"[E] {my_stance.upper()}", True, stance_col), (8, 44))
-        _draw_ammo_hud(screen, font, ammo, is_reloading)
+        _draw_ammo_hud(screen, font_hud, ammo, is_reloading)
         gold = state.gold_counts.get(my_id, 0)
         gold_surf = font.render(f"◆ {gold}", True, (255, 215, 0))
         screen.blit(gold_surf, (8, 62))
     if skill_cooldowns:
         _draw_skill_hud(screen, font, skill_cooldowns)
-    _draw_hp_bar(screen, state, my_id, font)
+    _draw_hp_bar(screen, state, my_id, font_hud)
 
 
 def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
     """右下角顯示子彈數；換彈時顯示進度條。"""
     now      = pygame.time.get_ticks()
-    bar_w    = 160
-    bar_h    = 14
+    bar_w    = HP_BAR_W
+    bar_h    = HP_BAR_H
     bar_x    = SCREEN_W - bar_w - 20
-    ammo_y   = SCREEN_H - 80
+    ammo_y   = SCREEN_H - HP_BAR_Y_FROM_BOTTOM
 
     if is_reloading:
         # 換彈進度條（從 input 模組的全域取進度）
@@ -1010,7 +1014,7 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
         col   = (255, 220, 60) if (mag >= 9999 or ammo > 10) else (255, 90, 90)
         label = font.render(f"AMMO  {ammo_display} / {mag_display}", True, col)
 
-    screen.blit(label, (bar_x + bar_w - label.get_width(), ammo_y - 18))
+    screen.blit(label, (bar_x + bar_w - label.get_width(), ammo_y - 30))
 
 
 def _draw_skill_hud(screen, font, skill_cooldowns: dict) -> None:
@@ -1150,7 +1154,7 @@ def _draw_hp_bar(screen, state, my_id, font):
     # HP 標籤：置左 "HP"，置右 "x / max"
     lbl_left  = font.render("HP", True, COL_TEXT)
     lbl_right = font.render(f"{hp} / {max_hp}", True, COL_TEXT)
-    label_y   = bar_y - 18
+    label_y   = bar_y - 30
     screen.blit(lbl_left,  (HP_BAR_X, label_y))
     screen.blit(lbl_right, (HP_BAR_X + HP_BAR_W - lbl_right.get_width(), label_y))
 
