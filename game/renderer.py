@@ -995,8 +995,8 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
 
     if is_reloading:
         # 換彈進度條（從 input 模組的全域取進度）
-        elapsed  = now - _inp._reload_start_ms
-        progress = min(1.0, elapsed / max(1, _inp._current_reload_ms))
+        elapsed  = now - _inp._state.reload_start_ms
+        progress = min(1.0, elapsed / max(1, _inp._state.current_reload_ms))
         pygame.draw.rect(screen, (60, 20, 20),
                          (bar_x, ammo_y, bar_w, bar_h), border_radius=4)
         fill_w = int(bar_w * progress)
@@ -1082,7 +1082,7 @@ def _draw_rune_hud(screen, font, skill_cooldowns: dict) -> None:
     """左下角：魔紋名稱 + 冷卻條（血量上限為被動，不顯示 CD）。"""
     from game.charselect import RUNES as _RUNES
 
-    rune_id = _inp._rune_id
+    rune_id = _inp._state.rune_id
     if rune_id < 0 or rune_id >= len(_RUNES):
         return
     rune    = _RUNES[rune_id]

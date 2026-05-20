@@ -93,11 +93,11 @@ def draw(screen, state, cx: float, cy: float) -> None:
 def draw_preview(screen, cx: float, cy: float, me_x: float, me_y: float, my_id: int) -> None:
     """R 按住時顯示 300px 灰色虛線範圍圈 + 80px 玩家色瞄準圈（僅本地可見）。"""
     import game.input as _inp
-    if not _inp._r_holding:
+    if not _inp._state.r_holding:
         return
 
-    aim_dx = _inp._last_aim_x
-    aim_dy = _inp._last_aim_y
+    aim_dx = _inp._state.last_aim_x
+    aim_dy = _inp._state.last_aim_y
     dist   = math.hypot(aim_dx, aim_dy)
     if dist > _MAX_RANGE and dist > 0:
         scale   = _MAX_RANGE / dist

@@ -29,13 +29,13 @@ def maybe_spawn_afterimage(px: float, py: float,
     global _last_afterimage_tick, _last_r_afterimage_tick
     import game.input as _inp
     now_ms   = pygame.time.get_ticks()
-    r_active = (now_ms - _inp._r_skill_start_ms < 500 and _inp._r_skill_start_ms > 0)
+    r_active = (now_ms - _inp._state.r_skill_start_ms < 500 and _inp._state.r_skill_start_ms > 0)
     if r_active:
         if state_tick - _last_r_afterimage_tick < 3:
             return
         _last_r_afterimage_tick = state_tick
         _afterimages.append([rotated_surf.copy(), px, py, state_tick, 18])
-    elif now_ms < _inp._speed_boost_end_ms:
+    elif now_ms < _inp._state.speed_boost_end_ms:
         if state_tick - _last_afterimage_tick < 6:
             return
         _last_afterimage_tick = state_tick
@@ -67,10 +67,10 @@ def draw_afterimages(screen, cx: float, cy: float, state_tick: int) -> None:
 def spawn_dash_dust(px: float, py: float, particles: list) -> None:
     """衝刺時在玩家後方噴出灰塵粒子（每幀 3 顆）。"""
     import game.input as _inp
-    if not _inp._dash_active:
+    if not _inp._state.dash_active:
         return
     now  = time.perf_counter()
-    base = math.atan2(-_inp._dash_dy, -_inp._dash_dx)
+    base = math.atan2(-_inp._state.dash_dy, -_inp._state.dash_dx)
     dust_cols = [(190, 180, 165), (168, 160, 148), (210, 202, 188)]
     for _ in range(3):
         angle = base + random.uniform(-0.65, 0.65)
@@ -96,7 +96,7 @@ def update_r_trail(px: float, py: float) -> None:
     global _trail_triangles, _trail_end_ms, _trail_was_active
     import game.input as _inp
     now_ms   = pygame.time.get_ticks()
-    r_active = (now_ms - _inp._r_skill_start_ms < 500 and _inp._r_skill_start_ms > 0)
+    r_active = (now_ms - _inp._state.r_skill_start_ms < 500 and _inp._state.r_skill_start_ms > 0)
     if r_active:
         if not _trail_was_active:
             _trail_triangles.clear()
@@ -152,12 +152,12 @@ def draw_r_trail(screen, cx: float, cy: float) -> None:
 def r_skill_angle(aim_angle_deg: float) -> float:
     """R 技能期間覆蓋本地玩家角度為順時針旋轉動畫；技能結束後恢復滑鼠瞄準。"""
     import game.input as _inp
-    elapsed = pygame.time.get_ticks() - _inp._r_skill_start_ms
-    if elapsed < 0 or elapsed >= 500 or _inp._r_skill_start_ms == 0:
+    elapsed = pygame.time.get_ticks() - _inp._state.r_skill_start_ms
+    if elapsed < 0 or elapsed >= 500 or _inp._state.r_skill_start_ms == 0:
         return aim_angle_deg
     phase_ms = 250
     if elapsed < phase_ms:
-        return _inp._r_skill_start_angle + 180.0 * (elapsed / phase_ms)
+        return _inp._state.r_skill_start_angle + 180.0 * (elapsed / phase_ms)
     else:
         progress = (elapsed - phase_ms) / phase_ms
-        return _inp._r_skill_start_angle + 180.0 + 180.0 * progress
+        return _inp._state.r_skill_start_angle + 180.0 + 180.0 * progress

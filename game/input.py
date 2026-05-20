@@ -1,177 +1,282 @@
 import math
 import pygame
+from dataclasses import dataclass, field
 from game.command import PlayerCommand
 from game.chars.vince.giant_state import GROW_TICKS, ACTIVE_TICKS, SHRINK_TICKS, TOTAL_TICKS
 
-# 預設值（連線前 / 未選角時的 fallback）
+# ── 模組級常數（renderer 以 from game.input import 取得；init_char 後同步更新）──
 SHOOT_COOLDOWN_MS = 333
 MAGAZINE_SIZE     = 12
 RELOAD_TIME_MS    = 2000
 
-_last_shot_time:  int  = 0
-_ammo:            int  = MAGAZINE_SIZE
-_reloading:         bool = False
-_reload_start_ms:   int  = 0
-_current_reload_ms: int  = 0   # 本次換彈所需毫秒（含按發計算）
-
-# ── 角色速度 (px/tick) ────────────────────────────────────────────
-_player_speed: float = 3.0
-
-
-_skill_cds_ms:  dict = {'space': -1, 'e': -1, 'r': -1, 'rmb': -1}
-_skill_last_ms: dict = {'space':  0, 'e':  0, 'r':  0, 'rmb':  0}
-_char_name:            str   = ""
-_rmb_prev:            bool  = False
-_r_prev:              bool  = False   # R 鍵（換彈）前幀狀態
-_f_prev:              bool  = False   # F 鍵（大招）前幀狀態
-_q_prev:              bool  = False   # Q 鍵（魔紋）前幀狀態
-_rune_id:             int   = 0       # 選中的魔紋 ID（由 init_rune 設定）
-_speed_boost_end_ms:  int   = 0     # 速度提升到期時間（ms），供 renderer 粒子使用
-_r_skill_start_ms:    int   = 0     # R 大招啟動時間（ms），供 renderer 旋轉使用
-_r_skill_start_angle: float = 0.0   # R 大招啟動時的瞄準角度（度）
-_r_holding:           bool  = False  # Vince R 按住中（未施放）
-_last_aim_x:          float = 0.0   # 上幀瞄準偏移（world 座標，供 airstrike_fx 使用）
-_last_aim_y:          float = 0.0
-_giant_age:           int   = -1    # 巨人模式年齡（-1 = 未啟動），由 client 每幀更新
-_burst_shots_left:    int   = 0     # 連射剩餘發數（> 0 = 連射中），由 client 每幀更新
-_dash_player_x:       float = 0.0   # 本地玩家位置（client 每幀更新，供衝刺碰撞檢查）
-_dash_player_y:       float = 0.0
-_dash_obstacles:      dict  = {}    # {id: Obstacle}，client 每幀更新
-_dash_destroyed:      set   = set() # 已摧毀障礙物 id
-
-# ── 衝刺常數 ──────────────────────────────────────────────────────
-# 9 ticks：15 + 14.1 + … + 7.8 ≈ 102 px，接近 100 px
+# ── 衝刺常數（不因角色或局別改變）────────────────────────────────────────────
 _DASH_V0          = 15.0   # 初速 (px/tick)
 _DASH_DECEL       = 0.9    # 每 tick 減速 (px/tick²)
 _DASH_MIN_SPEED   = 7.5    # 低於此速度停止衝刺
-_RAMBO_DASH_SPEED = 8.33   # Rambo 等速衝刺速度 (px/tick，≈500 px/s)
+_RAMBO_DASH_SPEED = 8.33   # 等速衝刺速度 (px/tick，保留供未來角色使用)
 
-# ── 衝刺狀態 ──────────────────────────────────────────────────────
-_dash_active:         bool  = False
-_dash_dx:             float = 0.0
-_dash_dy:             float = 0.0
-_dash_speed:          float = 0.0
-_dash_dist_remaining: float = 0.0   # > 0 時為等速衝刺模式（Rambo）
 
-# ── Robot Space 印記計時 ──────────────────────────────────────────
-_robot_mark_until_ms: int = 0   # 印記有效截止時間（ms），0 = 無印記
+# ─────────────────────────────────────────────────────────────────────────────
+# InputState：所有 client 端輸入狀態集中管理
+# 每局開始時由 init_char() 重建；新增狀態欄位只需在此加 field，不會遺漏重置。
+# ─────────────────────────────────────────────────────────────────────────────
 
-# ── sniper R 隱身狀態 ─────────────────────────────────────────────
-_cloak_ticks_left: int = 0      # 剩餘隱身 tick（> 0 = 隱身中），由 client 每幀更新
+@dataclass
+class InputState:
+    # ── 角色設定（init_char 設定）──────────────────────────────────────────
+    char_name:           str   = ""
+    shoot_cooldown_ms:   int   = 333
+    magazine_size:       int   = 12
+    reload_time_ms:      int   = 2000
+    current_reload_ms:   int   = 2000   # 本次換彈所需 ms（散彈/狙擊依發數計算）
+    player_speed:        float = 3.0
+    skill_cds_ms:        dict  = field(default_factory=lambda: {
+                                     'space': -1, 'e': -1, 'r': -1, 'rmb': -1, 'q': -1})
+    skill_last_ms:       dict  = field(default_factory=lambda: {
+                                     'space': 0, 'e': 0, 'r': 0, 'rmb': 0, 'q': 0})
+    # ── 射擊 / 彈夾 ─────────────────────────────────────────────────────────
+    last_shot_time:      int   = 0
+    ammo:                int   = 12
+    reloading:           bool  = False
+    reload_start_ms:     int   = 0
+    # ── 按鍵緣偵測 ───────────────────────────────────────────────────────────
+    space_prev:          bool  = False
+    e_prev:              bool  = False
+    rmb_prev:            bool  = False
+    r_prev:              bool  = False
+    f_prev:              bool  = False
+    q_prev:              bool  = False
+    r_holding:           bool  = False   # Vince RMB 蓄力中
+    # ── 技能輔助 ─────────────────────────────────────────────────────────────
+    speed_boost_end_ms:  int   = 0
+    r_skill_start_ms:    int   = 0
+    r_skill_start_angle: float = 0.0
+    robot_mark_until_ms: int   = 0
+    rune_id:             int   = 0
+    # ── 每幀由 client.py 推入（伺服器狀態鏡像）─────────────────────────────
+    giant_age:           int   = -1
+    burst_shots_left:    int   = 0
+    cloak_ticks_left:    int   = 0
+    last_aim_x:          float = 0.0
+    last_aim_y:          float = 0.0
+    # ── 衝刺狀態 ─────────────────────────────────────────────────────────────
+    dash_active:         bool  = False
+    dash_dx:             float = 0.0
+    dash_dy:             float = 0.0
+    dash_speed:          float = 0.0
+    dash_dist_remaining: float = 0.0
+    # ── 衝刺碰撞上下文（每幀由 client.py 更新）──────────────────────────────
+    dash_player_x:       float = 0.0
+    dash_player_y:       float = 0.0
+    dash_obstacles:      dict  = field(default_factory=dict)
+    dash_destroyed:      set   = field(default_factory=set)
 
-# ── 技能鍵上升緣偵測 ──────────────────────────────────────────────
-_space_prev: bool = False
-_e_prev:     bool = False
 
+_state = InputState()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# client.py 每幀推入的 setters（不需要 global 宣告）
+# ─────────────────────────────────────────────────────────────────────────────
 
 def set_giant_age(age: int) -> None:
-    global _giant_age
-    _giant_age = age
+    _state.giant_age = age
 
 
 def set_burst_shots_left(n: int) -> None:
-    global _burst_shots_left
-    _burst_shots_left = n
+    _state.burst_shots_left = n
 
 
 def set_cloak_ticks(n: int) -> None:
-    global _cloak_ticks_left
-    _cloak_ticks_left = n
+    _state.cloak_ticks_left = n
 
 
 def set_dash_context(player_x: float, player_y: float,
                      obstacles: dict, destroyed: set) -> None:
-    global _dash_player_x, _dash_player_y, _dash_obstacles, _dash_destroyed
-    _dash_player_x  = player_x
-    _dash_player_y  = player_y
-    _dash_obstacles = obstacles
-    _dash_destroyed = destroyed
+    _state.dash_player_x  = player_x
+    _state.dash_player_y  = player_y
+    _state.dash_obstacles = obstacles
+    _state.dash_destroyed = destroyed
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Space 技能 per-character handlers
+#
+# 簽名：(st, dx, dy, aim_x, aim_y, now) → (use_skill_space, dx, dy, speed_mult)
+# Handler 負責：寫入 st 的持久狀態、記錄 skill_last_ms['space']、回傳本幀覆蓋值
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _space_vince(st: InputState, dx: float, dy: float,
+                 aim_x: float, aim_y: float, now: int) -> tuple:
+    st.skill_last_ms['space'] = now
+    return True, dx, dy, 1.0
+
+
+def _space_marksman(st: InputState, dx: float, dy: float,
+                    aim_x: float, aim_y: float, now: int) -> tuple:
+    st.skill_last_ms['space'] = now
+    return True, dx, dy, 1.0
+
+
+def _space_hunter(st: InputState, dx: float, dy: float,
+                  aim_x: float, aim_y: float, now: int) -> tuple:
+    """向瞄準反方向翻滾衝刺。"""
+    aim_len = math.hypot(aim_x, aim_y)
+    if aim_len == 0:
+        return False, dx, dy, 1.0
+    ndx = -aim_x / aim_len
+    ndy = -aim_y / aim_len
+    st.dash_active            = True
+    st.dash_dx                = ndx
+    st.dash_dy                = ndy
+    st.dash_speed             = 18.0 - _DASH_DECEL
+    st.skill_last_ms['space'] = now
+    speed_mult = 18.0 / max(st.player_speed, 0.001)
+    return True, ndx, ndy, speed_mult
+
+
+def _space_pioneer_zombie(st: InputState, dx: float, dy: float,
+                          aim_x: float, aim_y: float, now: int) -> tuple:
+    """跳躍：通知 server 起跳，本地立即補滿彈夾並取消換彈。"""
+    st.skill_last_ms['space'] = now
+    st.ammo                   = st.magazine_size
+    st.reloading               = False
+    st.reload_start_ms         = 0
+    return True, dx, dy, 1.0
+
+
+def _space_robot(st: InputState, dx: float, dy: float,
+                 aim_x: float, aim_y: float, now: int) -> tuple:
+    """衝刺並在落點設置印記。"""
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return False, dx, dy, 1.0
+    ndx = dx / length
+    ndy = dy / length
+    st.dash_active            = True
+    st.dash_dx                = ndx
+    st.dash_dy                = ndy
+    st.dash_speed             = _DASH_V0 - _DASH_DECEL
+    st.skill_last_ms['space'] = now
+    st.robot_mark_until_ms    = now + 3000
+    speed_mult = _DASH_V0 / max(st.player_speed, 0.001)
+    return True, ndx, ndy, speed_mult
+
+
+def _space_assassin_noop(st: InputState, dx: float, dy: float,
+                         aim_x: float, aim_y: float, now: int) -> tuple:
+    """Assassin space 邏輯在 read_input 的獨立區塊處理
+    （因可在衝刺中觸發，不受 not dash_active guard 限制），此處為 no-op 佔位。"""
+    return False, dx, dy, 1.0
+
+
+def _default_space_dash(st: InputState, dx: float, dy: float,
+                        aim_x: float, aim_y: float, now: int) -> tuple:
+    """預設：純 client 端衝刺，不通知 server（use_skill_space=False）。"""
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return False, dx, dy, 1.0
+    ndx = dx / length
+    ndy = dy / length
+    st.dash_active            = True
+    st.dash_dx                = ndx
+    st.dash_dy                = ndy
+    st.dash_speed             = _DASH_V0 - _DASH_DECEL
+    st.skill_last_ms['space'] = now
+    speed_mult = _DASH_V0 / max(st.player_speed, 0.001)
+    return False, ndx, ndy, speed_mult
+
+
+# Pioneer 與 Zombie 共用 handler：兩者技能概念完全相同（跳躍起跳 + 補滿彈夾）。
+# Vince 與 Marksman 各自獨立：目前程式碼相同，但設計意圖不同（嘲諷 vs 衝刺）。
+# Assassin：no-op 佔位，避免 fallthrough 到 _default_space_dash。
+_SPACE_HANDLERS: dict = {
+    'Vince':    _space_vince,
+    'Marksman': _space_marksman,
+    'Hunter':   _space_hunter,
+    'Pioneer':  _space_pioneer_zombie,
+    'Zombie':   _space_pioneer_zombie,
+    'Robot':    _space_robot,
+    'Assassin': _space_assassin_noop,
+    # 不在 dict 中的角色（Agent、Poisoner 等）→ 走 _default_space_dash
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# init_char / init_rune
+# ─────────────────────────────────────────────────────────────────────────────
 
 def init_char(char_name: str) -> None:
-    """
-    遊戲開始後呼叫，依選擇角色設定射速 / 彈夾 / 換彈時間，並重置所有狀態。
-    """
-    global SHOOT_COOLDOWN_MS, MAGAZINE_SIZE, RELOAD_TIME_MS
-    global _ammo, _reloading, _reload_start_ms, _last_shot_time
-    global _player_speed, _skill_cds_ms, _skill_last_ms
-    global _dash_active, _dash_speed, _dash_dist_remaining, _space_prev
-    global _char_name, _rmb_prev, _r_prev, _f_prev, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
-    global _r_holding, _last_aim_x, _last_aim_y
-    global _robot_mark_until_ms
-    global _cloak_ticks_left, _current_reload_ms
+    """遊戲開始後呼叫，依選擇角色完整重置並設定所有 client 端狀態。"""
+    global _state, SHOOT_COOLDOWN_MS, MAGAZINE_SIZE, RELOAD_TIME_MS
 
     from game.char_data import get_stat, CHAR_STATS
 
-    interval = get_stat(char_name, "fire_interval")
-    SHOOT_COOLDOWN_MS = int(interval * 1000) if interval and interval > 0 else 9999
+    interval  = get_stat(char_name, "fire_interval")
+    shoot_cd  = int(interval * 1000) if interval and interval > 0 else 9999
 
     mag_str = get_stat(char_name, "mag")
-    MAGAZINE_SIZE = int(mag_str) if mag_str and str(mag_str).strip().isdigit() else 9999
+    mag     = int(mag_str) if mag_str and str(mag_str).strip().isdigit() else 9999
 
-    reload_s = get_stat(char_name, "reload_time")
-    RELOAD_TIME_MS = int(reload_s * 1000) if reload_s and reload_s > 0 else 99999
+    reload_s  = get_stat(char_name, "reload_time")
+    reload_ms = int(reload_s * 1000) if reload_s and reload_s > 0 else 99999
 
-    _player_speed = float(CHAR_STATS.get(char_name, {}).get('speed', 3.0))
+    player_speed = float(CHAR_STATS.get(char_name, {}).get('speed', 3.0))
 
     cfg = CHAR_STATS.get(char_name, {})
     def _cd(key: str) -> int:
         v = float(cfg.get(key, 0))
         return int(v * 1000) if v > 0 else -1
-    _skill_cds_ms = {
+
+    skill_cds = {
         'rmb':   _cd('cd_rmb'),
         'space': _cd('cd_space'),
         'e':     _cd('cd_e'),
         'r':     _cd('cd_r'),
         'q':     -1,   # 由 init_rune 設定
     }
-    _now = pygame.time.get_ticks()
-    _skill_last_ms = {
-        slot: (_now - cd - 1) if cd >= 0 else 0
-        for slot, cd in _skill_cds_ms.items()
+    now_ms = pygame.time.get_ticks()
+    skill_last = {
+        slot: (now_ms - cd - 1) if cd >= 0 else 0
+        for slot, cd in skill_cds.items()
     }
 
-    _char_name             = char_name
-    _speed_boost_end_ms   = 0
-    _r_skill_start_ms     = 0
-    _r_skill_start_angle  = 0.0
-    _ammo              = MAGAZINE_SIZE
-    _reloading         = False
-    _reload_start_ms   = 0
-    _current_reload_ms = RELOAD_TIME_MS
-    _last_shot_time    = 0
-    _dash_active          = False
-    _dash_speed           = 0.0
-    _dash_dist_remaining  = 0.0
-    _robot_mark_until_ms  = 0
-    _cloak_ticks_left     = 0
-    _space_prev      = False
-    _e_prev          = False
-    _rmb_prev        = False
-    _r_prev          = False
-    _f_prev          = False
-    _q_prev          = False
-    _r_holding       = False
-    _last_aim_x      = 0.0
-    _last_aim_y      = 0.0
+    # 一行重建 InputState → 所有欄位自動回到預設值，只需覆蓋角色相關設定
+    _state = InputState(
+        char_name         = char_name,
+        shoot_cooldown_ms = shoot_cd,
+        magazine_size     = mag,
+        reload_time_ms    = reload_ms,
+        current_reload_ms = reload_ms,
+        player_speed      = player_speed,
+        skill_cds_ms      = skill_cds,
+        skill_last_ms     = skill_last,
+        ammo              = mag,
+    )
+
+    # 同步 module-level 常數，維持 renderer.py 的 from-import 向後相容
+    SHOOT_COOLDOWN_MS = shoot_cd
+    MAGAZINE_SIZE     = mag
+    RELOAD_TIME_MS    = reload_ms
 
 
 def init_rune(rune_id: int) -> None:
+    """選角確認後呼叫（在 init_char 之後）。
+    rune_id: 0=一般恢復, 1=強化恢復, 2=血量上限（被動，Q 鍵無效）。
     """
-    選角確認後呼叫（在 init_char 之後）。
-    rune_id: 0=一般恢復, 1=強化恢復, 2=血量上限
-    血量上限為被動，Q 鍵無效（cd 設 -1）。
-    """
-    global _rune_id, _q_prev, _skill_cds_ms, _skill_last_ms
-    _rune_id = rune_id
-    _q_prev  = False
+    _state.rune_id = rune_id
+    _state.q_prev  = False
     if rune_id == 2:   # 血量上限：被動，Q 無動作
-        _skill_cds_ms['q']  = -1
-        _skill_last_ms['q'] = 0
+        _state.skill_cds_ms['q']  = -1
+        _state.skill_last_ms['q'] = 0
     else:              # 一般恢復 / 強化恢復：30s CD，遊戲開始即可用
-        _skill_cds_ms['q']  = 30_000
-        _skill_last_ms['q'] = pygame.time.get_ticks() - 30_001
+        _state.skill_cds_ms['q']  = 30_000
+        _state.skill_last_ms['q'] = pygame.time.get_ticks() - 30_001
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# read_input
+# ─────────────────────────────────────────────────────────────────────────────
 
 def read_input(player_id: int, keys_held: set,
                logical_mouse: tuple,
@@ -180,277 +285,238 @@ def read_input(player_id: int, keys_held: set,
     """
     回傳 (PlayerCommand, effective_stance, ammo, is_reloading, skill_cooldowns)
 
-    skill_cooldowns : {'space':(remaining_ms, max_ms), 'e':..., 'r':..., 'rmb':...}
+    skill_cooldowns : {'space':(remaining_ms, max_ms), 'e':..., 'r':..., 'rmb':..., 'q':...}
                       remaining_ms == -1  → 技能尚未實作
     """
-    global _last_shot_time, _ammo, _reloading, _reload_start_ms, _current_reload_ms
-    global _space_prev, _e_prev, _rmb_prev, _r_prev, _f_prev, _q_prev
-    global _robot_mark_until_ms, _cloak_ticks_left
-    global _dash_active, _dash_dx, _dash_dy, _dash_speed, _dash_dist_remaining
-    global _skill_last_ms, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
-    global _r_holding, _last_aim_x, _last_aim_y
-
+    from game.render_utils import LOGICAL_W, LOGICAL_H
     now = pygame.time.get_ticks()
 
-    # ── 換彈完成判斷 ──────────────────────────────────────────────
-    if _reloading and (now - _reload_start_ms) >= _current_reload_ms:
-        _reloading = False
-        _ammo      = MAGAZINE_SIZE
+    # ── 換彈完成判斷 ──────────────────────────────────────────────────────
+    if _state.reloading and (now - _state.reload_start_ms) >= _state.current_reload_ms:
+        _state.reloading = False
+        _state.ammo      = _state.magazine_size
 
-    effective_stance = "reload" if _reloading else "machine"
+    effective_stance = "reload" if _state.reloading else "machine"
 
-    from game.render_utils import LOGICAL_W, LOGICAL_H
-    lx, ly = logical_mouse
-    aim_x = float(lx - LOGICAL_W // 2)
-    aim_y = float(ly - LOGICAL_H // 2)
-    _last_aim_x = aim_x
-    _last_aim_y = aim_y
+    lx, ly            = logical_mouse
+    aim_x             = float(lx - LOGICAL_W // 2)
+    aim_y             = float(ly - LOGICAL_H // 2)
+    _state.last_aim_x = aim_x
+    _state.last_aim_y = aim_y
 
-    # ── 技能鍵上升緣 ──────────────────────────────────────────────
+    # ── 按鍵上升緣偵測 ────────────────────────────────────────────────────
     space_held         = pygame.K_SPACE in keys_held
-    space_just_pressed = space_held and not _space_prev
-    _space_prev        = space_held
+    space_just_pressed = space_held and not _state.space_prev
+    _state.space_prev  = space_held
 
     e_held             = pygame.K_e in keys_held
-    e_just_pressed     = e_held and not _e_prev
-    _e_prev            = e_held
+    e_just_pressed     = e_held and not _state.e_prev
+    _state.e_prev      = e_held
 
     rmb_held           = pygame.mouse.get_pressed()[2]
-    rmb_just_pressed   = rmb_held and not _rmb_prev
-    rmb_just_released  = not rmb_held and _rmb_prev
-    _rmb_prev          = rmb_held
+    rmb_just_pressed   = rmb_held and not _state.rmb_prev
+    rmb_just_released  = not rmb_held and _state.rmb_prev
+    _state.rmb_prev    = rmb_held
 
     r_held             = pygame.K_r in keys_held
-    r_just_pressed     = r_held and not _r_prev
-    _r_prev            = r_held
+    r_just_pressed     = r_held and not _state.r_prev
+    _state.r_prev      = r_held
 
     f_held             = pygame.K_f in keys_held
-    f_just_pressed     = f_held and not _f_prev
-    _f_prev            = f_held
+    f_just_pressed     = f_held and not _state.f_prev
+    _state.f_prev      = f_held
 
     q_held             = pygame.K_q in keys_held
-    q_just_pressed     = q_held and not _q_prev
-    _q_prev            = q_held
+    q_just_pressed     = q_held and not _state.q_prev
+    _state.q_prev      = q_held
 
-    # ── R 技能啟動狀態（在所有技能判斷之前計算，確保完全隔離）────
-    _r_skill_active = (now - _r_skill_start_ms) < 500 and _r_skill_start_ms > 0
+    # ── 衍生狀態（每幀計算，不持久化）────────────────────────────────────
+    r_skill_active = (_state.r_skill_start_ms > 0
+                      and (now - _state.r_skill_start_ms) < 500)
+    giant_frozen   = (_state.giant_age >= 0
+                      and not (GROW_TICKS <= _state.giant_age < GROW_TICKS + ACTIVE_TICKS))
 
-    # ── 隱身中（Sniper R）：封鎖所有技能與射擊，不記錄冷卻 ──────
-    _is_cloaked = _cloak_ticks_left > 0
-
-    # ── 巨人放大 / 縮小中：凍結移動與技能 ───────────────────────
-    _giant_frozen = (_giant_age >= 0 and
-                     not (GROW_TICKS <= _giant_age < GROW_TICKS + ACTIVE_TICKS))
-
-    # ── 位移 / WASD ───────────────────────────────────────────────
+    # ── 位移 / speed_mult 初始化 ──────────────────────────────────────────
     dx, dy          = 0.0, 0.0
     speed_mult      = 1.0
     use_skill_space = False
+    robot_recall    = False
 
-    # ── Robot 印記回傳（不受冷卻影響，優先於衝刺）──────────────────
-    _robot_recall = False
-    if (_char_name == 'Robot' and space_just_pressed
-            and _robot_mark_until_ms > now):
-        use_skill_space      = True   # 通知 server：mark 存在 → 傳送
-        _robot_mark_until_ms = 0      # 清除本地印記計時
-        _robot_recall        = True   # 阻止下方衝刺觸發
+    # ── Robot 印記回傳（可在衝刺中觸發，需先於主要位移處理）────────────
+    if (_state.char_name == 'Robot'
+            and space_just_pressed
+            and _state.robot_mark_until_ms > now):
+        use_skill_space            = True
+        _state.robot_mark_until_ms = 0
+        robot_recall               = True
 
-    if _dash_active:
-        if _dash_dist_remaining > 0:
-            # 等速衝刺（Rambo）：障礙物碰撞 → 立即停止
+    # ── 衝刺中：繼續推進衝刺位移 ─────────────────────────────────────────
+    if _state.dash_active:
+        if _state.dash_dist_remaining > 0:
+            # 等速衝刺：障礙物碰撞時立即中止
             from game.state import PLAYER_RADIUS as _PR
-            _hit_obs = any(
-                obs.collides_circle(_dash_player_x, _dash_player_y, _PR)
-                for oid, obs in _dash_obstacles.items()
-                if oid not in _dash_destroyed
+            hit_obs = any(
+                obs.collides_circle(_state.dash_player_x, _state.dash_player_y, _PR)
+                for oid, obs in _state.dash_obstacles.items()
+                if oid not in _state.dash_destroyed
             )
-            if _hit_obs:
-                _dash_active         = False
-                _dash_dist_remaining = 0.0
+            if hit_obs:
+                _state.dash_active         = False
+                _state.dash_dist_remaining = 0.0
             else:
-                speed_mult           = _RAMBO_DASH_SPEED / max(_player_speed, 0.001)
-                dx, dy               = _dash_dx, _dash_dy
-                _dash_dist_remaining -= _RAMBO_DASH_SPEED
-                if _dash_dist_remaining <= 0:
-                    _dash_active         = False
-                    _dash_dist_remaining = 0.0
-        elif _dash_speed < _DASH_MIN_SPEED:
-            _dash_active = False          # 速度低於閾值，衝刺結束
+                speed_mult                  = _RAMBO_DASH_SPEED / max(_state.player_speed, 0.001)
+                dx, dy                      = _state.dash_dx, _state.dash_dy
+                _state.dash_dist_remaining -= _RAMBO_DASH_SPEED
+                if _state.dash_dist_remaining <= 0:
+                    _state.dash_active         = False
+                    _state.dash_dist_remaining = 0.0
+        elif _state.dash_speed < _DASH_MIN_SPEED:
+            _state.dash_active = False
         else:
-            speed_mult  = _dash_speed / max(_player_speed, 0.001)
-            dx, dy      = _dash_dx, _dash_dy
-            _dash_speed -= _DASH_DECEL
+            speed_mult         = _state.dash_speed / max(_state.player_speed, 0.001)
+            dx, dy             = _state.dash_dx, _state.dash_dy
+            _state.dash_speed -= _DASH_DECEL
 
-    if not _dash_active and not _giant_frozen and not _burst_shots_left:
+    # ── WASD 移動 + Space 技能（不在衝刺 / 巨人凍結 / 連射中）──────────
+    if not _state.dash_active and not giant_frozen and not _state.burst_shots_left:
         if pygame.K_w in keys_held or pygame.K_UP    in keys_held: dy -= 1.0
         if pygame.K_s in keys_held or pygame.K_DOWN  in keys_held: dy += 1.0
         if pygame.K_a in keys_held or pygame.K_LEFT  in keys_held: dx -= 1.0
         if pygame.K_d in keys_held or pygame.K_RIGHT in keys_held: dx += 1.0
 
-        # ── 觸發衝刺（非 Assassin）或速度技能（Assassin）────────
-        if (not _r_skill_active
+        if (not r_skill_active
                 and space_just_pressed
-                and not _robot_recall
-                and _skill_cds_ms.get('space', -1) >= 0):
-            cd_remaining = _skill_cds_ms['space'] - (now - _skill_last_ms['space'])
+                and not robot_recall
+                and _state.skill_cds_ms.get('space', -1) >= 0):
+            cd_remaining = (_state.skill_cds_ms['space']
+                            - (now - _state.skill_last_ms['space']))
             if cd_remaining <= 0:
-                if _char_name == 'Assassin':
-                    pass   # 冷卻由下方 use_skill_space 區塊統一記錄
-                elif _char_name in ('Vince', 'Marksman'):
-                    use_skill_space         = True
-                    _skill_last_ms['space'] = now
-                elif _char_name == 'Hunter':
-                    aim_len = math.hypot(aim_x, aim_y)
-                    if aim_len > 0:
-                        _dash_active     = True
-                        _dash_dx         = -aim_x / aim_len
-                        _dash_dy         = -aim_y / aim_len
-                        speed_mult       = 18.0 / max(_player_speed, 0.001)
-                        dx, dy           = _dash_dx, _dash_dy
-                        _dash_speed      = 18.0 - _DASH_DECEL
-                        _skill_last_ms['space'] = now
-                        use_skill_space  = True
-                elif _char_name in ('Pioneer', 'Zombie'):
-                    # 跳躍：通知 server 起跳；本地立即補滿彈夾並取消換彈
-                    use_skill_space      = True
-                    _skill_last_ms['space'] = now
-                    _ammo                = MAGAZINE_SIZE
-                    _reloading           = False
-                    _reload_start_ms     = 0
+                handler = _SPACE_HANDLERS.get(_state.char_name)
+                if handler:
+                    use_skill_space, dx, dy, speed_mult = handler(
+                        _state, dx, dy, aim_x, aim_y, now)
                 else:
-                    length = math.hypot(dx, dy)
-                    if length > 0:
-                        _dash_active     = True
-                        _dash_dx         = dx / length
-                        _dash_dy         = dy / length
-                        speed_mult       = _DASH_V0 / max(_player_speed, 0.001)
-                        dx, dy           = _dash_dx, _dash_dy
-                        _dash_speed      = _DASH_V0 - _DASH_DECEL
-                        _skill_last_ms['space'] = now
-                        # Robot：通知 server 建立印記，並設定本地倒計時
-                        if _char_name == 'Robot':
-                            use_skill_space      = True
-                            _robot_mark_until_ms = now + 3000
+                    use_skill_space, dx, dy, speed_mult = _default_space_dash(
+                        _state, dx, dy, aim_x, aim_y, now)
 
-    running = shift_held and not _dash_active
+    running = shift_held and not _state.dash_active
 
-    # ── E 技能（閃光彈等）────────────────────────────────────────
+    # ── E 技能 ────────────────────────────────────────────────────────────
     use_skill_e = False
-    if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
-            and e_just_pressed and _skill_cds_ms.get('e', -1) >= 0):
-        cd_remaining = _skill_cds_ms['e'] - (now - _skill_last_ms['e'])
+    if (not r_skill_active and not giant_frozen and not _state.burst_shots_left
+            and e_just_pressed
+            and _state.skill_cds_ms.get('e', -1) >= 0):
+        cd_remaining = _state.skill_cds_ms['e'] - (now - _state.skill_last_ms['e'])
         if cd_remaining <= 0:
             use_skill_e = True
-            _skill_last_ms['e'] = now
+            _state.skill_last_ms['e'] = now
 
-    # ── RMB 技能（Vince：按住蓄力放開施放；其他角色：按下即發）────
+    # ── RMB 技能（Vince：蓄力放開；其他：按下即發）───────────────────────
     use_skill_rmb = False
-    if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
-            and _skill_cds_ms.get('rmb', -1) >= 0):
-        rmb_cd_ms = _skill_cds_ms['rmb']
-        if _char_name == 'Vince':
-            cd_ok = (rmb_cd_ms - (now - _skill_last_ms['rmb'])) <= 0
+    if (not r_skill_active and not giant_frozen and not _state.burst_shots_left
+            and _state.skill_cds_ms.get('rmb', -1) >= 0):
+        rmb_cd_ms = _state.skill_cds_ms['rmb']
+        if _state.char_name == 'Vince':
+            cd_ok = (rmb_cd_ms - (now - _state.skill_last_ms['rmb'])) <= 0
             if rmb_just_pressed and cd_ok:
-                _r_holding = True
-            if rmb_just_released and _r_holding:
+                _state.r_holding = True
+            if rmb_just_released and _state.r_holding:
                 use_skill_rmb = True
-                _skill_last_ms['rmb'] = now
+                _state.skill_last_ms['rmb'] = now
             if rmb_just_released:
-                _r_holding = False
+                _state.r_holding = False
         else:
-            if rmb_just_pressed and (rmb_cd_ms - (now - _skill_last_ms['rmb'])) <= 0:
+            if rmb_just_pressed and (rmb_cd_ms - (now - _state.skill_last_ms['rmb'])) <= 0:
                 use_skill_rmb = True
-                _skill_last_ms['rmb'] = now
+                _state.skill_last_ms['rmb'] = now
 
-    # ── Space 技能（Assassin：速度提升）──────────────────────────
-    if (not _r_skill_active and not _giant_frozen
-            and _char_name == 'Assassin'
+    # ── Assassin Space：速度提升（可在衝刺中觸發，獨立於主要 Space 區塊）─
+    if (not r_skill_active and not giant_frozen
+            and _state.char_name == 'Assassin'
             and space_just_pressed
-            and _skill_cds_ms.get('space', -1) >= 0):
-        cd_elapsed = now - _skill_last_ms['space']
-        if cd_elapsed >= _skill_cds_ms['space']:
-            use_skill_space = True
-            _skill_last_ms['space'] = now
-            _speed_boost_end_ms = now + 2000   # 2 秒提升
+            and _state.skill_cds_ms.get('space', -1) >= 0):
+        if (now - _state.skill_last_ms['space']) >= _state.skill_cds_ms['space']:
+            use_skill_space               = True
+            _state.skill_last_ms['space'] = now
+            _state.speed_boost_end_ms     = now + 2000
 
-    # ── F 鍵：大招（按下即發）────────────────────────────────────
+    # ── F 鍵：大招（按下即發）────────────────────────────────────────────
     use_skill_r = False
-    if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
-            and _skill_cds_ms.get('r', -1) >= 0):
-        if f_just_pressed and (_skill_cds_ms['r'] - (now - _skill_last_ms['r'])) <= 0:
+    if (not r_skill_active and not giant_frozen and not _state.burst_shots_left
+            and _state.skill_cds_ms.get('r', -1) >= 0):
+        if f_just_pressed and (_state.skill_cds_ms['r'] - (now - _state.skill_last_ms['r'])) <= 0:
             use_skill_r = True
-            _skill_last_ms['r']  = now
-            # 旋轉動畫只屬於 Assassin 的 R 技能
-            if _char_name == 'Assassin':
-                _r_skill_start_ms    = now
-                _r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
+            _state.skill_last_ms['r'] = now
+            if _state.char_name == 'Assassin':
+                _state.r_skill_start_ms    = now
+                _state.r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
 
-    # ── R 鍵：手動換彈 ────────────────────────────────────────────
-    # Robot / Assassin / Zombie 子彈無限，不需要換彈
+    # ── R 鍵：手動換彈 ────────────────────────────────────────────────────
     _NO_RELOAD = {'Robot', 'Assassin', 'Zombie'}
     if (r_just_pressed
-            and not _reloading
-            and _char_name not in _NO_RELOAD
-            and _ammo < MAGAZINE_SIZE):
-        if _char_name == 'Vince':
-            # 散彈槍：按發計算，每發 0.5 秒
-            _current_reload_ms = (MAGAZINE_SIZE - _ammo) * 500
-        elif _char_name == 'Hunter':
-            # 狙擊槍：按發計算，每發 1 秒
-            _current_reload_ms = (MAGAZINE_SIZE - _ammo) * 1000
+            and not _state.reloading
+            and _state.char_name not in _NO_RELOAD
+            and _state.ammo < _state.magazine_size):
+        if _state.char_name == 'Vince':
+            _state.current_reload_ms = (_state.magazine_size - _state.ammo) * 500
+        elif _state.char_name == 'Hunter':
+            _state.current_reload_ms = (_state.magazine_size - _state.ammo) * 1000
         else:
-            # 其餘角色：固定換彈時間（來自 chars.csv）
-            _current_reload_ms = RELOAD_TIME_MS
-        _reloading       = True
-        _reload_start_ms = now
+            _state.current_reload_ms = _state.reload_time_ms
+        _state.reloading       = True
+        _state.reload_start_ms = now
 
-    # ── Q 鍵：啟動魔紋（血量上限為被動，cd=-1 不觸發）───────────
+    # ── Q 鍵：啟動魔紋（血量上限為被動，cd=-1 不觸發）───────────────────
     use_rune = False
-    if (q_just_pressed and _skill_cds_ms.get('q', -1) >= 0
-            and not _giant_frozen and not _burst_shots_left):
-        cd_remaining = _skill_cds_ms['q'] - (now - _skill_last_ms['q'])
+    if (q_just_pressed and _state.skill_cds_ms.get('q', -1) >= 0
+            and not giant_frozen and not _state.burst_shots_left):
+        cd_remaining = _state.skill_cds_ms['q'] - (now - _state.skill_last_ms['q'])
         if cd_remaining <= 0:
             use_rune = True
-            _skill_last_ms['q'] = now
+            _state.skill_last_ms['q'] = now
 
-    # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────
+    # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────────────
     shooting = False
     if (not suppress_lmb
-            and not _reloading and not _r_skill_active and not _burst_shots_left
+            and not _state.reloading
+            and not r_skill_active
+            and not _state.burst_shots_left
             and pygame.mouse.get_pressed()[0]
-            and (now - _last_shot_time) >= SHOOT_COOLDOWN_MS):
-        shooting        = True
-        _last_shot_time = now
-        if MAGAZINE_SIZE < 9999:
-            _ammo -= 1
-            if _ammo <= 0:
-                _ammo              = 0
-                _reloading         = True
-                _reload_start_ms   = now
-                _current_reload_ms = RELOAD_TIME_MS
+            and (now - _state.last_shot_time) >= _state.shoot_cooldown_ms):
+        shooting              = True
+        _state.last_shot_time = now
+        if _state.magazine_size < 9999:
+            _state.ammo -= 1
+            if _state.ammo <= 0:
+                _state.ammo              = 0
+                _state.reloading         = True
+                _state.reload_start_ms   = now
+                _state.current_reload_ms = _state.reload_time_ms
 
-    # ── 技能冷卻資訊（給 HUD）────────────────────────────────────
+    # ── 技能冷卻資訊（給 HUD）────────────────────────────────────────────
     skill_cooldowns: dict = {}
     for slot in ('space', 'e', 'r', 'rmb', 'q'):
-        max_cd = _skill_cds_ms.get(slot, -1)
+        max_cd = _state.skill_cds_ms.get(slot, -1)
         if max_cd < 0:
             skill_cooldowns[slot] = (-1, -1)
         else:
-            remaining = max_cd - (now - _skill_last_ms[slot])
+            remaining = max_cd - (now - _state.skill_last_ms[slot])
             skill_cooldowns[slot] = (max(0, remaining), max_cd)
 
     cmd = PlayerCommand(
-        player_id=player_id,
-        move_x=dx, move_y=dy,
-        shooting=shooting,
-        aim_x=aim_x, aim_y=aim_y,
-        running=running,
-        stance=effective_stance,
-        speed_mult=speed_mult,
-        use_skill_e=use_skill_e,
-        use_skill_rmb=use_skill_rmb,
-        use_skill_space=use_skill_space,
-        use_skill_r=use_skill_r,
-        use_rune=use_rune,
+        player_id       = player_id,
+        move_x          = dx,
+        move_y          = dy,
+        shooting        = shooting,
+        aim_x           = aim_x,
+        aim_y           = aim_y,
+        running         = running,
+        stance          = effective_stance,
+        speed_mult      = speed_mult,
+        use_skill_e     = use_skill_e,
+        use_skill_rmb   = use_skill_rmb,
+        use_skill_space = use_skill_space,
+        use_skill_r     = use_skill_r,
+        use_rune        = use_rune,
     )
-    return cmd, effective_stance, _ammo, _reloading, skill_cooldowns
+    return cmd, effective_stance, _state.ammo, _state.reloading, skill_cooldowns
