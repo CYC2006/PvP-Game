@@ -556,7 +556,7 @@ class GameState:
                 for pid, player in self.players.items():
                     if pid == bullet.owner_id:
                         continue
-                    if player.jump_tick >= 0:
+                    if player.jump_tick >= 0 or player.zombie_jump_tick >= 0:
                         continue  # 跳躍中：無敵，跳過傷害判定
                     if player.r_skill_phase > 0:
                         continue  # Assassin R 衝刺中：無敵，跳過傷害判定
@@ -577,7 +577,7 @@ class GameState:
                 for pid, player in self.players.items():
                     if pid == bullet.owner_id:
                         continue
-                    if player.jump_tick >= 0:
+                    if player.jump_tick >= 0 or player.zombie_jump_tick >= 0:
                         continue  # 跳躍中：無敵，跳過傷害判定
                     if player.r_skill_phase > 0:
                         continue  # Assassin R 衝刺中：無敵，跳過傷害判定
@@ -610,7 +610,7 @@ class GameState:
                 for pid, player in self.players.items():
                     if pid == bullet.owner_id:
                         continue
-                    if player.jump_tick >= 0:
+                    if player.jump_tick >= 0 or player.zombie_jump_tick >= 0:
                         continue  # 跳躍中：無敵
                     if player.r_skill_phase > 0:
                         continue  # Assassin R 衝刺中：無敵
@@ -986,7 +986,7 @@ class GameState:
         if not obstacles:
             return
         for player in self.players.values():
-            if player.jump_tick >= 0:
+            if player.jump_tick >= 0 or player.zombie_jump_tick >= 0:
                 continue  # 跳躍中：穿越障礙物
             for oid, obs in obstacles.items():
                 if oid in self.destroyed_obstacles:
