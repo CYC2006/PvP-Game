@@ -51,10 +51,10 @@ _SKILLS: dict = {
         ("AIRSTRIKE",     "RMB",   5,
          "Calls a sequence of bombs along the aimed trajectory. "
          "Impacts land in a line with a short delay, covering a wide zone."),
-        ("CHARGE",        "SPACE", 9,
-         "Dash toward the cursor for 360 px. "
-         "Hitting an enemy stops the dash and stuns them for 1 second. "
-         "Stopped by intact obstacles; destroyed debris and trees are ignored."),
+        ("TAUNT",         "SPACE", 10,
+         "Release a lavender shockwave that expands from 60 px to 600 px over 1 second. "
+         "Any enemy caught by the ring is stunned for 0.8 s and forcibly pulled toward you "
+         "at 120 px/s — they cannot resist while stunned."),
         ("FRAG GRENADE",  "E",     8,
          "Hurls a fragmentation grenade that explodes on impact, "
          "dealing heavy damage to all enemies within the blast radius."),
@@ -66,8 +66,10 @@ _SKILLS: dict = {
         ("IMPACT ROUND",  "RMB",   4,
          "Fires an explosive bullet that detonates on contact. "
          "Deals burst damage to everything in a small radius around the point of impact."),
-        ("—",             "SPACE", 0,
-         "Skill under development."),
+        ("CHARGE",        "SPACE", 9,
+         "Dash toward the cursor for 360 px. "
+         "Hitting an enemy stops the dash and stuns them for 1 second. "
+         "Stopped by intact obstacles; destroyed debris and trees are ignored."),
         ("AUTO TURRET",   "E",     10,
          "Deploys a stationary turret at your position. "
          "It fires automatically at any enemy within 250 px, matching your gun's damage and fire rate. "
