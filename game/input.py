@@ -264,7 +264,7 @@ def read_input(player_id: int, keys_held: set,
             if cd_remaining <= 0:
                 if _char_name == 'Assassin':
                     pass   # 冷卻由下方 use_skill_space 區塊統一記錄
-                elif _char_name == 'Vince':
+                elif _char_name in ('Vince', 'Marksman'):
                     use_skill_space         = True
                     _skill_last_ms['space'] = now
                 elif _char_name == 'Hunter':

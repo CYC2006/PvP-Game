@@ -25,7 +25,7 @@ PKT_GAME_OVER   = 0x09   # server → clients: 一方離開，遊戲結束
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBffH")  # +H: speed_mult×1000
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age
+_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age vince_taunt_age
 _BULLET_ENTRY  = struct.Struct("!BBffhBB")    # id owner x y angle_i16 bullet_type bullet_scale_u8(×10)
 _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
 _SMOKE_ENTRY   = struct.Struct("!BffHI")     # id x y radius*10 spawn_tick
@@ -115,6 +115,7 @@ def pack_state(state: GameState) -> bytes:
             min(254, p.cloak_until - state.tick) if p.cloak_until > state.tick else 255,
             1 if p.vince_dash_tick >= 0 else 0,
             min(254, state.tick - p.zombie_jump_tick) if p.zombie_jump_tick >= 0 else 255,
+            min(254, state.tick - p.vince_taunt_tick) if p.vince_taunt_tick >= 0 else 255,
         )
         for p in players
     )
@@ -230,7 +231,7 @@ def unpack_state(data: bytes) -> GameState:
 
     p_count = data[offset]; offset += 1
     for _ in range(p_count):
-        pid, x, y, hp, max_hp, aim_i16, stance_u8, gold, flash, giant_age, stun_b, burst_b, clone_b, jump_age, cloak_rem, vince_dash, zombie_jump_age = _PLAYER_ENTRY.unpack(
+        pid, x, y, hp, max_hp, aim_i16, stance_u8, gold, flash, giant_age, stun_b, burst_b, clone_b, jump_age, cloak_rem, vince_dash, zombie_jump_age, vince_taunt_age = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
         p = Player(id=pid, x=x, y=y, hp=hp, max_hp=max_hp,
@@ -243,6 +244,7 @@ def unpack_state(data: bytes) -> GameState:
         p.cloak_until      = tick + cloak_rem if cloak_rem != 255 else -1
         p.vince_dash_tick   = 0 if vince_dash else -1
         p.zombie_jump_tick  = tick - zombie_jump_age if zombie_jump_age != 255 else -1
+        p.vince_taunt_tick  = tick - vince_taunt_age if vince_taunt_age != 255 else -1
         state.players[pid] = p
         state.gold_counts[pid] = gold
         offset += _PLAYER_ENTRY.size

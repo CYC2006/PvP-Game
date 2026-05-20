@@ -12,6 +12,7 @@ from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _w
 from game.chars.agent    import flash_fx
 from game.chars.agent    import burst_bullet_fx
 from game.chars.vince    import grenade_fx, airstrike_fx
+from game.chars.vince    import taunt_fx as vince_taunt_fx
 from game.chars.pioneer  import stun_bullet_fx
 from game.chars.vince.giant_state import get_scale as _giant_get_scale, GROW_TICKS, ACTIVE_TICKS, TOTAL_TICKS
 from game.chars.hunter   import mini_grenade_fx
@@ -529,6 +530,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     pioneer_shield_fx.draw_shockwaves(screen, cx, cy)
     zombie_jump_fx.update(state)
     zombie_jump_fx.draw_landing_shockwaves(screen, cx, cy)
+    vince_taunt_fx.update(state)
+    vince_taunt_fx.draw_taunt_shockwaves(screen, cx, cy)
     marksman_mine_fx.update(state, my_id)
     marksman_mine_fx.draw(screen, state, cx, cy, my_id)
     marksman_mine_fx.draw_explosions(screen, cx, cy)

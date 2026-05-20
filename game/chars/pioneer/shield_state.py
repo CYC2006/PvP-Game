@@ -25,9 +25,12 @@ def _start_shockwave(state, owner_id: int, *,
                      duration_ticks: int = SHOCKWAVE_DURATION_TICKS,
                      stun_ticks: int = SHOCKWAVE_STUN_TICKS,
                      kb_force: float = SHOCKWAVE_KB_FORCE,
+                     pull_source_id: int = -1,
+                     pull_speed: float = 0.0,
                      cx: float = None, cy: float = None) -> None:
     """記錄衝擊波起始資訊，由 step_shockwaves 每 tick 追蹤圓環位置。
     cx/cy 可選覆寫起始座標（預設取 owner 當前位置）。
+    pull_source_id/pull_speed：設定後改為吸引效果，不施加擊退。
     """
     if cx is None or cy is None:
         player = state.players.get(owner_id)
@@ -46,6 +49,8 @@ def _start_shockwave(state, owner_id: int, *,
         'duration_ticks': duration_ticks,
         'stun_ticks':     stun_ticks,
         'kb_force':       kb_force,
+        'pull_source_id': pull_source_id,
+        'pull_speed':     pull_speed,
     })
 
 
@@ -85,13 +90,21 @@ def step_shockwaves(state) -> None:
             continue   # 圓環還沒掃到對手
 
         # 圓環掃到對手 → 施加控制效果（無傷害）
-        if dist > 0:
-            ux = (opp.x - sw['cx']) / dist
-            uy = (opp.y - sw['cy']) / dist
+        pull_sid = sw.get('pull_source_id', -1)
+        pull_spd = sw.get('pull_speed', 0.0)
+        if pull_sid >= 0 and pull_spd > 0:
+            # 嘲諷：吸引，不擊退
+            opp.pull_source_id = pull_sid
+            opp.pull_speed     = pull_spd
         else:
-            ux, uy = 1.0, 0.0
-        opp.kb_vx = ux * kb_force
-        opp.kb_vy = uy * kb_force
+            # 一般衝擊波：擊退
+            if dist > 0:
+                ux = (opp.x - sw['cx']) / dist
+                uy = (opp.y - sw['cy']) / dist
+            else:
+                ux, uy = 1.0, 0.0
+            opp.kb_vx = ux * kb_force
+            opp.kb_vy = uy * kb_force
 
         opp.stun_until = max(
             opp.stun_until if opp.stun_until > state.tick else state.tick,

@@ -57,10 +57,15 @@ class Player:
     jump_tick: int             = -1   # tick when soldier jump started (-1 = not jumping)
     jump_dx: float             = 0.0  # normalized jump direction x
     jump_dy: float             = 0.0  # normalized jump direction y
-    # ── Vince Space 技能狀態（前衝）─────────────────────────────────
+    # ── Marksman Space 技能狀態（前衝）──────────────────────────────
     vince_dash_tick: int      = -1   # tick when dash started (-1 = inactive)
     vince_dash_dx: float      = 0.0  # normalized dash direction x
     vince_dash_dy: float      = 0.0  # normalized dash direction y
+    # ── Vince Space 技能狀態（嘲諷）─────────────────────────────────
+    vince_taunt_tick: int     = -1   # tick when taunt started (-1 = inactive)
+    # ── 被嘲諷吸引狀態（任意角色可持有）──────────────────────────────
+    pull_source_id: int       = -1   # player id pulling this player (-1 = none)
+    pull_speed: float         = 0.0  # px/tick
     # ── Zombie Space 技能狀態（跳躍衝擊）────────────────────────────
     zombie_jump_tick: int   = -1   # tick when zombie jump started (-1 = inactive)
     zombie_jump_dx: float   = 0.0  # normalized jump direction x
@@ -1036,3 +1041,35 @@ class GameState:
     def step_zombie_jumps(self) -> None:
         from game.chars.zombie.jump_state import step_zombie_jumps
         step_zombie_jumps(self)
+
+    # ── Vince Space：嘲諷 ────────────────────────────────────────────────────
+    def _activate_vince_taunt(self, owner_id: int) -> None:
+        from game.chars.vince.taunt_state import activate_vince_taunt
+        activate_vince_taunt(self, owner_id)
+
+    def step_vince_taunt(self) -> None:
+        from game.chars.vince.taunt_state import step_vince_taunt
+        step_vince_taunt(self)
+
+    def step_pull(self) -> None:
+        """每 tick：被嘲諷吸引的玩家向吸引源等速移動。"""
+        for player in self.players.values():
+            if player.pull_source_id < 0:
+                continue
+            if player.stun_until <= self.tick:
+                player.pull_source_id = -1
+                player.pull_speed     = 0.0
+                continue
+            source = self.players.get(player.pull_source_id)
+            if source is None:
+                player.pull_source_id = -1
+                continue
+            dx   = source.x - player.x
+            dy   = source.y - player.y
+            dist = math.hypot(dx, dy)
+            if dist <= PLAYER_RADIUS * 2:
+                continue   # 已抵達，停止
+            player.x = max(PLAYER_RADIUS, min(MAP_WIDTH  - PLAYER_RADIUS,
+                           player.x + (dx / dist) * player.pull_speed))
+            player.y = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS,
+                           player.y + (dy / dist) * player.pull_speed))

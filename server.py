@@ -36,7 +36,8 @@ _SKILL_SPACE: dict = {
     'Hunter':   lambda s, pid, ax, ay: s._spawn_mini_grenades(pid),
     'Robot':    lambda s, pid, ax, ay: s._activate_robot_space(pid),
     'Pioneer':  lambda s, pid, ax, ay: s._activate_jump(pid, ax, ay),
-    'Vince':    lambda s, pid, ax, ay: s._activate_vince_dash(pid, ax, ay),
+    'Vince':    lambda s, pid, ax, ay: s._activate_vince_taunt(pid),
+    'Marksman': lambda s, pid, ax, ay: s._activate_vince_dash(pid, ax, ay),
     'Zombie':   lambda s, pid, ax, ay: s._activate_zombie_jump(pid, ax, ay),
 }
 
@@ -248,6 +249,7 @@ def run():
                 state.step_pending_pellets()
                 state.step_jumps()
                 state.step_zombie_jumps()
+                state.step_vince_taunt()
                 state.step_vince_dash(obstacles)
                 state.resolve_player_collisions(obstacles)
                 state.step_gold_collection()
@@ -264,6 +266,7 @@ def run():
                 state.step_poison_pools()
                 state.step_shields()
                 state.step_shockwaves()
+                state.step_pull()
                 state.step_knockback()
                 state.step_push_zones()
                 state.step_robot_marks()
