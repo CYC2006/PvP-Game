@@ -6,6 +6,7 @@ from game.state import PLAYER_RADIUS, MAP_WIDTH, MAP_HEIGHT
 R_PHASE_TICKS = 15
 R_V0          = 1600.0 / 45.0   # ≈ 35.56 px/tick
 R_DAMAGE      = 30               # 每段碰撞傷害
+R_STUN_TICKS  = 12               # 每段暈眩 0.2 s × 60 fps
 
 
 def activate_r_skill(state, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -47,6 +48,10 @@ def step_r_skill(state) -> None:
         if opponent and not (player.r_skill_dmg_done & dmg_flag):
             if math.hypot(player.x - opponent.x, player.y - opponent.y) < PLAYER_RADIUS * 2 + 4:
                 state.apply_damage(opponent_id, R_DAMAGE)
+                opponent.stun_until = max(
+                    opponent.stun_until if opponent.stun_until > state.tick else state.tick,
+                    state.tick + R_STUN_TICKS,
+                )
                 player.r_skill_dmg_done |= dmg_flag
 
         player.r_skill_tick += 1
