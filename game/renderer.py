@@ -860,6 +860,21 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         if player.clone_until > state.tick:
             _draw_soldier_clones(screen, player, rotated, angle, cx, cy)
 
+        # ── Vince 衝刺金光（畫在 sprite 之下）───────────────────────────
+        if player.vince_dash_tick >= 0:
+            _pulse    = 0.5 + 0.5 * math.sin(state.tick * 0.5)   # 0.0 ~ 1.0
+            _base_r   = int(PLAYER_RADIUS * giant_scale)
+            # 外層：大範圍柔和光暈（SRCALPHA 填充圓）
+            _glow_r   = _base_r + int(10 + _pulse * 8)
+            _glow_a   = int(65 + _pulse * 45)
+            _glow_s   = pygame.Surface((_glow_r * 2, _glow_r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(_glow_s, (255, 210, 30, _glow_a),
+                               (_glow_r, _glow_r), _glow_r)
+            screen.blit(_glow_s, (sx - _glow_r, sy - _glow_r))
+            # 內層：2px 銳利金色環
+            pygame.draw.circle(screen, (255, 235, 80),
+                               (sx, sy), _base_r + 4, 2)
+
         if _cloak_alpha is not None:
             _cloak_surf = rotated.copy()
             _cloak_surf.set_alpha(_cloak_alpha)
