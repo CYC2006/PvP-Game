@@ -37,6 +37,7 @@ _SKILL_SPACE: dict = {
     'Robot':    lambda s, pid, ax, ay: s._activate_robot_space(pid),
     'Pioneer':  lambda s, pid, ax, ay: s._activate_jump(pid, ax, ay),
     'Vince':    lambda s, pid, ax, ay: s._activate_vince_dash(pid, ax, ay),
+    'Zombie':   lambda s, pid, ax, ay: s._activate_zombie_jump(pid, ax, ay),
 }
 
 _SKILL_R: dict = {
@@ -246,6 +247,7 @@ def run():
                 state.step_bullets(obstacles, obstacle_hp)
                 state.step_pending_pellets()
                 state.step_jumps()
+                state.step_zombie_jumps()
                 state.step_vince_dash(obstacles)
                 state.resolve_player_collisions(obstacles)
                 state.step_gold_collection()

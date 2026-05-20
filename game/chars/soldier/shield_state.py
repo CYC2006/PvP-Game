@@ -19,35 +19,60 @@ SHOCKWAVE_KB_FORCE      = 10.0   # px/tick（robot 為 18）
 SHOCKWAVE_STUN_TICKS    = 30     # 0.5 s（robot 為 60 = 1 s）
 
 
-def _start_shockwave(state, owner_id: int) -> None:
-    """記錄衝擊波起始資訊，由 step_shockwaves 每 tick 追蹤圓環位置。"""
-    player = state.players.get(owner_id)
-    if player is None:
-        return
+def _start_shockwave(state, owner_id: int, *,
+                     start_r: float = SHIELD_RADIUS,
+                     end_r: float = SHOCKWAVE_RADIUS,
+                     duration_ticks: int = SHOCKWAVE_DURATION_TICKS,
+                     stun_ticks: int = SHOCKWAVE_STUN_TICKS,
+                     kb_force: float = SHOCKWAVE_KB_FORCE,
+                     cx: float = None, cy: float = None) -> None:
+    """記錄衝擊波起始資訊，由 step_shockwaves 每 tick 追蹤圓環位置。
+    cx/cy 可選覆寫起始座標（預設取 owner 當前位置）。
+    """
+    if cx is None or cy is None:
+        player = state.players.get(owner_id)
+        if player is None:
+            return
+        cx = player.x
+        cy = player.y
     state._pending_shockwaves.append({
-        'owner_id':   owner_id,
-        'cx':         player.x,
-        'cy':         player.y,
-        'start_tick': state.tick,
-        'hit_done':   False,
+        'owner_id':       owner_id,
+        'cx':             cx,
+        'cy':             cy,
+        'start_tick':     state.tick,
+        'hit_done':       False,
+        'start_r':        start_r,
+        'end_r':          end_r,
+        'duration_ticks': duration_ticks,
+        'stun_ticks':     stun_ticks,
+        'kb_force':       kb_force,
     })
 
 
 def step_shockwaves(state) -> None:
-    """每 tick 推進圓環半徑，圓環首次覆蓋到對手時觸發效果。"""
+    """每 tick 推進圓環半徑，圓環首次覆蓋到對手時觸發效果。
+    每個衝擊波 dict 可攜帶自訂參數，預設退回護盾衝擊波常數。
+    """
     still_active = []
     for sw in state._pending_shockwaves:
-        t = state.tick - sw['start_tick']
-        if t > SHOCKWAVE_DURATION_TICKS:
+        dur = sw.get('duration_ticks', SHOCKWAVE_DURATION_TICKS)
+        t   = state.tick - sw['start_tick']
+        if t > dur:
             continue   # 衝擊波已結束，丟棄
         still_active.append(sw)
 
         if sw['hit_done']:
             continue
 
+        # 讀取此衝擊波的自訂參數
+        s_r        = sw.get('start_r',    SHIELD_RADIUS)
+        e_r        = sw.get('end_r',      SHOCKWAVE_RADIUS)
+        stun_ticks = sw.get('stun_ticks', SHOCKWAVE_STUN_TICKS)
+        kb_force   = sw.get('kb_force',   SHOCKWAVE_KB_FORCE)
+
         # 當前圓環半徑（線性擴張）
-        frac   = t / SHOCKWAVE_DURATION_TICKS
-        ring_r = SHIELD_RADIUS + (SHOCKWAVE_RADIUS - SHIELD_RADIUS) * frac
+        frac   = t / dur
+        ring_r = s_r + (e_r - s_r) * frac
 
         owner_id    = sw['owner_id']
         opponent_id = 3 - owner_id
@@ -65,12 +90,12 @@ def step_shockwaves(state) -> None:
             uy = (opp.y - sw['cy']) / dist
         else:
             ux, uy = 1.0, 0.0
-        opp.kb_vx = ux * SHOCKWAVE_KB_FORCE
-        opp.kb_vy = uy * SHOCKWAVE_KB_FORCE
+        opp.kb_vx = ux * kb_force
+        opp.kb_vy = uy * kb_force
 
         opp.stun_until = max(
             opp.stun_until if opp.stun_until > state.tick else state.tick,
-            state.tick + SHOCKWAVE_STUN_TICKS,
+            state.tick + stun_ticks,
         )
         sw['hit_done'] = True
 

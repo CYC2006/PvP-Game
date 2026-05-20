@@ -61,6 +61,10 @@ class Player:
     vince_dash_tick: int      = -1   # tick when dash started (-1 = inactive)
     vince_dash_dx: float      = 0.0  # normalized dash direction x
     vince_dash_dy: float      = 0.0  # normalized dash direction y
+    # ── Zombie Space 技能狀態（跳躍衝擊）────────────────────────────
+    zombie_jump_tick: int   = -1   # tick when zombie jump started (-1 = inactive)
+    zombie_jump_dx: float   = 0.0  # normalized jump direction x
+    zombie_jump_dy: float   = 0.0  # normalized jump direction y
     # ── Assassin R 技能狀態 ───────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -380,8 +384,8 @@ class GameState:
                 mult *= 1.5
         # 通用速度懲罰（由技能模組設定，如毒液區域 0.8）
         mult *= player.speed_penalty
-        # 跳躍 / Vince 衝刺中：由各自 step 控制位置，忽略普通移動輸入
-        if player.jump_tick < 0 and player.vince_dash_tick < 0:
+        # 跳躍 / Vince 衝刺 / Zombie 跳躍中：由各自 step 控制位置，忽略普通移動輸入
+        if player.jump_tick < 0 and player.vince_dash_tick < 0 and player.zombie_jump_tick < 0:
             player.move(dx, dy, speed_mult=mult)
         player.stance = stance
         # 連射期間：禁止普攻（避免與連射子彈重疊）
@@ -1023,3 +1027,12 @@ class GameState:
     def step_vince_dash(self, obstacles: dict = None) -> None:
         from game.chars.vince.dash_state import step_vince_dash
         step_vince_dash(self, obstacles)
+
+    # ── Zombie Space：跳躍衝擊 ───────────────────────────────────────────────
+    def _activate_zombie_jump(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.zombie.jump_state import activate_zombie_jump
+        activate_zombie_jump(self, owner_id, aim_x, aim_y)
+
+    def step_zombie_jumps(self) -> None:
+        from game.chars.zombie.jump_state import step_zombie_jumps
+        step_zombie_jumps(self)

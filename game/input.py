@@ -120,7 +120,11 @@ def init_char(char_name: str) -> None:
         'e':     _cd('cd_e'),
         'r':     _cd('cd_r'),
     }
-    _skill_last_ms = {'space': 0, 'e': 0, 'r': 0, 'rmb': 0}
+    _now = pygame.time.get_ticks()
+    _skill_last_ms = {
+        slot: (_now - cd - 1) if cd >= 0 else 0
+        for slot, cd in _skill_cds_ms.items()
+    }
 
     _char_name             = char_name
     _speed_boost_end_ms   = 0
@@ -274,7 +278,7 @@ def read_input(player_id: int, keys_held: set,
                         _dash_speed      = 18.0 - _DASH_DECEL
                         _skill_last_ms['space'] = now
                         use_skill_space  = True
-                elif _char_name == 'Pioneer':
+                elif _char_name in ('Pioneer', 'Zombie'):
                     # 跳躍：通知 server 起跳；本地立即補滿彈夾並取消換彈
                     use_skill_space      = True
                     _skill_last_ms['space'] = now

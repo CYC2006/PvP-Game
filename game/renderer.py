@@ -16,6 +16,7 @@ from game.chars.soldier  import stun_bullet_fx
 from game.chars.rambo.giant_state import get_scale as _giant_get_scale, GROW_TICKS, ACTIVE_TICKS, TOTAL_TICKS
 from game.chars.sniper   import mini_grenade_fx
 from game.chars.zombie   import blade_fx
+from game.chars.zombie   import jump_fx as zombie_jump_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
 from game.chars.dancer   import bubble_fx
 from game.chars.dancer   import poison_pool_fx
@@ -526,6 +527,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     stun_bullet_fx.draw_explosions(screen, cx, cy)
     explosion_bullet_fx.draw_explosions(screen, cx, cy)
     soldier_shield_fx.draw_shockwaves(screen, cx, cy)
+    zombie_jump_fx.update(state)
+    zombie_jump_fx.draw_landing_shockwaves(screen, cx, cy)
     bear_mine_fx.update(state, my_id)
     bear_mine_fx.draw(screen, state, cx, cy, my_id)
     bear_mine_fx.draw_explosions(screen, cx, cy)
@@ -837,7 +840,7 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             new_h = max(1, int(rotated.get_height() * giant_scale))
             rotated = pygame.transform.scale(rotated, (new_w, new_h))
 
-        # ── 跳躍：地面陰影 + 玩家放大 ────────────────────────────────────
+        # ── 跳躍：地面陰影 + 玩家放大（Soldier/Pioneer jump_tick）─────────
         if player.jump_tick >= 0:
             from game.chars.soldier.jump_state import JUMP_TICKS as _JUMP_TICKS
             _j_age = state.tick - player.jump_tick
@@ -854,6 +857,22 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             _j_scale = 1.0 + 0.25 * math.sin(math.pi * _j_t)
             new_w = max(1, int(rotated.get_width()  * _j_scale))
             new_h = max(1, int(rotated.get_height() * _j_scale))
+            rotated = pygame.transform.scale(rotated, (new_w, new_h))
+
+        # ── Zombie Space 跳躍：地面陰影 + 玩家放大 ───────────────────────
+        if player.zombie_jump_tick >= 0:
+            from game.chars.zombie.jump_state import JUMP_TICKS as _ZJ_TICKS
+            _zj_age = state.tick - player.zombie_jump_tick
+            _zj_t   = max(0.0, min(1.0, _zj_age / _ZJ_TICKS))
+            _sh_r = int(PLAYER_RADIUS * 0.9)
+            _sh_surf = pygame.Surface((_sh_r * 4, _sh_r * 2), pygame.SRCALPHA)
+            _sh_alpha = int(120 * math.sin(math.pi * _zj_t))
+            pygame.draw.ellipse(_sh_surf, (0, 0, 0, _sh_alpha),
+                                _sh_surf.get_rect())
+            screen.blit(_sh_surf, (sx - _sh_r * 2, sy - _sh_r))
+            _zj_scale = 1.0 + 0.25 * math.sin(math.pi * _zj_t)
+            new_w = max(1, int(rotated.get_width()  * _zj_scale))
+            new_h = max(1, int(rotated.get_height() * _zj_scale))
             rotated = pygame.transform.scale(rotated, (new_w, new_h))
 
         # ── Soldier 分身（clone_until 有效時先畫，在本體之下）──────────────
