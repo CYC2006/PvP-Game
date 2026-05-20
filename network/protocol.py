@@ -38,7 +38,7 @@ _PUSH_ENTRY        = struct.Struct("!BhhHhB") # id x_i16 y_i16 age_u16 angle_i16
 _ROBOT_MARK_ENTRY  = struct.Struct("!BhhH")  # owner_id x_i16 y_i16 age_u16
 _TURRET_ENTRY      = struct.Struct("!BhhHB")  # id x_i16 y_i16 hp_u16 owner_id
 _BARRAGE_ENTRY     = struct.Struct("!BhhBB")  # id x_i16 y_i16 age_u8 owner_id
-_SHIELD_ENTRY      = struct.Struct("!BHB")    # owner_id hp_u16 status_u8(0=active,1=broken)
+_SHIELD_ENTRY      = struct.Struct("!BHHB")   # owner_id hp_u16 max_hp_u16 status_u8(0=active,1=broken)
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -216,7 +216,7 @@ def pack_state(state: GameState) -> bytes:
 
     shield_list = list(state.shields.values())
     shield_data = bytes([len(shield_list)]) + b"".join(
-        _SHIELD_ENTRY.pack(sh.owner_id, max(0, sh.hp),
+        _SHIELD_ENTRY.pack(sh.owner_id, max(0, sh.hp), max(1, sh.max_hp),
                            1 if sh.broken_tick >= 0 else 0)
         for sh in shield_list
     )
@@ -379,9 +379,9 @@ def unpack_state(data: bytes) -> GameState:
     if offset < len(data):
         shield_count = data[offset]; offset += 1
         for _ in range(shield_count):
-            sowner, shp, sstatus = _SHIELD_ENTRY.unpack(
+            sowner, shp, smaxhp, sstatus = _SHIELD_ENTRY.unpack(
                 data[offset: offset + _SHIELD_ENTRY.size])
-            sh = Shield(owner_id=sowner, hp=shp, max_hp=80)
+            sh = Shield(owner_id=sowner, hp=shp, max_hp=smaxhp)
             sh.broken_tick = 0 if sstatus == 1 else -1
             state.shields[sowner] = sh
             offset += _SHIELD_ENTRY.size

@@ -21,7 +21,7 @@ from network.protocol import (
 )
 
 PORT                = 5000
-BUF_SIZE            = 1024
+BUF_SIZE            = 8192
 FPS                 = 60
 MAP_PATH            = "maps/map_01.json"
 

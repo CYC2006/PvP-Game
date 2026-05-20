@@ -463,6 +463,8 @@ class GameState:
                 pellet_range = random.uniform(player.bullet_range_min, player.bullet_range) * _bscale
             else:
                 pellet_range = player.bullet_range * _bscale
+            while self._next_bullet_id in self.bullets:
+                self._next_bullet_id = (self._next_bullet_id + 1) % 256
             bid = self._next_bullet_id
             self._next_bullet_id = (self._next_bullet_id + 1) % 256
             _btype = 9 if player.char_name == 'Robot' else 0
@@ -722,6 +724,8 @@ class GameState:
         """掉落 1 個道具（金錠或血包），位置稍微隨機偏移。"""
         angle = random.uniform(0, math.tau)
         dist  = random.uniform(10, 30)
+        while self._next_gold_id in self.gold_ingots:
+            self._next_gold_id = (self._next_gold_id + 1) % 256
         gid   = self._next_gold_id
         self._next_gold_id = (self._next_gold_id + 1) % 256
         self.gold_ingots[gid] = GoldIngot(
@@ -736,6 +740,8 @@ class GameState:
         for _ in range(random.randint(2, 5)):
             angle = random.uniform(0, math.tau)
             dist  = random.uniform(20, 70)
+            while self._next_gold_id in self.gold_ingots:
+                self._next_gold_id = (self._next_gold_id + 1) % 256
             gid   = self._next_gold_id
             self._next_gold_id = (self._next_gold_id + 1) % 256
             self.gold_ingots[gid] = GoldIngot(

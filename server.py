@@ -56,7 +56,7 @@ PORT        = 5000
 TICK_RATE   = 60
 TICK_DT     = 1.0 / TICK_RATE
 MAX_PLAYERS = 2
-BUF_SIZE    = 1024
+BUF_SIZE    = 8192
 MAP_PATH    = "maps/map_01.json"
 
 
