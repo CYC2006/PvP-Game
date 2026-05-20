@@ -10,8 +10,9 @@ RELOAD_TIME_MS    = 2000
 
 _last_shot_time:  int  = 0
 _ammo:            int  = MAGAZINE_SIZE
-_reloading:       bool = False
-_reload_start_ms: int  = 0
+_reloading:         bool = False
+_reload_start_ms:   int  = 0
+_current_reload_ms: int  = 0   # 本次換彈所需毫秒（含按發計算）
 
 # ── 角色速度 (px/tick) ────────────────────────────────────────────
 _player_speed: float = 3.0
@@ -21,7 +22,8 @@ _skill_cds_ms:  dict = {'space': -1, 'e': -1, 'r': -1, 'rmb': -1}
 _skill_last_ms: dict = {'space':  0, 'e':  0, 'r':  0, 'rmb':  0}
 _char_name:            str   = ""
 _rmb_prev:            bool  = False
-_r_prev:              bool  = False
+_r_prev:              bool  = False   # R 鍵（換彈）前幀狀態
+_f_prev:              bool  = False   # F 鍵（大招）前幀狀態
 _speed_boost_end_ms:  int   = 0     # 速度提升到期時間（ms），供 renderer 粒子使用
 _r_skill_start_ms:    int   = 0     # R 大招啟動時間（ms），供 renderer 旋轉使用
 _r_skill_start_angle: float = 0.0   # R 大招啟動時的瞄準角度（度）
@@ -92,10 +94,10 @@ def init_char(char_name: str) -> None:
     global _ammo, _reloading, _reload_start_ms, _last_shot_time
     global _player_speed, _skill_cds_ms, _skill_last_ms
     global _dash_active, _dash_speed, _dash_dist_remaining, _space_prev
-    global _char_name, _rmb_prev, _r_prev, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
+    global _char_name, _rmb_prev, _r_prev, _f_prev, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
     global _r_holding, _last_aim_x, _last_aim_y
     global _robot_mark_until_ms
-    global _cloak_ticks_left
+    global _cloak_ticks_left, _current_reload_ms
 
     from game.char_data import get_stat, CHAR_STATS
 
@@ -130,19 +132,21 @@ def init_char(char_name: str) -> None:
     _speed_boost_end_ms   = 0
     _r_skill_start_ms     = 0
     _r_skill_start_angle  = 0.0
-    _ammo                 = MAGAZINE_SIZE
-    _reloading       = False
-    _reload_start_ms = 0
-    _last_shot_time  = 0
+    _ammo              = MAGAZINE_SIZE
+    _reloading         = False
+    _reload_start_ms   = 0
+    _current_reload_ms = RELOAD_TIME_MS
+    _last_shot_time    = 0
     _dash_active          = False
     _dash_speed           = 0.0
     _dash_dist_remaining  = 0.0
     _robot_mark_until_ms  = 0
     _cloak_ticks_left     = 0
-    _space_prev           = False
+    _space_prev      = False
     _e_prev          = False
     _rmb_prev        = False
     _r_prev          = False
+    _f_prev          = False
     _r_holding       = False
     _last_aim_x      = 0.0
     _last_aim_y      = 0.0
@@ -158,8 +162,8 @@ def read_input(player_id: int, keys_held: set,
     skill_cooldowns : {'space':(remaining_ms, max_ms), 'e':..., 'r':..., 'rmb':...}
                       remaining_ms == -1  → 技能尚未實作
     """
-    global _last_shot_time, _ammo, _reloading, _reload_start_ms
-    global _space_prev, _e_prev, _rmb_prev, _r_prev
+    global _last_shot_time, _ammo, _reloading, _reload_start_ms, _current_reload_ms
+    global _space_prev, _e_prev, _rmb_prev, _r_prev, _f_prev
     global _robot_mark_until_ms, _cloak_ticks_left
     global _dash_active, _dash_dx, _dash_dy, _dash_speed, _dash_dist_remaining
     global _skill_last_ms, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
@@ -168,7 +172,7 @@ def read_input(player_id: int, keys_held: set,
     now = pygame.time.get_ticks()
 
     # ── 換彈完成判斷 ──────────────────────────────────────────────
-    if _reloading and (now - _reload_start_ms) >= RELOAD_TIME_MS:
+    if _reloading and (now - _reload_start_ms) >= _current_reload_ms:
         _reloading = False
         _ammo      = MAGAZINE_SIZE
 
@@ -197,8 +201,11 @@ def read_input(player_id: int, keys_held: set,
 
     r_held             = pygame.K_r in keys_held
     r_just_pressed     = r_held and not _r_prev
-    r_just_released    = not r_held and _r_prev
     _r_prev            = r_held
+
+    f_held             = pygame.K_f in keys_held
+    f_just_pressed     = f_held and not _f_prev
+    _f_prev            = f_held
 
     # ── R 技能啟動狀態（在所有技能判斷之前計算，確保完全隔離）────
     _r_skill_active = (now - _r_skill_start_ms) < 500 and _r_skill_start_ms > 0
@@ -341,17 +348,36 @@ def read_input(player_id: int, keys_held: set,
             _skill_last_ms['space'] = now
             _speed_boost_end_ms = now + 2000   # 2 秒提升
 
-    # ── R 技能（按下即發）────────────────────────────────────────
+    # ── F 鍵：大招（按下即發）────────────────────────────────────
     use_skill_r = False
     if (not _r_skill_active and not _giant_frozen and not _burst_shots_left
             and _skill_cds_ms.get('r', -1) >= 0):
-        if r_just_pressed and (_skill_cds_ms['r'] - (now - _skill_last_ms['r'])) <= 0:
+        if f_just_pressed and (_skill_cds_ms['r'] - (now - _skill_last_ms['r'])) <= 0:
             use_skill_r = True
             _skill_last_ms['r']  = now
             # 旋轉動畫只屬於 Assassin 的 R 技能
             if _char_name == 'Assassin':
                 _r_skill_start_ms    = now
                 _r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
+
+    # ── R 鍵：手動換彈 ────────────────────────────────────────────
+    # Robot / Assassin / Zombie 子彈無限，不需要換彈
+    _NO_RELOAD = {'Robot', 'Assassin', 'Zombie'}
+    if (r_just_pressed
+            and not _reloading
+            and _char_name not in _NO_RELOAD
+            and _ammo < MAGAZINE_SIZE):
+        if _char_name == 'Vince':
+            # 散彈槍：按發計算，每發 0.5 秒
+            _current_reload_ms = (MAGAZINE_SIZE - _ammo) * 500
+        elif _char_name == 'Hunter':
+            # 狙擊槍：按發計算，每發 1 秒
+            _current_reload_ms = (MAGAZINE_SIZE - _ammo) * 1000
+        else:
+            # 其餘角色：固定換彈時間（來自 chars.csv）
+            _current_reload_ms = RELOAD_TIME_MS
+        _reloading       = True
+        _reload_start_ms = now
 
     # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────
     shooting = False
@@ -364,9 +390,10 @@ def read_input(player_id: int, keys_held: set,
         if MAGAZINE_SIZE < 9999:
             _ammo -= 1
             if _ammo <= 0:
-                _ammo            = 0
-                _reloading       = True
-                _reload_start_ms = now
+                _ammo              = 0
+                _reloading         = True
+                _reload_start_ms   = now
+                _current_reload_ms = RELOAD_TIME_MS
 
     # ── 技能冷卻資訊（給 HUD）────────────────────────────────────
     skill_cooldowns: dict = {}

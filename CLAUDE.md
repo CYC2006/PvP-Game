@@ -120,7 +120,9 @@ particles, shake timers, and the map surface cache.
 - Module-level `pygame.Rect` objects in `renderer.py` and `pages/` are safe to
   define before `pygame.init()` — `Rect` is a pure data struct.
 - Skill cooldown HUD uses `SKILL_CIRCLE_R = 34`; positioned center-bottom of the game screen.
-- `_SKILL_SLOTS = ('rmb', 'space', 'e', 'r')` — order matches HUD left-to-right (MB / SP / E / R).
+- `_SKILL_SLOTS = ('rmb', 'space', 'e', 'r')` — order matches HUD left-to-right (MB / SP / E / F).
+- **Key bindings**: RMB = MB skill, Space = SP skill, E = E skill, **F = ultimate (大招)**; **R = reload**.
+- Reload rules: Robot/Assassin/Zombie have infinite ammo (R key ignored). Vince (Shotgun) reloads per-bullet at 500 ms/bullet; Hunter (Sniper) at 1000 ms/bullet. Others use fixed `reload_time` from chars.csv.
 
 ---
 

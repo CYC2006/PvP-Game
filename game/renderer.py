@@ -55,7 +55,7 @@ SKILL_CIRCLE_R   = 34   # 17 × 2
 SKILL_CIRCLE_GAP = 10
 SKILL_STEP       = SKILL_CIRCLE_R * 2 + SKILL_CIRCLE_GAP   # 78 px
 _SKILL_SLOTS     = ('rmb', 'space', 'e', 'r')
-_SKILL_LABELS    = ('MB', 'SP', 'E', 'R')
+_SKILL_LABELS    = ('MB', 'SP', 'E', 'F')
 
 COL_SKILL_READY_BORDER = (220, 220, 255)
 COL_SKILL_CD_BORDER    = ( 80,  80,  80)
