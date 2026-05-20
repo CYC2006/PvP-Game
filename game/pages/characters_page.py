@@ -51,9 +51,10 @@ _SKILLS: dict = {
         ("AIRSTRIKE",     "RMB",   5,
          "Calls a sequence of bombs along the aimed trajectory. "
          "Impacts land in a line with a short delay, covering a wide zone."),
-        ("CHARGE",        "SPACE", 6,
-         "Surge toward the cursor at high speed for a fixed distance. "
-         "Closes gaps aggressively or repositions through open terrain."),
+        ("CHARGE",        "SPACE", 9,
+         "Dash toward the cursor for 360 px. "
+         "Hitting an enemy stops the dash and stuns them for 1 second. "
+         "Stopped by intact obstacles; destroyed debris and trees are ignored."),
         ("FRAG GRENADE",  "E",     8,
          "Hurls a fragmentation grenade that explodes on impact, "
          "dealing heavy damage to all enemies within the blast radius."),
