@@ -8,8 +8,8 @@ import pygame
 from game.render_utils import ws, SCREEN_W
 
 SHOCKWAVE_START_R  = 60
-SHOCKWAVE_END_R    = 250
-SHOCKWAVE_DURATION = 0.4   # 秒
+SHOCKWAVE_END_R    = 150
+SHOCKWAVE_DURATION = 0.3   # 秒
 
 # {player_id: was_active}  ← 偵測 active→inactive 轉換
 _prev_active:       dict = {}

@@ -12,9 +12,9 @@ _JUMP_SPEED   = JUMP_DISTANCE / JUMP_TICKS   # 5.0 px/tick
 
 # 落地衝擊波參數（傳給 shield_state._start_shockwave）
 _SW_START_R   = 60
-_SW_END_R     = 250
-_SW_DUR_TICKS = 24    # 0.4 s × 60 fps
-_SW_STUN      = 24    # 0.4 s
+_SW_END_R     = 150
+_SW_DUR_TICKS = 18    # 0.3 s × 60 fps
+_SW_STUN      = 30    # 0.5 s
 _SW_KB        = 12.0  # px/tick
 
 
