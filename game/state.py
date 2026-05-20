@@ -650,14 +650,8 @@ class GameState:
                 if not obs.solid:          # 非實體（樹/草叢）→ 子彈穿透
                     continue
                 if obs.collides_circle(bullet.x, bullet.y, coll_r):
-                    if bullet.bullet_type in (1, 2, 3, 4, 5):
-                        continue   # 投擲物 / 手裡劍 / 迷你手雷無視障礙物
-                    if bullet.dot_interval > 0:
-                        # DoT 子彈（毒氣泡）：撞牆時停住，不消失，不傷障礙物
-                        if bullet.dx != 0.0 or bullet.dy != 0.0:
-                            bullet.dx = 0.0
-                            bullet.dy = 0.0   # 停在障礙物旁，觸發 linger 倒數
-                        break   # 只對第一個相交的障礙物作用
+                    if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
+                        continue   # 投擲物 / 手裡劍 / 迷你手雷 / 毒氣泡無視障礙物
                     else:
                         # 一般子彈：碰到障礙物即消失，可能破壞
                         # 毒液彈（type 8）不對障礙物造成傷害
@@ -677,8 +671,8 @@ class GameState:
                     if lb is None:
                         continue
                     if math.hypot(bullet.x - lb.x, bullet.y - lb.y) < lb.radius + coll_r:
-                        if bullet.bullet_type in (1, 2, 3, 4, 5):
-                            continue   # 投擲物/手裡劍/迷你手雷穿透
+                        if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
+                            continue   # 投擲物/手裡劍/迷你手雷/毒氣泡穿透
                         if does_damage and shooter:
                             lb.hp -= self._roll_damage(shooter)
                             if lb.hp <= 0:
@@ -696,8 +690,8 @@ class GameState:
                     # 只有敵方子彈才傷害機槍台
                     if bullet.owner_id == turret.owner_id:
                         continue
-                    if bullet.bullet_type in (1, 2, 3, 4, 5):
-                        continue   # 投擲物/手裡劍/迷你手雷穿透
+                    if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
+                        continue   # 投擲物/手裡劍/迷你手雷/毒氣泡穿透
                     if math.hypot(bullet.x - turret.x, bullet.y - turret.y) < TURRET_HITBOX_R + coll_r:
                         if does_damage and shooter:
                             turret.hp -= self._roll_damage(shooter)
