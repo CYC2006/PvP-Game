@@ -6,7 +6,7 @@ import pygame
 from game.state import (GameState, MAP_WIDTH, MAP_HEIGHT,
                         PLAYER_RADIUS, BULLET_RADIUS)
 import game.input as _inp
-from game.input import MAGAZINE_SIZE, RELOAD_TIME_MS
+from game.input import MAGAZINE_SIZE
 from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _ws, COL_BULLET as _COL_BULLET_UTILS
 
 from game.chars.agent    import flash_fx
@@ -984,7 +984,7 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
     if is_reloading:
         # 換彈進度條（從 input 模組的全域取進度）
         elapsed  = now - _inp._reload_start_ms
-        progress = min(1.0, elapsed / _inp.RELOAD_TIME_MS)
+        progress = min(1.0, elapsed / max(1, _inp._current_reload_ms))
         pygame.draw.rect(screen, (60, 20, 20),
                          (bar_x, ammo_y, bar_w, bar_h), border_radius=4)
         fill_w = int(bar_w * progress)
