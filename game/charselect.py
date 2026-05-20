@@ -299,16 +299,9 @@ def draw_char_select(screen: pygame.Surface,
     if right_col:
         pygame.draw.polygon(screen, right_col, right_pts)
 
-    # ── 提示文字（未確認時）──────────────────────────────────────
-    hint_y = CARD_Y + CARD_H // 2 + 16
-    if not my_ready:
-        hint_surf = font_sm.render(
-            "← → / click arrows to browse   |   Enter or CONFIRM to lock in",
-            True, COL_HINT)
-        screen.blit(hint_surf, (CENTER_X - hint_surf.get_width() // 2, hint_y))
-
     # ── 數值面板 + 確認按鈕 + 魔紋欄位 ──────────────────────────
-    _draw_stats_panel(screen, font_lg, font_sm, hint_y + 26, my_ready)
+    stats_top = CARD_Y + CARD_H // 2 + 36
+    _draw_stats_panel(screen, font_lg, font_sm, stats_top, my_ready)
 
 
 def _draw_stats_panel(screen, font_lg, font_sm, top_y: int,
@@ -367,14 +360,14 @@ def _draw_stats_panel(screen, font_lg, font_sm, top_y: int,
     mx, my_pos = pygame.mouse.get_pos()
 
     # ── 魔紋選擇欄位（stats 下方，confirm 按鈕上方）───────────────
-    rune_top    = panel_y + panel_h + 10
+    rune_top    = panel_y + panel_h + 20
     rune_bottom = _draw_rune_panel(screen, font_lg, font_sm,
                                    panel_x, rune_top, panel_w, mx, my_pos)
 
     # ── 確認按鈕（魔紋欄位下方靠右）──────────────────────────────
     btn_w, btn_h = 164, 38
     btn_x = panel_x + panel_w - btn_w
-    btn_y = rune_bottom + 10
+    btn_y = rune_bottom + 20
 
     _confirm_btn_rect = pygame.Rect(btn_x, btn_y, btn_w, btn_h)
 

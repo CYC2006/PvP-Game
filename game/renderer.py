@@ -54,8 +54,8 @@ PLAYER_SPRITE_SCALE  = 1.5   # 原圖 33–54 × 43 px，放大後約 50–81 ×
 SKILL_CIRCLE_R   = 34   # 17 × 2
 SKILL_CIRCLE_GAP = 10
 SKILL_STEP       = SKILL_CIRCLE_R * 2 + SKILL_CIRCLE_GAP   # 78 px
-_SKILL_SLOTS     = ('rmb', 'space', 'e', 'r')
-_SKILL_LABELS    = ('MB', 'SP', 'E', 'F')
+_SKILL_SLOTS     = ('rmb', 'space', 'e', 'r', 'q')
+_SKILL_LABELS    = ('MB', 'SP', 'E', 'F', 'Q')
 
 COL_SKILL_READY_BORDER = (220, 220, 255)
 COL_SKILL_CD_BORDER    = ( 80,  80,  80)
@@ -64,6 +64,14 @@ COL_SKILL_READY_TEXT   = (255, 255, 255)
 COL_SKILL_CD_TEXT      = (180, 180, 180)
 COL_SKILL_NONE_TEXT    = ( 70,  70,  70)
 COL_SKILL_FILL         = ( 25,  25,  38)
+
+# Q rune — 綠色系（回血主題）
+COL_RUNE_READY_BORDER   = ( 80, 220, 130)
+COL_RUNE_CD_BORDER      = ( 35,  90,  60)
+COL_RUNE_PASSIVE_BORDER = ( 50, 130,  85)
+COL_RUNE_READY_TEXT     = (170, 255, 205)
+COL_RUNE_CD_TEXT        = ( 90, 165, 120)
+COL_RUNE_PASSIVE_TEXT   = (100, 175, 135)
 
 # 角色定義：char name → (資料夾名稱, 檔名前綴)
 # folder 來自 chars.csv，不在此處維護
@@ -970,7 +978,6 @@ def _draw_hud(screen, state, my_id, font, my_stance="stand",
         screen.blit(gold_surf, (8, 62))
     if skill_cooldowns:
         _draw_skill_hud(screen, font, skill_cooldowns)
-        _draw_rune_hud(screen, font, skill_cooldowns)
     _draw_hp_bar(screen, state, my_id, font)
 
 
@@ -1007,61 +1014,60 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
 
 
 def _draw_skill_hud(screen, font, skill_cooldowns: dict) -> None:
-    """畫面中下方四個技能冷卻圓圈（MB / SP / E / R）。"""
-    cy = SCREEN_H - SKILL_CIRCLE_R - 10   # 距離底部 10 px
-    x0 = SCREEN_W // 2 - (3 * SKILL_STEP) // 2   # 水平居中起點
+    """畫面中下方五個技能冷卻方塊（MB / SP / E / F / Q）。"""
+    SIDE = SKILL_CIRCLE_R * 2   # 68 px
+    BRAD = 9
+    cy   = SCREEN_H - SIDE // 2 - 22
+    x0   = SCREEN_W // 2 - 2 * SKILL_STEP   # 5 格居中
 
     for i, (slot, label) in enumerate(zip(_SKILL_SLOTS, _SKILL_LABELS)):
-        cx = x0 + i * SKILL_STEP
+        cx   = x0 + i * SKILL_STEP
+        rect = pygame.Rect(cx - SIDE // 2, cy - SIDE // 2, SIDE, SIDE)
 
         remaining_ms, max_ms = skill_cooldowns.get(slot, (-1, -1))
+        is_rune = (slot == 'q')
+        passive = is_rune and remaining_ms == -1
 
-        if remaining_ms == -1:                # 未實作
+        if passive:                           # Q 被動魔紋（永久效果）
+            border_col = COL_RUNE_PASSIVE_BORDER
+            text_col   = COL_RUNE_PASSIVE_TEXT
+            text       = label
+        elif remaining_ms == -1:              # 未實作
             border_col = COL_SKILL_NONE_BORDER
             text_col   = COL_SKILL_NONE_TEXT
             text       = '?'
         elif remaining_ms == 0:               # 就緒
-            border_col = COL_SKILL_READY_BORDER
-            text_col   = COL_SKILL_READY_TEXT
+            border_col = COL_RUNE_READY_BORDER   if is_rune else COL_SKILL_READY_BORDER
+            text_col   = COL_RUNE_READY_TEXT     if is_rune else COL_SKILL_READY_TEXT
             text       = label
         else:                                 # 冷卻中
-            border_col = COL_SKILL_CD_BORDER
-            text_col   = COL_SKILL_CD_TEXT
+            border_col = COL_RUNE_CD_BORDER      if is_rune else COL_SKILL_CD_BORDER
+            text_col   = COL_RUNE_CD_TEXT        if is_rune else COL_SKILL_CD_TEXT
             secs       = remaining_ms / 1000.0
             text       = f"{secs:.0f}" if secs >= 1.0 else f"{secs:.1f}"
 
         # ── 背景填充（使用預建 Surface，省掉每幀 allocation）──────
         global _skill_bg_surf
         if _skill_bg_surf is None:
-            _skill_bg_surf = pygame.Surface((SKILL_CIRCLE_R * 2, SKILL_CIRCLE_R * 2), pygame.SRCALPHA)
-            pygame.draw.circle(_skill_bg_surf, (*COL_SKILL_FILL, 200),
-                               (SKILL_CIRCLE_R, SKILL_CIRCLE_R), SKILL_CIRCLE_R)
-        screen.blit(_skill_bg_surf, (cx - SKILL_CIRCLE_R, cy - SKILL_CIRCLE_R))
+            _skill_bg_surf = pygame.Surface((SIDE, SIDE), pygame.SRCALPHA)
+            pygame.draw.rect(_skill_bg_surf, (*COL_SKILL_FILL, 200),
+                             (0, 0, SIDE, SIDE), border_radius=BRAD)
+        screen.blit(_skill_bg_surf, rect.topleft)
 
-        # ── 冷卻覆蓋（暗色扇形）────────────────────────────────────
+        # ── 冷卻覆蓋（由上往下填滿矩形，覆蓋整個方塊）────────────
         if 0 < remaining_ms and max_ms > 0:
             fraction = remaining_ms / max_ms
-            steps    = max(4, int(fraction * 32))
-            start_a  = -math.pi / 2              # 12 點鐘方向
-            sweep    = math.tau * fraction        # 順時針覆蓋
-            pts      = [(cx, cy)]
-            for j in range(steps + 1):
-                a = start_a + sweep * j / steps
-                pts.append((cx + SKILL_CIRCLE_R * math.cos(a),
-                             cy + SKILL_CIRCLE_R * math.sin(a)))
-            # 重複使用預配置 pie Surface（fill 清空後重繪，省掉每幀 allocation）
+            fill_h   = max(1, int(SIDE * fraction))
             global _skill_pie_surf
             if _skill_pie_surf is None:
-                _skill_pie_surf = pygame.Surface(
-                    (SKILL_CIRCLE_R * 2 + 2, SKILL_CIRCLE_R * 2 + 2), pygame.SRCALPHA)
+                _skill_pie_surf = pygame.Surface((SIDE, SIDE), pygame.SRCALPHA)
             _skill_pie_surf.fill((0, 0, 0, 0))
-            lpts = [(x - cx + SKILL_CIRCLE_R + 1, y - cy + SKILL_CIRCLE_R + 1)
-                    for x, y in pts]
-            pygame.draw.polygon(_skill_pie_surf, (10, 10, 20, 180), lpts)
-            screen.blit(_skill_pie_surf, (cx - SKILL_CIRCLE_R - 1, cy - SKILL_CIRCLE_R - 1))
+            pygame.draw.rect(_skill_pie_surf, (10, 10, 20, 180),
+                             (0, 0, SIDE, fill_h), border_radius=BRAD)
+            screen.blit(_skill_pie_surf, rect.topleft)
 
         # ── 外框 ──────────────────────────────────────────────────
-        pygame.draw.circle(screen, border_col, (cx, cy), SKILL_CIRCLE_R, 2)
+        pygame.draw.rect(screen, border_col, rect, 2, border_radius=BRAD)
 
         # ── 文字（居中）──────────────────────────────────────────────
         txt = font.render(text, True, text_col)
