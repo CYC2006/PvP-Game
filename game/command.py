@@ -16,3 +16,4 @@ class PlayerCommand:
     use_skill_rmb: bool = False
     use_skill_space: bool = False
     use_skill_r: bool = False
+    use_rune:    bool = False

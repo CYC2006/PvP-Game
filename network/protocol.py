@@ -23,7 +23,7 @@ PKT_GAME_OVER   = 0x09   # server → clients: 一方離開，遊戲結束
 #   | ba_count(B) | [id(B) x(h) y(h) age(B) dir(b) owner(B)] * ba_count |
 
 _JOINED_STRUCT = struct.Struct("!BB")
-_CMD_STRUCT    = struct.Struct("!BBffBffH")  # +H: speed_mult×1000
+_CMD_STRUCT    = struct.Struct("!BBffBBffH")  # +B: flags2（bit0=use_rune）
 _STATE_HDR     = struct.Struct("!BI")
 _PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age vince_taunt_age
 _BULLET_ENTRY  = struct.Struct("!BBffhBB")    # id owner x y angle_i16 bullet_type bullet_scale_u8(×10)
@@ -63,8 +63,9 @@ def unpack_joined(data: bytes) -> int:
 
 
 def pack_command(cmd: PlayerCommand) -> bytes:
-    # bit 0=shooting  bit 1=running  bits 2-3=stance  bit 4=use_skill_e
-    # bit 5=use_skill_rmb  bit 6=use_skill_space  bit 7=use_skill_r
+    # flags bit 0=shooting  bit 1=running  bits 2-3=stance  bit 4=use_skill_e
+    #       bit 5=use_skill_rmb  bit 6=use_skill_space  bit 7=use_skill_r
+    # flags2 bit 0=use_rune
     stance_bits = _STANCE_TO_INT.get(cmd.stance, 0) << 2
     flags = (int(cmd.shooting)
              | (int(cmd.running)          << 1)
@@ -73,18 +74,19 @@ def pack_command(cmd: PlayerCommand) -> bytes:
              | (int(cmd.use_skill_rmb)   << 5)
              | (int(cmd.use_skill_space) << 6)
              | (int(cmd.use_skill_r)     << 7))
+    flags2    = int(cmd.use_rune)
     speed_raw = max(0, min(65535, int(cmd.speed_mult * 1000)))
     return _CMD_STRUCT.pack(
         PKT_CMD, cmd.player_id,
         cmd.move_x, cmd.move_y,
-        flags,
+        flags, flags2,
         cmd.aim_x, cmd.aim_y,
         speed_raw,
     )
 
 
 def unpack_command(data: bytes) -> PlayerCommand:
-    _, pid, mx, my, flags, ax, ay, speed_raw = _CMD_STRUCT.unpack(data[:_CMD_STRUCT.size])
+    _, pid, mx, my, flags, flags2, ax, ay, speed_raw = _CMD_STRUCT.unpack(data[:_CMD_STRUCT.size])
     stance = _INT_TO_STANCE.get((flags >> 2) & 0x03, "machine")
     return PlayerCommand(player_id=pid, move_x=mx, move_y=my,
                          shooting=bool(flags & 0x01), aim_x=ax, aim_y=ay,
@@ -93,7 +95,8 @@ def unpack_command(data: bytes) -> PlayerCommand:
                          use_skill_e=bool((flags >> 4) & 0x01),
                          use_skill_rmb=bool((flags >> 5) & 0x01),
                          use_skill_space=bool((flags >> 6) & 0x01),
-                         use_skill_r=bool((flags >> 7) & 0x01))
+                         use_skill_r=bool((flags >> 7) & 0x01),
+                         use_rune=bool(flags2 & 0x01))
 
 
 def pack_state(state: GameState) -> bytes:
@@ -389,8 +392,8 @@ def unpack_state(data: bytes) -> GameState:
     return state
 
 
-def pack_char_select(char_id: int) -> bytes:
-    return bytes([PKT_CHAR_SELECT, char_id & 0xFF])
+def pack_char_select(char_id: int, rune_id: int = 0) -> bytes:
+    return bytes([PKT_CHAR_SELECT, char_id & 0xFF, rune_id & 0xFF])
 
 
 def pack_game_start(chars: dict = None) -> bytes:

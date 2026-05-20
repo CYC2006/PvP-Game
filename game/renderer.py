@@ -970,6 +970,7 @@ def _draw_hud(screen, state, my_id, font, my_stance="stand",
         screen.blit(gold_surf, (8, 62))
     if skill_cooldowns:
         _draw_skill_hud(screen, font, skill_cooldowns)
+        _draw_rune_hud(screen, font, skill_cooldowns)
     _draw_hp_bar(screen, state, my_id, font)
 
 
@@ -1065,6 +1066,59 @@ def _draw_skill_hud(screen, font, skill_cooldowns: dict) -> None:
         # ── 文字（居中）──────────────────────────────────────────────
         txt = font.render(text, True, text_col)
         screen.blit(txt, (cx - txt.get_width() // 2, cy - txt.get_height() // 2))
+
+
+def _draw_rune_hud(screen, font, skill_cooldowns: dict) -> None:
+    """左下角：魔紋名稱 + 冷卻條（血量上限為被動，不顯示 CD）。"""
+    from game.charselect import RUNES as _RUNES
+
+    rune_id = _inp._rune_id
+    if rune_id < 0 or rune_id >= len(_RUNES):
+        return
+    rune    = _RUNES[rune_id]
+    q_rem, q_max = skill_cooldowns.get('q', (-1, -1))
+
+    bar_w  = 160
+    bar_h  = 10
+    bar_x  = HP_BAR_X
+    hud_y  = SCREEN_H - HP_BAR_Y_FROM_BOTTOM - 48   # 在 HP 條上方
+
+    # 魔紋名稱
+    passive   = (q_max < 0)
+    ready     = (not passive and q_rem == 0)
+    name_col  = ((80, 220, 130) if ready
+                 else (160, 190, 230) if passive
+                 else (130, 145, 175))
+    name_surf = font.render(rune["name"], True, name_col)
+    screen.blit(name_surf, (bar_x, hud_y))
+
+    if passive:
+        # 血量上限：顯示「PASSIVE」
+        ps = font.render("PASSIVE", True, (100, 140, 195))
+        screen.blit(ps, (bar_x, hud_y + name_surf.get_height() + 3))
+    else:
+        # 冷卻進度條
+        pygame.draw.rect(screen, (45, 28, 20),
+                         (bar_x, hud_y + name_surf.get_height() + 4, bar_w, bar_h),
+                         border_radius=4)
+        if ready:
+            fill_col = (80, 220, 130)
+            fill_w   = bar_w
+        else:
+            fill_col = (70, 120, 200)
+            fill_w   = int(bar_w * max(0.0, 1.0 - q_rem / max(1, q_max)))
+        if fill_w > 0:
+            pygame.draw.rect(screen, fill_col,
+                             (bar_x, hud_y + name_surf.get_height() + 4,
+                              fill_w, bar_h), border_radius=4)
+        pygame.draw.rect(screen, (90, 60, 40),
+                         (bar_x, hud_y + name_surf.get_height() + 4, bar_w, bar_h),
+                         1, border_radius=4)
+        if not ready:
+            cd_secs = q_rem // 1000
+            cd_s    = font.render(f"{cd_secs}s", True, (160, 180, 215))
+            screen.blit(cd_s, (bar_x + bar_w + 6,
+                               hud_y + name_surf.get_height() + 4 - 2))
 
 
 def _draw_hp_bar(screen, state, my_id, font):

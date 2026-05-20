@@ -191,14 +191,15 @@ def char_select_loop(sock, server_addr, screen,
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return None, None
+                return None, None, 0
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                return None, None
+                return None, None, 0
             just_confirmed = charselect.handle_event(event)
             if just_confirmed:
                 # 每次確認（含重新確認）都送一次選角封包
-                idx = charselect.selected_idx()
-                sock.sendto(pack_char_select(idx), server_addr)
+                idx     = charselect.selected_idx()
+                rune_id = charselect.selected_rune()
+                sock.sendto(pack_char_select(idx, rune_id), server_addr)
             my_ready = charselect.is_confirmed()
 
         while True:
@@ -210,7 +211,7 @@ def char_select_loop(sock, server_addr, screen,
                     player_chars = {pid: CHARACTERS[cid]["name"]
                                     for pid, cid in raw_chars.items()
                                     if 0 <= cid < len(CHARACTERS)}
-                    return player_chars, charselect.selected_char()["name"]
+                    return player_chars, charselect.selected_char()["name"], charselect.selected_rune()
             except (BlockingIOError, ConnectionResetError, OSError):
                 break
 
@@ -304,15 +305,16 @@ def run() -> None:
         obstacles = load_map(MAP_PATH)
 
         # ── 選角 ────────────────────────────────────────────────────
-        player_chars, my_char_name = char_select_loop(
+        player_chars, my_char_name, my_rune_id = char_select_loop(
             sock, server_addr, screen, font_lg, font_sm, clock)
         if player_chars is None:
             sock.close()
             pygame.display.set_caption("PvP Game")
             continue
 
-        from game.input import init_char
+        from game.input import init_char, init_rune
         init_char(my_char_name)
+        init_rune(my_rune_id)
 
         # ── 遊戲主迴圈 ──────────────────────────────────────────────
         reset_game_state()          # 清除上一局的殘骸、粒子、震動等視覺狀態

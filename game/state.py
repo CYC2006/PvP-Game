@@ -42,6 +42,11 @@ class Player:
     speed_boost_ticks: int  = 0     # >0：速度提升中，倒數至 0（Assassin space）
     speed_boost_mult: float = 1.0   # 速度提升倍率
     char_name: str          = ""    # 角色名稱，由 apply_char_stats 設定，不同步至 client
+    # ── 魔紋狀態 ──────────────────────────────────────────────────
+    rune_id: int              = 0   # 0=一般恢復 1=強化恢復 2=血量上限
+    rune_cd_until: int        = -1  # server tick when rune CD expires（-1=無 CD）
+    rune_recovery_ticks: int  = 0   # 一般恢復剩餘 tick（>0 生效, ≤0 非啟動）
+    base_max_hp: int          = 0   # 原始血量上限（血量上限魔紋boost 前）
     # ── Vince R 技能狀態（巨大化）────────────────────────────────────
     stun_until: int            = -1   # tick when stun ends (-1 = not stunned)
     burst_next_tick: int       = -1   # tick to fire next burst shot (-1 = inactive)
@@ -302,14 +307,17 @@ class GameState:
                                          x=float(spawn_x), y=float(spawn_y))
         return self.players[player_id]
 
-    def apply_char_stats(self, player_id: int, char_name: str) -> None:
-        """遊戲開始後由 server 呼叫，將角色數值套用到 Player。"""
+    def apply_char_stats(self, player_id: int, char_name: str,
+                         rune_id: int = 0) -> None:
+        """遊戲開始後由 server 呼叫，將角色數值及魔紋設定套用到 Player。"""
         from game.char_data import get_stat, CHAR_STATS
         if player_id not in self.players:
             return
         p = self.players[player_id]
         p.char_name    = char_name
+        p.rune_id      = rune_id
         p.max_hp       = get_stat(char_name, "hp")
+        p.base_max_hp  = p.max_hp   # 記錄原始血量上限（供魔紋回復計算）
         p.hp           = p.max_hp
         p.speed        = float(get_stat(char_name, "speed"))
         p.damage_min   = get_stat(char_name, "damage_min")
@@ -335,6 +343,11 @@ class GameState:
         p._shoot_slow_ticks  = int(char_cfg.get("shoot_slow_dur", 0))
         p._shoot_slow_timer  = 0
         p.pellet_interval    = float(char_cfg.get("pellet_interval", 0.0))
+
+        # 血量上限魔紋（rune_id=2）：遊戲開始即 +30% max_hp
+        if rune_id == 2:
+            p.max_hp = int(p.base_max_hp * 1.3)
+        p.hp = p.max_hp   # 以最終 max_hp 滿血開始
 
     def apply_command(self, player_id: int, dx: float, dy: float,
                       shooting: bool, aim_x: float, aim_y: float,
@@ -891,6 +904,9 @@ class GameState:
         # Assassin R 衝刺中：完全無敵
         if player.r_skill_phase > 0:
             return
+        # 一般恢復魔紋：任何傷害（含護盾吸收前）即打斷回復
+        if damage > 0 and player.rune_recovery_ticks > 0:
+            player.rune_recovery_ticks = 0
 
         shield = self.shields.get(player_id)
         if shield is not None and shield.broken_tick < 0:
@@ -949,6 +965,36 @@ class GameState:
     def step_push_zones(self) -> None:
         from game.chars.robot.push_state import step_push_zones
         step_push_zones(self)
+
+    # ── 魔紋 ─────────────────────────────────────────────────────────────────
+
+    _RUNE_CD_TICKS = 30 * 60   # 30 秒 × 60 tick/s = 1800 ticks
+
+    def _activate_rune(self, player_id: int) -> None:
+        """Q 鍵啟動魔紋（血量上限 rune_id=2 為被動，server 不會收到 use_rune）。"""
+        p = self.players.get(player_id)
+        if p is None:
+            return
+        if p.rune_cd_until > self.tick:
+            return   # 冷卻中
+        p.rune_cd_until = self.tick + self._RUNE_CD_TICKS
+
+        if p.rune_id == 0:   # 一般恢復：每秒 5% 持續 6 秒，首 tick 立即恢復
+            p.rune_recovery_ticks = 360
+        elif p.rune_id == 1:   # 強化恢復：瞬間 20%
+            heal = int(p.base_max_hp * 0.20)
+            p.hp  = min(p.max_hp, p.hp + heal)
+
+    def step_rune_recovery(self) -> None:
+        """每 tick 呼叫：驅動一般恢復的逐秒治療倒計時。"""
+        for p in self.players.values():
+            if p.rune_recovery_ticks <= 0:
+                continue
+            # 在 360, 300, 240, 180, 120, 60 tick 各回復 5%（共 6 次）
+            if p.rune_recovery_ticks % 60 == 0:
+                heal = int(p.base_max_hp * 0.05)
+                p.hp = min(p.max_hp, p.hp + heal)
+            p.rune_recovery_ticks -= 1
 
     def _spawn_stun_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.pioneer.stun_bullet_state import spawn_stun_bullet

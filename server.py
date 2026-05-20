@@ -92,6 +92,7 @@ def run():
     clients: dict[int, tuple] = {}   # pid → addr
     addr_to_id: dict          = {}   # addr → pid
     player_chars: dict        = {}   # pid → char_id（選角完成後才有）
+    player_runes: dict        = {}   # pid → rune_id
     game_started: bool        = False
     last_seen: dict[int, float] = {}  # pid → 最後收到封包的時間
     paused: bool              = False
@@ -144,8 +145,10 @@ def run():
                 if addr in addr_to_id and not game_started and len(data) >= 2:
                     pid     = addr_to_id[addr]
                     char_id = data[1]
+                    rune_id = data[2] if len(data) >= 3 else 0
                     player_chars[pid] = char_id
-                    print(f"[Server] Player {pid} selected char {char_id}")
+                    player_runes[pid] = rune_id
+                    print(f"[Server] Player {pid} selected char {char_id}, rune {rune_id}")
 
                     # 雙方都選完 → 套用角色數值 → 開始遊戲
                     if len(player_chars) == MAX_PLAYERS:
@@ -154,8 +157,9 @@ def run():
                         reload()   # 每局開始重新讀取 chars.csv
                         for p_id, c_id in player_chars.items():
                             char_name = CHAR_ORDER[c_id]
-                            state.apply_char_stats(p_id, char_name)
-                            print(f"[Server] Player {p_id} → {char_name}")
+                            r_id      = player_runes.get(p_id, 0)
+                            state.apply_char_stats(p_id, char_name, r_id)
+                            print(f"[Server] Player {p_id} → {char_name}, rune {r_id}")
                         payload = pack_game_start(player_chars)
                         for a in clients.values():
                             try:
@@ -176,6 +180,7 @@ def run():
                 clients.clear()
                 addr_to_id.clear()
                 player_chars.clear()
+                player_runes.clear()
                 last_seen.clear()
                 game_started = False
                 paused       = False
@@ -213,6 +218,8 @@ def run():
                                 fn = _SKILL_R.get(p.char_name)
                                 if fn:
                                     fn(state, pid, ax, ay)
+                        if cmd.use_rune:
+                            state._activate_rune(pid)
                     state.apply_command(
                         cmd.player_id,
                         cmd.move_x, cmd.move_y,
@@ -270,6 +277,7 @@ def run():
                 state.step_knockback()
                 state.step_push_zones()
                 state.step_robot_marks()
+                state.step_rune_recovery()
 
                 payload = pack_state(state)
                 for addr in clients.values():

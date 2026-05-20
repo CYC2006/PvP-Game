@@ -24,6 +24,8 @@ _char_name:            str   = ""
 _rmb_prev:            bool  = False
 _r_prev:              bool  = False   # R 鍵（換彈）前幀狀態
 _f_prev:              bool  = False   # F 鍵（大招）前幀狀態
+_q_prev:              bool  = False   # Q 鍵（魔紋）前幀狀態
+_rune_id:             int   = 0       # 選中的魔紋 ID（由 init_rune 設定）
 _speed_boost_end_ms:  int   = 0     # 速度提升到期時間（ms），供 renderer 粒子使用
 _r_skill_start_ms:    int   = 0     # R 大招啟動時間（ms），供 renderer 旋轉使用
 _r_skill_start_angle: float = 0.0   # R 大招啟動時的瞄準角度（度）
@@ -121,6 +123,7 @@ def init_char(char_name: str) -> None:
         'space': _cd('cd_space'),
         'e':     _cd('cd_e'),
         'r':     _cd('cd_r'),
+        'q':     -1,   # 由 init_rune 設定
     }
     _now = pygame.time.get_ticks()
     _skill_last_ms = {
@@ -147,9 +150,27 @@ def init_char(char_name: str) -> None:
     _rmb_prev        = False
     _r_prev          = False
     _f_prev          = False
+    _q_prev          = False
     _r_holding       = False
     _last_aim_x      = 0.0
     _last_aim_y      = 0.0
+
+
+def init_rune(rune_id: int) -> None:
+    """
+    選角確認後呼叫（在 init_char 之後）。
+    rune_id: 0=一般恢復, 1=強化恢復, 2=血量上限
+    血量上限為被動，Q 鍵無效（cd 設 -1）。
+    """
+    global _rune_id, _q_prev, _skill_cds_ms, _skill_last_ms
+    _rune_id = rune_id
+    _q_prev  = False
+    if rune_id == 2:   # 血量上限：被動，Q 無動作
+        _skill_cds_ms['q']  = -1
+        _skill_last_ms['q'] = 0
+    else:              # 一般恢復 / 強化恢復：30s CD，遊戲開始即可用
+        _skill_cds_ms['q']  = 30_000
+        _skill_last_ms['q'] = pygame.time.get_ticks() - 30_001
 
 
 def read_input(player_id: int, keys_held: set,
@@ -163,7 +184,7 @@ def read_input(player_id: int, keys_held: set,
                       remaining_ms == -1  → 技能尚未實作
     """
     global _last_shot_time, _ammo, _reloading, _reload_start_ms, _current_reload_ms
-    global _space_prev, _e_prev, _rmb_prev, _r_prev, _f_prev
+    global _space_prev, _e_prev, _rmb_prev, _r_prev, _f_prev, _q_prev
     global _robot_mark_until_ms, _cloak_ticks_left
     global _dash_active, _dash_dx, _dash_dy, _dash_speed, _dash_dist_remaining
     global _skill_last_ms, _speed_boost_end_ms, _r_skill_start_ms, _r_skill_start_angle
@@ -206,6 +227,10 @@ def read_input(player_id: int, keys_held: set,
     f_held             = pygame.K_f in keys_held
     f_just_pressed     = f_held and not _f_prev
     _f_prev            = f_held
+
+    q_held             = pygame.K_q in keys_held
+    q_just_pressed     = q_held and not _q_prev
+    _q_prev            = q_held
 
     # ── R 技能啟動狀態（在所有技能判斷之前計算，確保完全隔離）────
     _r_skill_active = (now - _r_skill_start_ms) < 500 and _r_skill_start_ms > 0
@@ -379,6 +404,15 @@ def read_input(player_id: int, keys_held: set,
         _reloading       = True
         _reload_start_ms = now
 
+    # ── Q 鍵：啟動魔紋（血量上限為被動，cd=-1 不觸發）───────────
+    use_rune = False
+    if (q_just_pressed and _skill_cds_ms.get('q', -1) >= 0
+            and not _giant_frozen and not _burst_shots_left):
+        cd_remaining = _skill_cds_ms['q'] - (now - _skill_last_ms['q'])
+        if cd_remaining <= 0:
+            use_rune = True
+            _skill_last_ms['q'] = now
+
     # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────
     shooting = False
     if (not suppress_lmb
@@ -397,7 +431,7 @@ def read_input(player_id: int, keys_held: set,
 
     # ── 技能冷卻資訊（給 HUD）────────────────────────────────────
     skill_cooldowns: dict = {}
-    for slot in ('space', 'e', 'r', 'rmb'):
+    for slot in ('space', 'e', 'r', 'rmb', 'q'):
         max_cd = _skill_cds_ms.get(slot, -1)
         if max_cd < 0:
             skill_cooldowns[slot] = (-1, -1)
@@ -417,5 +451,6 @@ def read_input(player_id: int, keys_held: set,
         use_skill_rmb=use_skill_rmb,
         use_skill_space=use_skill_space,
         use_skill_r=use_skill_r,
+        use_rune=use_rune,
     )
     return cmd, effective_stance, _ammo, _reloading, skill_cooldowns
