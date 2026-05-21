@@ -140,10 +140,18 @@ _SKILLS: dict = {
     ],
     'Poisoner': [
         ("POISON POOL", "RMB", 9,
-         "Fires a toxic projectile that splashes on contact, creating a poison zone. "
-         "Enemies caught inside take continuous damage and move 20% slower."),
-        ("—", "SPACE", 0, "Skill under development."),
-        ("—", "E",     0, "Skill under development."),
+         "Fires a toxic projectile that splashes on contact, creating a large poison zone (r 150). "
+         "Enemies inside take 3 dmg/tick and move 20% slower. "
+         "Each tick in the pool adds 1 poison stack (cap 2 from this source)."),
+        ("TOXIC SPRINT", "SPACE", 8,
+         "Dash forward at +20% speed for 3 s, leaving afterimages. "
+         "Drops 9 small poison pools (r 20-30) at your feet every 20 ticks as you run. "
+         "Standing in a mini-pool adds 1 poison stack per 30 ticks (cap 2 from this source)."),
+        ("TOXIC RESONANCE", "E", 10,
+         "For 3 s, every 30 ticks the game checks if you are standing on one of your own pools. "
+         "If so, a green shockwave (r 60→60→400, 0.6 s) erupts: deals 3 dmg to the enemy "
+         "and heals you for 3 \xd7 (enemy poison stacks). Up to 6 shockwaves per activation. "
+         "The shockwave also applies up to 2 poison stacks to the enemy."),
         ("—", "R",     0, "Skill under development."),
     ],
     'Zombie': [

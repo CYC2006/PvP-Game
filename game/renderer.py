@@ -1149,12 +1149,20 @@ def _draw_hp_bar(screen, state, my_id, font):
 
     ratio = max(0.0, hp / max_hp) if max_hp > 0 else 0.0
 
-    pygame.draw.rect(screen, COL_HP_BG,
+    # Green bar when the local player is poisoned; red otherwise
+    poisoned = player is not None and player.poison_stacks > 0
+    if poisoned:
+        bg_col   = (20, 55, 20)
+        fill_col = (60, 210, 70) if ratio > 0.3 else (200, 200, 40)
+    else:
+        bg_col   = COL_HP_BG
+        fill_col = COL_HP_FILL if ratio > 0.3 else (255, 140, 30)
+
+    pygame.draw.rect(screen, bg_col,
                      (HP_BAR_X, bar_y, HP_BAR_W, HP_BAR_H), border_radius=4)
 
     fill_w = int(HP_BAR_W * ratio)
     if fill_w > 0:
-        fill_col = COL_HP_FILL if ratio > 0.3 else (255, 140, 30)
         pygame.draw.rect(screen, fill_col,
                          (HP_BAR_X, bar_y, fill_w, HP_BAR_H), border_radius=4)
 
