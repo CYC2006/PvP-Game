@@ -910,13 +910,13 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         if pid == my_id:
             r_dash_fx.maybe_spawn_afterimage(player.x, player.y, rotated, state.tick)
 
-        # 對方頭上顯示 HP bar（依真實血量百分比）
-        if pid != my_id:
+        # 頭頂毒素層數（自己 + 對方都顯示）
+        if player.poison_stacks > 0:
             head_y = sy - rotated.get_height() // 2 - 10
-            _draw_opponent_hp_bar(screen, player.hp, player.max_hp, sx, head_y)
-            if player.poison_stacks > 0:
-                _draw_poison_stack_label(screen, font,
-                                         player.poison_stacks, sx, head_y)
+            if pid != my_id:
+                _draw_opponent_hp_bar(screen, player.hp, player.max_hp, sx, head_y)
+            _draw_poison_stack_label(screen, font,
+                                     player.poison_stacks, sx, head_y)
 
         # 暈眩指示：三顆黃色小球繞頭頂旋轉
         if player.stun_until > state.tick:
@@ -1175,18 +1175,6 @@ def _draw_hp_bar(screen, state, my_id, font):
     label_y   = bar_y - 30
     screen.blit(lbl_left,  (HP_BAR_X, label_y))
     screen.blit(lbl_right, (HP_BAR_X + HP_BAR_W - lbl_right.get_width(), label_y))
-
-    # 中毒層數：粗體綠色數字，緊接 "HP" 右側
-    if poisoned and player.poison_stacks > 0:
-        if not _poison_stack_font:
-            import os
-            _poison_stack_font.append(
-                pygame.font.Font(
-                    os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf"), 15))
-        stk_surf = _poison_stack_font[0].render(str(player.poison_stacks), True, (30, 140, 45))
-        stk_x    = HP_BAR_X + lbl_left.get_width() + 6
-        stk_y    = label_y + (lbl_left.get_height() - stk_surf.get_height()) // 2
-        screen.blit(stk_surf, (stk_x, stk_y))
 
     # ── 護盾血條（Soldier E，在 HP 條右方）────────────────────────────────
     shield = state.shields.get(my_id)
