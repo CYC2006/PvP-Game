@@ -283,6 +283,7 @@ class Bullet:
     bubble_radius_max: float = 0.0     # DoT 泡泡最大碰撞半徑 px（由 server 亂數，client 同步）
     bullet_scale: float = 1.0          # 巨大化子彈：3.0（碰撞半徑與視覺同比放大）
     bullet_type: int  = 0              # 0=一般子彈  1=閃光彈
+    has_knockback: bool = False        # True 僅限 Agent RMB 放大彈；Vince 大招子彈不觸發擊退
 
     def step(self) -> None:
         self.x += self.dx
@@ -476,7 +477,8 @@ class GameState:
 
     def _spawn_bullet(self, owner_id: int, aim_x: float, aim_y: float,
                       bullet_scale_override: float = 0.0,
-                      spread_override: float = -1.0) -> None:
+                      spread_override: float = -1.0,
+                      has_knockback: bool = False) -> None:
         player = self.players[owner_id]
         length = math.hypot(aim_x, aim_y)
         if length == 0:
@@ -551,6 +553,7 @@ class GameState:
                 ),
                 bullet_scale=_bscale,
                 bullet_type=_btype,
+                has_knockback=has_knockback,
             )
             # pellet_interval > 0：第一顆立即發射，其餘依 fire_tick 升序插入佇列
             if player.pellet_interval > 0 and pellet_i > 0:
@@ -649,7 +652,7 @@ class GameState:
                     if player.giant_tick >= 0:
                         damage = int(damage * 0.8)
                     self.apply_damage(pid, damage)
-                    if bullet.bullet_scale > 1.0:   # Agent RMB 放大子彈：施加擊退
+                    if bullet.has_knockback:
                         self.apply_knockback(pid, bullet.dx, bullet.dy)
                     expired.append(bid)
                     return True
