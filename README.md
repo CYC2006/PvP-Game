@@ -71,7 +71,7 @@ Skill descriptions are shortened to fit the table; see the in-game **Characters*
 | **Robot** | — | Dash; recall to mark | — | Launch enemies away |
 | **Pioneer** |  Stun bullet on hit | Leap + refill ammo | 120 HP absorb shield | Clones fire with you |
 | **Assassin** | Throw a shuriken | Short speed boost | Deploy smoke cloud | Dash + blade sweep |
-| **Poisoner** | Toxic splash zone | — | — | — |
+| **Poisoner** | Toxic splash zone (pool) | +20% speed, afterimage, 9 mini pools | Shockwave from pool; heals caster | — |
 | **Zombie** | — | — | — | — |
 
 > Characters marked **—** have skills still under development.
