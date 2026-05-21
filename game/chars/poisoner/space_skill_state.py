@@ -1,7 +1,7 @@
 """Poisoner Space — 毒素疾走（server-only）
 
 - 持續 3 秒（180 tick），移速 +20%，殘影效果（client 透過 speed_boost_end_ms 呈現）
-- 每 20 tick 在腳下生成一個小毒液池（半徑 20~30），最多 9 個
+- 每 20 tick 在腳下生成一個小毒液池（半徑 30~50），最多 9 個
 - 小池存活 5 秒（300 tick），冷卻 8 秒（由 chars.csv cd_space=8）
 """
 import random
@@ -35,7 +35,7 @@ def step_poisoner_space(state) -> None:
         if player.poisoner_space_pool_count >= MAX_POOLS:
             continue
         if state.tick - player.poisoner_space_last_pool_tick >= POOL_INTERVAL:
-            radius = random.uniform(20.0, 30.0)
+            radius = random.uniform(30.0, 50.0)
             create_small_poison_pool(state, player.x, player.y, pid, radius)
             player.poisoner_space_last_pool_tick = state.tick
             player.poisoner_space_pool_count    += 1

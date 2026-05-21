@@ -559,11 +559,11 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
 
-    # ── 殘血紅色暈邊（HUD 之前，保持 UI 在最上層）
-    _draw_low_hp_vignette(screen, me.hp, me.max_hp)
-    # ── 毒素感染綠色覆蓋（本地玩家有層數時顯示）
-    if me.poison_stacks > 0:
+    # ── 邊框脈動：中毒綠框（非殘血時）或殘血紅框（優先級高）
+    low_hp = me.max_hp > 0 and (me.hp / me.max_hp) <= 0.30
+    if me.poison_stacks > 0 and not low_hp:
         _draw_poison_vignette(screen, me.poison_stacks)
+    _draw_low_hp_vignette(screen, me.hp, me.max_hp)
 
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns,
               font_hud=font_hud or font)
@@ -1266,53 +1266,46 @@ _poison_overlay_cache: dict = {}
 def _draw_poison_stack_label(screen: pygame.Surface,
                               font: pygame.font.Font,
                               stacks: int, sx: int, bar_y: int) -> None:
-    """在對手頭頂血條上方繪製綠色毒素層數數字（如 ☠ 3）。"""
-    text  = f"☠ {stacks}"   # ☠ skull
-    # 主體文字（亮綠）
-    surf  = font.render(text, True, (80, 240, 80))
-    # 黑色描邊（向四個方向各偏 1px）
-    shadow = font.render(text, True, (0, 0, 0))
-    tx = sx - surf.get_width() // 2
-    ty = bar_y - surf.get_height() - 4
-    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-        screen.blit(shadow, (tx + dx, ty + dy))
+    """在對手頭頂血條上方繪製毒素層數數字（無邊框、無前綴符號）。"""
+    text = str(stacks)
+    # 亮黃綠色，與地面草地綠區隔
+    surf = font.render(text, True, (30, 140, 45))
+    tx   = sx - surf.get_width() // 2
+    ty   = bar_y - surf.get_height() - 4
     screen.blit(surf, (tx, ty))
 
 
-def _build_poison_overlay(alpha: int) -> pygame.Surface:
-    """建立一張半透明綠色感染覆蓋 Surface。"""
-    W, H = LOGICAL_W, LOGICAL_H
-    surf = pygame.Surface((W, H), pygame.SRCALPHA)
-    # 全畫面平鋪淡綠底色
-    surf.fill((30, 140, 30, alpha))
-    # 四邊額外加深邊緣暈染（各 12% 畫面寬 / 高）
-    edge_w = W // 8
-    edge_h = H // 8
-    steps  = 18
+def _build_poison_vignette(alpha_mult: float) -> pygame.Surface:
+    """建立一張 SRCALPHA 的綠色暈邊 Surface，alpha_mult ∈ [0,1]。"""
+    W, H   = LOGICAL_W, LOGICAL_H
+    surf   = pygame.Surface((W, H), pygame.SRCALPHA)
+    steps  = 36
+    max_in = int(min(W, H) * 0.30)
+
     for i in range(steps):
-        t      = i / (steps - 1)
-        e_alpha = int(alpha * 1.8 * (1.0 - t) ** 1.4)
-        if e_alpha <= 0:
+        t     = i / (steps - 1)
+        alpha = int(220 * (1.0 - t) ** 1.6 * alpha_mult)
+        if alpha <= 0:
             continue
-        inset = int(min(edge_w, edge_h) * t)
-        thick = max(1, min(edge_w, edge_h) // steps + 2)
-        pygame.draw.rect(surf, (20, 160, 20, e_alpha),
-                         (inset, inset, W - 2 * inset, H - 2 * inset), thick)
+        inset = int(max_in * t)
+        thick = max(1, max_in // steps + 2)
+        pygame.draw.rect(surf, (20, 180, 40, alpha),
+                         (inset, inset, W - 2 * inset, H - 2 * inset),
+                         thick)
     return surf
 
 
 def _draw_poison_vignette(screen: pygame.Surface, stacks: int) -> None:
-    """本地玩家中毒時的綠色感染視覺，層數越高越明顯，帶輕微脈動。"""
-    # 基礎 alpha：每層 +6（1層=6, 5層=30），脈動振幅 ±每層3
-    pulse     = 0.5 + 0.5 * math.sin(time.perf_counter() * math.pi * 1.2)
-    alpha_f   = stacks * 6 + pulse * stacks * 3
-    alpha     = max(1, min(60, int(alpha_f)))
+    """本地玩家中毒時的綠色邊框脈動（機制與紅色殘血相同，層數越高越明顯）。"""
+    # 強度：1 層=0.2，5 層=1.0；脈動 ~1.6 Hz
+    intensity = stacks / 5.0
+    pulse     = 0.60 + 0.40 * math.sin(time.perf_counter() * math.pi * 1.6)
+    alpha_mul = round(intensity * pulse, 2)
 
-    # 以 2 為步進快取
-    bucket = (alpha // 2) * 2
+    bucket = round(alpha_mul / 0.04) * 0.04
     if bucket not in _poison_overlay_cache:
-        _poison_overlay_cache[bucket] = _build_poison_overlay(bucket)
-        if len(_poison_overlay_cache) > 40:
+        _poison_overlay_cache[bucket] = _build_poison_vignette(bucket)
+        if len(_poison_overlay_cache) > 50:
             _poison_overlay_cache.pop(next(iter(_poison_overlay_cache)))
 
     screen.blit(_poison_overlay_cache[bucket], (0, 0))
