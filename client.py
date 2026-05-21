@@ -6,7 +6,7 @@ import time
 import threading
 import pygame
 
-from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left, set_cloak_ticks
+from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left, set_cloak_ticks, get_mercury_aim_angle
 from game.renderer   import draw, handle_settings_click, reset_game_state, settings_blocks_click, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
@@ -369,6 +369,9 @@ def run() -> None:
             cmd, effective_stance, ammo, is_reloading, skill_cooldowns = read_input(
                 player_id, keys_held, logical_mouse, shift_held, suppress_lmb)
             aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
+            _mercury_locked = get_mercury_aim_angle()
+            if _mercury_locked is not None:
+                aim_angle_deg = _mercury_locked
 
             try:
                 sock.sendto(pack_command(cmd), server_addr)
@@ -409,10 +412,6 @@ def run() -> None:
                 if local_player and local_player.cloak_until > state.tick
                 else 0
             )
-            # Mercury Barrage: lock visual aim to the server-authoritative angle
-            if local_player and local_player.mercury_start_tick >= 0:
-                aim_angle_deg = local_player.aim_angle
-
             draw(screen, state, player_id, font_sm, obstacles,
                  effective_stance, aim_angle_deg, ammo, is_reloading,
                  player_chars, skill_cooldowns,

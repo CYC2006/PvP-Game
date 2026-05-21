@@ -53,6 +53,7 @@ class InputState:
     r_skill_start_angle: float = 0.0
     robot_mark_until_ms: int   = 0
     mercury_end_ms:      int   = 0   # ms when Agent barrage ends (0=inactive)
+    mercury_aim_angle:   float = 0.0  # aim_angle_deg locked at barrage activation
     rune_id:             int   = 0
     # ── 每幀由 client.py 推入（伺服器狀態鏡像）─────────────────────────────
     giant_age:           int   = -1
@@ -90,6 +91,14 @@ def set_burst_shots_left(n: int) -> None:
 
 def set_cloak_ticks(n: int) -> None:
     _state.cloak_ticks_left = n
+
+
+def get_mercury_aim_angle() -> float | None:
+    """Return locked aim_angle_deg while Agent's Mercury Barrage is active, else None."""
+    now = pygame.time.get_ticks()
+    if _state.char_name == 'Agent' and now < _state.mercury_end_ms:
+        return _state.mercury_aim_angle
+    return None
 
 
 def set_dash_context(player_x: float, player_y: float,
@@ -465,7 +474,8 @@ def read_input(player_id: int, keys_held: set,
                 _state.r_skill_start_ms    = now
                 _state.r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
             if _state.char_name == 'Agent':
-                _state.mercury_end_ms = now + 1250  # 72 ticks × ~17ms + safety margin
+                _state.mercury_end_ms   = now + 1250  # 72 ticks × ~17ms + safety margin
+                _state.mercury_aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
 
     # ── R 鍵：手動換彈 ────────────────────────────────────────────────────
     _NO_RELOAD = {'Robot', 'Assassin', 'Zombie'}
