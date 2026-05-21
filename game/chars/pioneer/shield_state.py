@@ -27,10 +27,12 @@ def _start_shockwave(state, owner_id: int, *,
                      kb_force: float = SHOCKWAVE_KB_FORCE,
                      pull_source_id: int = -1,
                      pull_speed: float = 0.0,
+                     damage: int = 0,
+                     poison_src: str = '',
                      cx: float = None, cy: float = None) -> None:
     """記錄衝擊波起始資訊，由 step_shockwaves 每 tick 追蹤圓環位置。
     cx/cy 可選覆寫起始座標（預設取 owner 當前位置）。
-    pull_source_id/pull_speed：設定後改為吸引效果，不施加擊退。
+    damage/poison_src：支援純傷害型衝擊波（無暈眩/擊退）。
     """
     if cx is None or cy is None:
         player = state.players.get(owner_id)
@@ -51,6 +53,8 @@ def _start_shockwave(state, owner_id: int, *,
         'kb_force':       kb_force,
         'pull_source_id': pull_source_id,
         'pull_speed':     pull_speed,
+        'damage':         damage,
+        'poison_src':     poison_src,
     })
 
 
@@ -89,24 +93,32 @@ def step_shockwaves(state) -> None:
         if dist > ring_r:
             continue   # 圓環還沒掃到對手
 
-        # 圓環掃到對手 → 施加控制效果（無傷害）
+        # 圓環掃到對手 → 施加效果
         pull_sid = sw.get('pull_source_id', -1)
         pull_spd = sw.get('pull_speed', 0.0)
+        dmg      = sw.get('damage', 0)
+        psrc     = sw.get('poison_src', '')
+
         if pull_sid >= 0 and pull_spd > 0:
-            # 嘲諷：吸引，不擊退
             opp.pull_source_id = pull_sid
             opp.pull_speed     = pull_spd
         else:
-            # 一般衝擊波：擊退
-            if dist > 0:
-                ux = (opp.x - sw['cx']) / dist
-                uy = (opp.y - sw['cy']) / dist
-            else:
-                ux, uy = 1.0, 0.0
-            opp.kb_vx = ux * kb_force
-            opp.kb_vy = uy * kb_force
+            if kb_force > 0:
+                if dist > 0:
+                    ux = (opp.x - sw['cx']) / dist
+                    uy = (opp.y - sw['cy']) / dist
+                else:
+                    ux, uy = 1.0, 0.0
+                opp.kb_vx = ux * kb_force
+                opp.kb_vy = uy * kb_force
 
-        state.apply_stun(opponent_id, stun_ticks)
+        if stun_ticks > 0:
+            state.apply_stun(opponent_id, stun_ticks)
+        if dmg > 0:
+            state.apply_damage(opponent_id, dmg)
+        if psrc:
+            from game.chars.poisoner.poison_stack_state import add_poison_stack
+            add_poison_stack(state, opponent_id, psrc)
         sw['hit_done'] = True
 
     state._pending_shockwaves = still_active

@@ -82,6 +82,23 @@ class Player:
     r_skill_dy: float         = 0.0  # 第一段滑動方向 y
     r_skill_start_angle: float = 0.0 # 技能啟動時的 aim_angle
     r_skill_dmg_done: int     = 0    # bitmask: 1=phase1 已傷害, 2=phase2 已傷害
+    # ── Poisoner 毒素層數系統 ──────────────────────────────────────────
+    poison_stacks: int        = 0    # 當前毒素層數（0~5）
+    _poison_last_tick: int    = -1   # 上次受到毒素傷害的 tick（-1=從未）
+    _poison_stk_dmg_timer: int = 0  # 每秒傷害計時器（60 tick → 造成一次）
+    _poison_src_normal: int   = 0   # 普攻已貢獻層數（上限 1）
+    _poison_src_rmb: int      = 0   # RMB 毒液池已貢獻層數（上限 2）
+    _poison_src_space_pool: int = 0 # Space 小毒液池已貢獻層數（上限 2）
+    _poison_src_e: int        = 0   # E 衝擊波已貢獻層數（上限 2）
+    # ── Poisoner Space 技能狀態 ────────────────────────────────────────
+    poisoner_space_until: int           = -1  # 技能結束 tick（-1=未啟動）
+    poisoner_space_last_pool_tick: int  = -1  # 上次生成小池的 tick
+    poisoner_space_pool_count: int      = 0   # 本次已生成小池數
+    # ── Poisoner E 技能狀態 ────────────────────────────────────────────
+    poisoner_e_until: int               = -1  # 技能結束 tick（-1=未啟動）
+    poisoner_e_last_check_tick: int     = -1  # 上次 30-tick 檢查的 tick
+    poisoner_e_check_count: int         = 0   # 本次已檢查次數
+    poisoner_e_shockwave_seq: int       = 0   # 每次釋放衝擊波時遞增（供 client FX 偵測）
 
     def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -95,6 +112,13 @@ class Player:
         self.hp = self.max_hp
         self.x  = float(MAP_WIDTH  // 4 if self.id == 1 else MAP_WIDTH  * 3 // 4)
         self.y  = float(MAP_HEIGHT // 2)
+        self.poison_stacks         = 0
+        self._poison_last_tick     = -1
+        self._poison_stk_dmg_timer = 0
+        self._poison_src_normal    = 0
+        self._poison_src_rmb       = 0
+        self._poison_src_space_pool = 0
+        self._poison_src_e         = 0
 
 
 GOLD_RADIUS = 10   # 玩家撿取金錠的碰撞半徑
@@ -142,12 +166,13 @@ class AirStrike:
 
 @dataclass
 class PoisonPool:
-    id:         int
-    owner_id:   int
-    x:          float
-    y:          float
-    spawn_tick: int
-    radius:     float = 300.0
+    id:          int
+    owner_id:    int
+    x:           float
+    y:           float
+    spawn_tick:  int
+    radius:      float = 150.0   # RMB 大池=150, Space 小池=20~30
+    pool_source: str   = "rmb"  # "rmb" | "space"
 
 
 @dataclass
@@ -590,6 +615,9 @@ class GameState:
                             if player.giant_tick >= 0:
                                 damage = int(damage * 0.8)
                             self.apply_damage(pid, damage)
+                            if shooter and shooter.char_name == 'Poisoner':
+                                from game.chars.poisoner.poison_stack_state import add_poison_stack
+                                add_poison_stack(self, pid, 'normal')
                             self._dot_cooldown[key] = self.tick + bullet.dot_interval
                             self._dot_keys_by_bid.setdefault(bid, set()).add(key)
             elif does_damage:
@@ -850,6 +878,26 @@ class GameState:
     def step_poison_pools(self) -> None:
         from game.chars.poisoner.poison_pool_state import step_poison_pools
         step_poison_pools(self)
+
+    def _activate_poisoner_space(self, owner_id: int) -> None:
+        from game.chars.poisoner.space_skill_state import activate_poisoner_space
+        activate_poisoner_space(self, owner_id)
+
+    def step_poisoner_space(self) -> None:
+        from game.chars.poisoner.space_skill_state import step_poisoner_space
+        step_poisoner_space(self)
+
+    def _activate_poisoner_e(self, owner_id: int) -> None:
+        from game.chars.poisoner.e_skill_state import activate_poisoner_e
+        activate_poisoner_e(self, owner_id)
+
+    def step_poisoner_e(self) -> None:
+        from game.chars.poisoner.e_skill_state import step_poisoner_e
+        step_poisoner_e(self)
+
+    def step_poison_stacks(self) -> None:
+        from game.chars.poisoner.poison_stack_state import step_poison_stacks
+        step_poison_stacks(self)
 
     def _place_mine(self, owner_id: int) -> None:
         from game.chars.marksman.mine_state import place_mine

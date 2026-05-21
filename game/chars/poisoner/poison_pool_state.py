@@ -2,13 +2,15 @@ import math
 import random
 from game.state import Bullet, PoisonPool, PLAYER_RADIUS
 
-POOL_RADIUS         = 150.0
-POOL_TICKS          = 300    # 5s
-DOT_INTERVAL        = 30     # 每 0.5s
-DOT_MIN             = 3
-DOT_MAX             = 3
-POOL_BULLET_SPEED   = 10.0   # px/tick（600 px/s）
-POOL_BULLET_RANGE   = 1200.0
+POOL_RADIUS    = 150.0   # RMB 大毒液池碰撞半徑
+POOL_TICKS     = 300     # 5s（RMB 與 Space 小池共用）
+DOT_INTERVAL   = 30      # RMB 池：每 0.5s 傷害一次
+DOT_MIN        = 3
+DOT_MAX        = 3
+POOL_BULLET_SPEED = 10.0    # px/tick
+POOL_BULLET_RANGE = 1200.0
+
+SPACE_DOT_INTERVAL = 30  # Space 小池：每 0.5s 嘗試疊層一次（無傷害）
 
 
 def spawn_pool_bullet(state, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -36,17 +38,36 @@ def spawn_pool_bullet(state, owner_id: int, aim_x: float, aim_y: float) -> None:
 
 
 def create_poison_pool(state, x: float, y: float, owner_id: int) -> None:
+    """建立 RMB 大毒液池（radius=150, pool_source='rmb'）。"""
     ppid = state._next_pool_id
     state._next_pool_id = (state._next_pool_id + 1) % 256
     state.poison_pools[ppid] = PoisonPool(
         id=ppid, owner_id=owner_id,
         x=x, y=y,
         spawn_tick=state.tick,
+        radius=POOL_RADIUS,
+        pool_source='rmb',
+    )
+
+
+def create_small_poison_pool(state, x: float, y: float,
+                              owner_id: int, radius: float) -> None:
+    """建立 Space 小毒液池（radius=20~30, pool_source='space'）。"""
+    ppid = state._next_pool_id
+    state._next_pool_id = (state._next_pool_id + 1) % 256
+    state.poison_pools[ppid] = PoisonPool(
+        id=ppid, owner_id=owner_id,
+        x=x, y=y,
+        spawn_tick=state.tick,
+        radius=radius,
+        pool_source='space',
     )
 
 
 def step_poison_pools(state) -> None:
-    # 每 tick 開始先重置所有玩家的速度懲罰（由本模組負責管理）
+    from game.chars.poisoner.poison_stack_state import add_poison_stack
+
+    # 每 tick 重置速度懲罰，RMB 池在下方重新設定
     for player in state.players.values():
         player.speed_penalty = 1.0
 
@@ -59,15 +80,24 @@ def step_poison_pools(state) -> None:
 
         opponent_id = 3 - pool.owner_id
         opp = state.players.get(opponent_id)
-        if opp:
-            dist = math.hypot(opp.x - pool.x, opp.y - pool.y)
-            if dist <= POOL_RADIUS:
-                opp.speed_penalty = 0.8   # 毒液慢速 20%
-                if age > 0 and age % DOT_INTERVAL == 0:
-                    dmg = random.randint(DOT_MIN, DOT_MAX)
-                    if opp.giant_tick >= 0:
-                        dmg = int(dmg * 0.8)
-                    state.apply_damage(opponent_id, dmg)
+        if not opp:
+            continue
+
+        dist = math.hypot(opp.x - pool.x, opp.y - pool.y)
+        if dist > pool.radius:
+            continue
+
+        if pool.pool_source == 'rmb':
+            opp.speed_penalty = 0.8
+            if age > 0 and age % DOT_INTERVAL == 0:
+                dmg = random.randint(DOT_MIN, DOT_MAX)
+                if opp.giant_tick >= 0:
+                    dmg = int(dmg * 0.8)
+                state.apply_damage(opponent_id, dmg)
+                add_poison_stack(state, opponent_id, 'rmb')
+        elif pool.pool_source == 'space':
+            if age > 0 and age % SPACE_DOT_INTERVAL == 0:
+                add_poison_stack(state, opponent_id, 'space_pool')
 
     for ppid in to_remove:
         state.poison_pools.pop(ppid, None)

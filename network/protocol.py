@@ -25,7 +25,7 @@ PKT_GAME_OVER   = 0x09   # server → clients: 一方離開，遊戲結束
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBBffH")  # +B: flags2（bit0=use_rune）
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age vince_taunt_age
+_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age vince_taunt_age poison_stacks e_shockwave_seq
 _BULLET_ENTRY  = struct.Struct("!BBffhBB")    # id owner x y angle_i16 bullet_type bullet_scale_u8(×10)
 _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
 _SMOKE_ENTRY   = struct.Struct("!BffHI")     # id x y radius*10 spawn_tick
@@ -33,7 +33,7 @@ _BLADE_ENTRY      = struct.Struct("!BhhBbB")   # id x_i16 y_i16 age dir owner_id
 _AIRSTRIKE_ENTRY  = struct.Struct("!BhhBB")    # id cx_i16 cy_i16 age(u8) owner_id
 _LOG_BARRIER_ENTRY = struct.Struct("!BhhBB")  # id x_i16 y_i16 hp(u8) owner_id
 _MINE_ENTRY        = struct.Struct("!BhhHB")  # id x_i16 y_i16 triggered_age_u16(65535=idle) owner_id
-_POOL_ENTRY        = struct.Struct("!BhhHB")  # id x_i16 y_i16 age_u16 owner_id
+_POOL_ENTRY        = struct.Struct("!BhhHBB") # id x_i16 y_i16 age_u16 owner_id source_u8(0=rmb,1=space)
 _PUSH_ENTRY        = struct.Struct("!BhhHhB") # id x_i16 y_i16 age_u16 angle_i16 owner_id
 _ROBOT_MARK_ENTRY  = struct.Struct("!BhhH")  # owner_id x_i16 y_i16 age_u16
 _TURRET_ENTRY      = struct.Struct("!BhhHB")  # id x_i16 y_i16 hp_u16 owner_id
@@ -119,6 +119,8 @@ def pack_state(state: GameState) -> bytes:
             1 if p.vince_dash_tick >= 0 else 0,
             min(254, state.tick - p.zombie_jump_tick) if p.zombie_jump_tick >= 0 else 255,
             min(254, state.tick - p.vince_taunt_tick) if p.vince_taunt_tick >= 0 else 255,
+            min(255, max(0, p.poison_stacks)),
+            p.poisoner_e_shockwave_seq,
         )
         for p in players
     )
@@ -183,7 +185,8 @@ def pack_state(state: GameState) -> bytes:
     pool_list = list(state.poison_pools.values())
     pool_data = bytes([len(pool_list)]) + b"".join(
         _POOL_ENTRY.pack(p.id, int(p.x), int(p.y),
-                         min(65534, state.tick - p.spawn_tick), p.owner_id)
+                         min(65534, state.tick - p.spawn_tick), p.owner_id,
+                         1 if p.pool_source == 'space' else 0)
         for p in pool_list
     )
 
@@ -234,20 +237,25 @@ def unpack_state(data: bytes) -> GameState:
 
     p_count = data[offset]; offset += 1
     for _ in range(p_count):
-        pid, x, y, hp, max_hp, aim_i16, stance_u8, gold, flash, giant_age, stun_b, burst_b, clone_b, jump_age, cloak_rem, vince_dash, zombie_jump_age, vince_taunt_age = _PLAYER_ENTRY.unpack(
+        (pid, x, y, hp, max_hp, aim_i16, stance_u8, gold, flash,
+         giant_age, stun_b, burst_b, clone_b, jump_age, cloak_rem,
+         vince_dash, zombie_jump_age, vince_taunt_age,
+         poison_stacks_b, e_sw_seq_b) = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
         p = Player(id=pid, x=x, y=y, hp=hp, max_hp=max_hp,
                    aim_angle=float(aim_i16), stance=stance, flash_ticks=flash)
-        p.giant_tick  = tick - giant_age if giant_age != 65535 else -1
-        p.clone_until = tick + clone_b if clone_b > 0 else -1
-        p.stun_until       = tick + stun_b if stun_b > 0 else -1
-        p.burst_shots_fired = 6 - burst_b   # used client-side only to detect active burst
-        p.jump_tick   = tick - jump_age if jump_age != 255 else -1
-        p.cloak_until      = tick + cloak_rem if cloak_rem != 255 else -1
-        p.vince_dash_tick   = 0 if vince_dash else -1
-        p.zombie_jump_tick  = tick - zombie_jump_age if zombie_jump_age != 255 else -1
-        p.vince_taunt_tick  = tick - vince_taunt_age if vince_taunt_age != 255 else -1
+        p.giant_tick             = tick - giant_age if giant_age != 65535 else -1
+        p.clone_until            = tick + clone_b if clone_b > 0 else -1
+        p.stun_until             = tick + stun_b if stun_b > 0 else -1
+        p.burst_shots_fired      = 6 - burst_b   # used client-side only to detect active burst
+        p.jump_tick              = tick - jump_age if jump_age != 255 else -1
+        p.cloak_until            = tick + cloak_rem if cloak_rem != 255 else -1
+        p.vince_dash_tick        = 0 if vince_dash else -1
+        p.zombie_jump_tick       = tick - zombie_jump_age if zombie_jump_age != 255 else -1
+        p.vince_taunt_tick       = tick - vince_taunt_age if vince_taunt_age != 255 else -1
+        p.poison_stacks          = poison_stacks_b
+        p.poisoner_e_shockwave_seq = e_sw_seq_b
         state.players[pid] = p
         state.gold_counts[pid] = gold
         offset += _PLAYER_ENTRY.size
@@ -329,10 +337,13 @@ def unpack_state(data: bytes) -> GameState:
     if offset < len(data):
         pool_count = data[offset]; offset += 1
         for _ in range(pool_count):
-            ppid, px, py, page, powner = _POOL_ENTRY.unpack(
+            ppid, px, py, page, powner, src_b = _POOL_ENTRY.unpack(
                 data[offset: offset + _POOL_ENTRY.size])
-            pp = PoisonPool(id=ppid, owner_id=powner, x=float(px), y=float(py),
-                            spawn_tick=state.tick - page)
+            src = 'space' if src_b == 1 else 'rmb'
+            pp  = PoisonPool(id=ppid, owner_id=powner, x=float(px), y=float(py),
+                             spawn_tick=state.tick - page,
+                             radius=25.0 if src == 'space' else 150.0,
+                             pool_source=src)
             state.poison_pools[ppid] = pp
             offset += _POOL_ENTRY.size
 

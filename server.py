@@ -20,6 +20,7 @@ _SKILL_E: dict = {
     'Hunter':   lambda s, pid, ax, ay: s._activate_log_barriers(pid, ax, ay),
     'Marksman': lambda s, pid, ax, ay: s._place_turret(pid),
     'Pioneer':  lambda s, pid, ax, ay: s._activate_shield(pid),
+    'Poisoner': lambda s, pid, ax, ay: s._activate_poisoner_e(pid),
 }
 
 _SKILL_RMB: dict = {
@@ -39,6 +40,7 @@ _SKILL_SPACE: dict = {
     'Vince':    lambda s, pid, ax, ay: s._activate_vince_taunt(pid),
     'Marksman': lambda s, pid, ax, ay: s._activate_vince_dash(pid, ax, ay),
     'Zombie':   lambda s, pid, ax, ay: s._activate_zombie_jump(pid, ax, ay),
+    'Poisoner': lambda s, pid, ax, ay: s._activate_poisoner_space(pid),
 }
 
 _SKILL_R: dict = {
@@ -271,6 +273,9 @@ def run():
                 state.step_turrets(obstacles, obstacle_hp)
                 state.step_barrage()
                 state.step_poison_pools()
+                state.step_poisoner_space()
+                state.step_poisoner_e()
+                state.step_poison_stacks()
                 state.step_shields()
                 state.step_shockwaves()
                 state.step_pull()

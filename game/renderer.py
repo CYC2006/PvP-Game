@@ -21,6 +21,7 @@ from game.chars.zombie   import jump_fx as zombie_jump_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
 from game.chars.poisoner   import bubble_fx
 from game.chars.poisoner   import poison_pool_fx
+from game.chars.poisoner   import e_skill_fx as poisoner_e_fx
 from game.chars.marksman     import explosion_bullet_fx
 from game.chars.marksman     import mine_fx as marksman_mine_fx
 from game.chars.marksman     import turret_fx as marksman_turret_fx
@@ -550,6 +551,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     marksman_barrage_fx.draw_explosions(screen, cx, cy)
     poison_pool_fx.update(state)
     poison_pool_fx.draw(screen, state, cx, cy)
+    poisoner_e_fx.update(state)
+    poisoner_e_fx.draw(screen, cx, cy)
     robot_push_fx.draw(screen, state, my_id, cx, cy)
     robot_mark_fx.draw(screen, state, my_id, cx, cy)
     airstrike_fx.update(state)

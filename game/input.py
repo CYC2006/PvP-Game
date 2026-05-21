@@ -170,6 +170,14 @@ def _space_assassin_noop(st: InputState, dx: float, dy: float,
     return False, dx, dy, 1.0
 
 
+def _space_poisoner(st: InputState, dx: float, dy: float,
+                    aim_x: float, aim_y: float, now: int) -> tuple:
+    """Poisoner Space：移速 +20%（server 處理）+ 殘影（client 透過 speed_boost_end_ms）。"""
+    st.speed_boost_end_ms     = now + 3000
+    st.skill_last_ms['space'] = now
+    return True, dx, dy, 1.0
+
+
 def _default_space_dash(st: InputState, dx: float, dy: float,
                         aim_x: float, aim_y: float, now: int) -> tuple:
     """預設：純 client 端衝刺，不通知 server（use_skill_space=False）。"""
@@ -198,7 +206,7 @@ _SPACE_HANDLERS: dict = {
     'Zombie':   _space_pioneer_zombie,
     'Robot':    _space_robot,
     'Assassin': _space_assassin_noop,
-    # 不在 dict 中的角色（Agent、Poisoner 等）→ 走 _default_space_dash
+    'Poisoner': _space_poisoner,
 }
 
 
