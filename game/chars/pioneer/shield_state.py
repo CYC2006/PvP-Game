@@ -29,6 +29,7 @@ def _start_shockwave(state, owner_id: int, *,
                      pull_speed: float = 0.0,
                      damage: int = 0,
                      poison_src: str = '',
+                     heal_per_stack: int = 0,
                      cx: float = None, cy: float = None) -> None:
     """記錄衝擊波起始資訊，由 step_shockwaves 每 tick 追蹤圓環位置。
     cx/cy 可選覆寫起始座標（預設取 owner 當前位置）。
@@ -55,6 +56,7 @@ def _start_shockwave(state, owner_id: int, *,
         'pull_speed':     pull_speed,
         'damage':         damage,
         'poison_src':     poison_src,
+        'heal_per_stack': heal_per_stack,
     })
 
 
@@ -119,6 +121,11 @@ def step_shockwaves(state) -> None:
         if psrc:
             from game.chars.poisoner.poison_stack_state import add_poison_stack
             add_poison_stack(state, opponent_id, psrc)
+        heal_ps = sw.get('heal_per_stack', 0)
+        if heal_ps > 0 and opp.poison_stacks > 0:
+            owner_p = state.players.get(owner_id)
+            if owner_p:
+                owner_p.hp = min(owner_p.max_hp, owner_p.hp + heal_ps * opp.poison_stacks)
         sw['hit_done'] = True
 
     state._pending_shockwaves = still_active

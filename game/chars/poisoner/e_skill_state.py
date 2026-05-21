@@ -1,12 +1,11 @@
 """Poisoner E — 毒素共鳴（server-only）
 
 - 持續 3 秒（180 tick）
-- 每 30 tick 檢查一次：若站在自己的毒液池上 → 釋放綠色衝擊波
+- 每 30 tick 釋放一次綠色衝擊波（不再需要站在毒液池上）
 - 衝擊波：半徑 60→400，歷時 0.6 秒（36 tick），命中對手 3 點傷害 + 毒素層數 +1
-- 每次釋放：自己回復 3 × 對手當前毒素層數 HP
+- 衝擊波命中對手時：自己回復 3 × 對手當前毒素層數 HP
 - 最多 6 次，冷卻 10 秒（由 chars.csv cd_e=10）
 """
-import math
 from game.chars.pioneer.shield_state import _start_shockwave
 from game.chars.poisoner.poison_stack_state import add_poison_stack
 
@@ -47,23 +46,7 @@ def step_poisoner_e(state) -> None:
         player.poisoner_e_last_check_tick = state.tick
         player.poisoner_e_check_count    += 1
 
-        # 檢查是否站在自己的毒液池上（RMB 大池 / Space 小池 皆算）
-        on_pool = any(
-            pool.owner_id == pid
-            and math.hypot(player.x - pool.x, player.y - pool.y) <= pool.radius
-            for pool in state.poison_pools.values()
-        )
-        if not on_pool:
-            continue
-
-        # 回血（依對手當前毒素層數）
-        opponent_id = 3 - pid
-        opp = state.players.get(opponent_id)
-        if opp and opp.poison_stacks > 0:
-            heal = HEAL_PER_STACK * opp.poison_stacks
-            player.hp = min(player.max_hp, player.hp + heal)
-
-        # 釋放衝擊波（無暈眩、無擊退，有傷害、有毒素層數）
+        # 釋放衝擊波（無暈眩、無擊退；命中時造成傷害、疊毒、回血）
         _start_shockwave(
             state, pid,
             start_r=SW_START_R,
@@ -73,6 +56,7 @@ def step_poisoner_e(state) -> None:
             kb_force=0.0,
             damage=SW_DAMAGE,
             poison_src='e',
+            heal_per_stack=HEAL_PER_STACK,
             cx=player.x,
             cy=player.y,
         )

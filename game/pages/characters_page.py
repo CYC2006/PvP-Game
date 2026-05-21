@@ -153,10 +153,9 @@ _SKILLS: dict = {
          "Drops 9 small poison pools (r 20-30) at your feet every 20 ticks as you run. "
          "Standing in a mini-pool adds 1 poison stack per 30 ticks (cap 2 from this source)."),
         ("TOXIC RESONANCE", "E", 10,
-         "For 3 s, every 30 ticks the game checks if you are standing on one of your own pools. "
-         "If so, a green shockwave (r 60→60→400, 0.6 s) erupts: deals 3 dmg to the enemy "
-         "and heals you for 3 \xd7 (enemy poison stacks). Up to 6 shockwaves per activation. "
-         "The shockwave also applies up to 2 poison stacks to the enemy."),
+         "For 3 s, every 30 ticks a green shockwave (r 60→60→400, 0.6 s) erupts from your position. "
+         "No pool required. When the ring hits the enemy: deals 3 dmg, adds 1 poison stack, "
+         "and heals you for 3 \xd7 (enemy's current poison stacks). Up to 6 shockwaves per activation."),
         ("—", "R",     0, "Skill under development."),
     ],
     'Zombie': [
