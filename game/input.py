@@ -93,7 +93,7 @@ def set_cloak_ticks(n: int) -> None:
     _state.cloak_ticks_left = n
 
 
-def get_mercury_aim_angle() -> float | None:
+def get_mercury_aim_angle():
     """Return locked aim_angle_deg while Agent's Mercury Barrage is active, else None."""
     now = pygame.time.get_ticks()
     if _state.char_name == 'Agent' and now < _state.mercury_end_ms:
