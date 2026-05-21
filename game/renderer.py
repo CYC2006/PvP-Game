@@ -915,7 +915,7 @@ def _draw_players(screen, state, my_id, cx, cy, font,
             head_y = sy - rotated.get_height() // 2 - 10
             _draw_opponent_hp_bar(screen, player.hp, player.max_hp, sx, head_y)
             if player.poison_stacks > 0:
-                _draw_poison_stack_label(screen, font_hud or font,
+                _draw_poison_stack_label(screen, font,
                                          player.poison_stacks, sx, head_y)
 
         # 暈眩指示：三顆黃色小球繞頭頂旋轉
@@ -1152,8 +1152,8 @@ def _draw_hp_bar(screen, state, my_id, font):
     # Green bar when the local player is poisoned; red otherwise
     poisoned = player is not None and player.poison_stacks > 0
     if poisoned:
-        bg_col   = (20, 55, 20)
-        fill_col = (60, 210, 70) if ratio > 0.3 else (200, 200, 40)
+        bg_col   = (10, 30, 10)
+        fill_col = (30, 140, 45) if ratio > 0.3 else (130, 160, 20)
     else:
         bg_col   = COL_HP_BG
         fill_col = COL_HP_FILL if ratio > 0.3 else (255, 140, 30)
