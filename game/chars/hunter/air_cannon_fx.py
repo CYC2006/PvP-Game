@@ -6,7 +6,7 @@
 import pygame
 from game.render_utils import ws, SCREEN_W, SCREEN_H
 
-_CANNON_RADIUS = 35    # 視覺半徑 px（與碰撞半徑對應）
+_CANNON_RADIUS = 25    # 視覺半徑 px（與碰撞半徑對應）
 _FILL_ALPHA    = 120   # 填色透明度（0–255）
 _RING_ALPHA    = 200   # 外環透明度
 _RING_WIDTH    = 3     # 外環線寬 px

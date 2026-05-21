@@ -1226,8 +1226,7 @@ class GameState:
     # ── Hunter RMB：空氣炮 ───────────────────────────────────────────────────
 
     _AIR_CANNON_SPEED = 800.0 / 60.0   # px/tick
-    _AIR_CANNON_RADIUS = 35.0          # 碰撞半徑 px
-    _AIR_CANNON_DMG    = 15
+    _AIR_CANNON_RADIUS = 25.0          # 碰撞半徑 px
 
     def _spawn_air_cannon(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         player = self.players.get(owner_id)
@@ -1261,8 +1260,6 @@ class GameState:
             if opp:
                 hit_r = PLAYER_RADIUS + self._AIR_CANNON_RADIUS
                 if math.hypot(opp.x - cannon.x, opp.y - cannon.y) < hit_r:
-                    dmg = int(self._AIR_CANNON_DMG * 0.8) if opp.giant_tick >= 0 else self._AIR_CANNON_DMG
-                    self.apply_damage(opponent_id, dmg)
                     self.apply_knockback(opponent_id, cannon.dx, cannon.dy)
                     owner = self.players.get(cannon.owner_id)
                     if owner:
