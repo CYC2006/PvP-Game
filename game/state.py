@@ -558,199 +558,197 @@ class GameState:
             elif r < 0.20:
                 self._spawn_item(obs.x, obs.y, "health")
 
+    # ── step_bullets 輔助方法 ────────────────────────────────────────────────
+
+    def _calc_coll_radius(self, bullet: "Bullet") -> float:
+        """計算本 tick 的碰撞半徑（依子彈類型與成長狀態動態變化）。"""
+        from game.chars.assassin.shuriken_state import SHURIKEN_GROW_RATE
+        if bullet.bullet_type == 3:   # 手裡劍：半徑隨時間線性成長
+            age = self.tick - bullet.spawn_tick
+            return BULLET_RADIUS + age * SHURIKEN_GROW_RATE
+        if bullet.dot_interval > 0 and bullet.bubble_radius_max > 0:   # 毒氣泡
+            _BUBBLE_LIFE_TICKS = 120   # 2.0 s × 60 fps
+            age    = self.tick - bullet.spawn_tick
+            t_grow = min(1.0, age / _BUBBLE_LIFE_TICKS)
+            return (BULLET_RADIUS * 2
+                    + (bullet.bubble_radius_max - BULLET_RADIUS * 2) * t_grow)
+        return float(BULLET_RADIUS) * bullet.bullet_scale   # 一般子彈
+
+    def _bullet_vs_players(self, bullet: "Bullet", bid: int, coll_r: float,
+                            does_damage: bool, shooter,
+                            expired: list) -> bool:
+        """子彈 vs 玩家碰撞。回傳 True 表示命中（子彈應停止繼續檢查障礙物）。"""
+        from game.chars.assassin.shuriken_state import SHURIKEN_BASE_DMG, SHURIKEN_DMG_SCALE
+
+        def _invincible(p: "Player") -> bool:
+            return p.jump_tick >= 0 or p.zombie_jump_tick >= 0 or p.r_skill_phase > 0
+
+        if bullet.dot_interval > 0:
+            # DoT 子彈（毒氣泡）：穿透玩家，以動態半徑每 dot_interval tick 傷害一次
+            for pid, player in self.players.items():
+                if pid == bullet.owner_id or _invincible(player):
+                    continue
+                if math.hypot(bullet.x - player.x, bullet.y - player.y) < PLAYER_RADIUS + coll_r:
+                    key = (bid, pid)
+                    if self.tick >= self._dot_cooldown.get(key, 0):
+                        damage = self._roll_damage(shooter)
+                        if bullet.bullet_scale != 1.0:
+                            damage = int(damage * bullet.bullet_scale)
+                        if player.giant_tick >= 0:
+                            damage = int(damage * 0.8)
+                        self.apply_damage(pid, damage)
+                        if shooter and shooter.char_name == 'Poisoner':
+                            from game.chars.poisoner.poison_stack_state import add_poison_stack
+                            add_poison_stack(self, pid, 'normal')
+                        self._dot_cooldown[key] = self.tick + bullet.dot_interval
+                        self._dot_keys_by_bid.setdefault(bid, set()).add(key)
+            return False   # DoT 子彈不因碰到玩家而停止
+
+        if does_damage:
+            # 一般子彈：碰到玩家即消失
+            for pid, player in self.players.items():
+                if pid == bullet.owner_id or _invincible(player):
+                    continue
+                if math.hypot(bullet.x - player.x, bullet.y - player.y) < PLAYER_RADIUS + coll_r:
+                    if bullet.bullet_type == 3:   # 手裡劍：傷害隨半徑線性成長
+                        damage = int(SHURIKEN_BASE_DMG
+                                     + SHURIKEN_DMG_SCALE * (coll_r - BULLET_RADIUS))
+                    else:
+                        damage = self._roll_damage(shooter)
+                    if bullet.bullet_scale != 1.0:
+                        damage = int(damage * bullet.bullet_scale)
+                    if player.giant_tick >= 0:
+                        damage = int(damage * 0.8)
+                    self.apply_damage(pid, damage)
+                    if bullet.bullet_scale > 1.0:   # Agent RMB 放大子彈：施加擊退
+                        spd = math.hypot(bullet.dx, bullet.dy)
+                        if spd > 0:
+                            player.kb_vx = (bullet.dx / spd) * 10.0
+                            player.kb_vy = (bullet.dy / spd) * 10.0
+                    expired.append(bid)
+                    return True
+
+        # 暈眩彈(6)/爆炸彈(7)/毒液彈(8)：碰觸玩家即觸發（傷害由爆炸效果處理）
+        if bullet.bullet_type in (6, 7, 8):
+            for pid, player in self.players.items():
+                if pid == bullet.owner_id or _invincible(player):
+                    continue
+                if math.hypot(bullet.x - player.x, bullet.y - player.y) < PLAYER_RADIUS + coll_r:
+                    expired.append(bid)
+                    return True
+
+        return False
+
+    def _bullet_vs_obstacles(self, bullet: "Bullet", bid: int, coll_r: float,
+                              does_damage: bool, shooter,
+                              obstacles: dict, obstacle_hp,
+                              expired: list) -> None:
+        """子彈 vs 地圖障礙物碰撞（可破壞障礙物）。"""
+        for oid, obs in obstacles.items():
+            if oid in self.destroyed_obstacles or not obs.solid:
+                continue
+            if obs.collides_circle(bullet.x, bullet.y, coll_r):
+                if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
+                    continue   # 投擲物 / 手裡劍 / 迷你手雷 / 毒氣泡穿透
+                if obstacle_hp is not None and obs.destructible and does_damage \
+                        and bullet.bullet_type != 8:   # 毒液彈不破壞障礙物
+                    obstacle_hp[oid] -= self._roll_damage(shooter)
+                    if obstacle_hp[oid] <= 0:
+                        self.destroyed_obstacles.add(oid)
+                        self._handle_obstacle_drop(obs)
+                expired.append(bid)
+                break
+
+    def _bullet_vs_barriers(self, bullet: "Bullet", bid: int, coll_r: float,
+                             does_damage: bool, shooter,
+                             expired: list) -> None:
+        """子彈 vs 木頭屏障碰撞（Hunter E 技能）。"""
+        for lid in list(self.log_barriers):
+            lb = self.log_barriers.get(lid)
+            if lb is None:
+                continue
+            if math.hypot(bullet.x - lb.x, bullet.y - lb.y) < lb.radius + coll_r:
+                if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
+                    continue   # 投擲物 / 手裡劍 / 迷你手雷 / 毒氣泡穿透
+                if does_damage and shooter:
+                    lb.hp -= self._roll_damage(shooter)
+                    if lb.hp <= 0:
+                        self.log_barriers.pop(lid, None)
+                expired.append(bid)
+                break
+
+    def _bullet_vs_turrets(self, bullet: "Bullet", bid: int, coll_r: float,
+                            does_damage: bool, shooter,
+                            expired: list) -> None:
+        """子彈 vs 機槍台碰撞（敵方子彈才傷害）。"""
+        from game.chars.marksman.turret_state import TURRET_HITBOX_R
+        for tid in list(self.turrets):
+            turret = self.turrets.get(tid)
+            if turret is None or bullet.owner_id == turret.owner_id:
+                continue
+            if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
+                continue   # 投擲物 / 手裡劍 / 迷你手雷 / 毒氣泡穿透
+            if math.hypot(bullet.x - turret.x, bullet.y - turret.y) < TURRET_HITBOX_R + coll_r:
+                if does_damage and shooter:
+                    turret.hp -= self._roll_damage(shooter)
+                    if turret.hp <= 0:
+                        self.turrets.pop(tid, None)
+                expired.append(bid)
+                break
+
+    def _trigger_bullet_expiry(self, b: "Bullet") -> None:
+        """子彈消失時的副作用（爆炸、毒液池等）。"""
+        # 停在地上 linger 結束後才引爆的投擲物
+        if b.decel > 0 and b.dx == 0.0 and b.dy == 0.0:
+            if b.bullet_type == 1:
+                self._trigger_flash_explosion(b.x, b.y, b.owner_id)
+            elif b.bullet_type == 2:
+                self._trigger_grenade_explosion(b.x, b.y, b.owner_id)
+            elif b.bullet_type == 4:
+                self._trigger_smoke_explosion(b.x, b.y)
+            elif b.bullet_type == 5:
+                self._trigger_mini_grenade_explosion(b.x, b.y, b.owner_id)
+        # 以下無論何種原因消失都觸發
+        if b.bullet_type == 6:   # 暈眩彈
+            from game.chars.pioneer.stun_bullet_state import trigger_stun_explosion
+            trigger_stun_explosion(self, b.x, b.y, b.owner_id)
+        if b.bullet_type == 7:   # 爆炸彈
+            self._trigger_explosion_bullet(b.x, b.y, b.owner_id)
+        if b.bullet_type == 8 and b.distance_travelled < b.max_range:   # 毒液彈命中物體才生成毒液池
+            self._create_poison_pool(b.x, b.y, b.owner_id)
+
+    # ── 主要更新方法 ─────────────────────────────────────────────────────────
+
     def step_bullets(self, obstacles: dict = None,
                      obstacle_hp: dict = None) -> None:
-        from game.chars.assassin.shuriken_state import (
-            SHURIKEN_GROW_RATE as _SHURIKEN_GROW_RATE,
-            SHURIKEN_BASE_DMG  as _SHURIKEN_BASE_DMG,
-            SHURIKEN_DMG_SCALE as _SHURIKEN_DMG_SCALE,
-        )
         if obstacles is None:
             obstacles = {}
 
-        expired = []
+        expired: list = []
         for bid, bullet in self.bullets.items():
             bullet.step()
             if bullet.is_expired():
                 expired.append(bid)
                 continue
 
-            hit = False
-            shooter = self.players.get(bullet.owner_id)
-            does_damage = not (shooter and shooter.damage_min == 0 and shooter.damage_max == 0)
+            shooter     = self.players.get(bullet.owner_id)
+            does_damage = not (shooter and shooter.damage_min == 0
+                               and shooter.damage_max == 0)
             if bullet.bullet_type in (1, 2, 5, 6, 7, 8):
-                does_damage = False   # 閃光彈/手榴彈/迷你手雷/暈眩彈/爆炸彈/毒液彈不造成接觸傷害
+                does_damage = False   # 投擲物 / 特殊彈不造成接觸傷害
+            coll_r = self._calc_coll_radius(bullet)
 
-            # 手裡劍：碰撞半徑隨時間線性成長
-            if bullet.bullet_type == 3:
-                age    = self.tick - bullet.spawn_tick
-                coll_r = BULLET_RADIUS + age * _SHURIKEN_GROW_RATE
-            # DoT 子彈的動態碰撞半徑（隨泡泡成長）
-            elif bullet.dot_interval > 0 and bullet.bubble_radius_max > 0:
-                _BUBBLE_LIFE_TICKS = 120  # 2.0s × 60 fps
-                age    = self.tick - bullet.spawn_tick
-                t_grow = min(1.0, age / _BUBBLE_LIFE_TICKS)
-                coll_r = (BULLET_RADIUS * 2
-                          + (bullet.bubble_radius_max - BULLET_RADIUS * 2) * t_grow)
-            else:
-                coll_r = float(BULLET_RADIUS) * bullet.bullet_scale
-
-            # ── 子彈 vs 玩家 ────────────────────────────────────────────
-            if bullet.dot_interval > 0:
-                # DoT 子彈（毒氣泡）：穿透玩家，以動態半徑每 dot_interval tick 傷害一次
-                for pid, player in self.players.items():
-                    if pid == bullet.owner_id:
-                        continue
-                    if player.jump_tick >= 0 or player.zombie_jump_tick >= 0:
-                        continue  # 跳躍中：無敵，跳過傷害判定
-                    if player.r_skill_phase > 0:
-                        continue  # Assassin R 衝刺中：無敵，跳過傷害判定
-                    if math.hypot(bullet.x - player.x,
-                                  bullet.y - player.y) < PLAYER_RADIUS + coll_r:
-                        key = (bid, pid)
-                        if self.tick >= self._dot_cooldown.get(key, 0):
-                            damage = self._roll_damage(shooter)
-                            if bullet.bullet_scale != 1.0:
-                                damage = int(damage * bullet.bullet_scale)
-                            if player.giant_tick >= 0:
-                                damage = int(damage * 0.8)
-                            self.apply_damage(pid, damage)
-                            if shooter and shooter.char_name == 'Poisoner':
-                                from game.chars.poisoner.poison_stack_state import add_poison_stack
-                                add_poison_stack(self, pid, 'normal')
-                            self._dot_cooldown[key] = self.tick + bullet.dot_interval
-                            self._dot_keys_by_bid.setdefault(bid, set()).add(key)
-            elif does_damage:
-                # 一般子彈：碰到玩家即消失
-                for pid, player in self.players.items():
-                    if pid == bullet.owner_id:
-                        continue
-                    if player.jump_tick >= 0 or player.zombie_jump_tick >= 0:
-                        continue  # 跳躍中：無敵，跳過傷害判定
-                    if player.r_skill_phase > 0:
-                        continue  # Assassin R 衝刺中：無敵，跳過傷害判定
-                    if math.hypot(bullet.x - player.x,
-                                  bullet.y - player.y) < PLAYER_RADIUS + coll_r:
-                        if bullet.bullet_type == 3:
-                            # 手裡劍：傷害隨碰撞半徑線性成長
-                            damage = int(_SHURIKEN_BASE_DMG
-                                         + _SHURIKEN_DMG_SCALE
-                                         * (coll_r - BULLET_RADIUS))
-                        else:
-                            damage = self._roll_damage(shooter)
-                        if bullet.bullet_scale != 1.0:
-                            damage = int(damage * bullet.bullet_scale)
-                        if player.giant_tick >= 0:
-                            damage = int(damage * 0.8)
-                        self.apply_damage(pid, damage)
-                        # Agent RMB 放大子彈（bullet_scale > 1）：施加擊退
-                        if bullet.bullet_scale > 1.0:
-                            spd = math.hypot(bullet.dx, bullet.dy)
-                            if spd > 0:
-                                player.kb_vx = (bullet.dx / spd) * 10.0
-                                player.kb_vy = (bullet.dy / spd) * 10.0
-                        expired.append(bid)
-                        hit = True
-                        break
-
-            # ── 暈眩彈(6)/爆炸彈(7)/毒液彈(8) vs 玩家：碰觸即加入 expired ──
-            if not hit and bullet.bullet_type in (6, 7, 8):
-                for pid, player in self.players.items():
-                    if pid == bullet.owner_id:
-                        continue
-                    if player.jump_tick >= 0 or player.zombie_jump_tick >= 0:
-                        continue  # 跳躍中：無敵
-                    if player.r_skill_phase > 0:
-                        continue  # Assassin R 衝刺中：無敵
-                    if math.hypot(bullet.x - player.x,
-                                  bullet.y - player.y) < PLAYER_RADIUS + coll_r:
-                        expired.append(bid)
-                        hit = True
-                        break
-
-            if hit:
-                continue
-
-            # ── 子彈 vs 障礙物 ──────────────────────────────────────────
-            for oid, obs in obstacles.items():
-                if oid in self.destroyed_obstacles:
-                    continue
-                if not obs.solid:          # 非實體（樹/草叢）→ 子彈穿透
-                    continue
-                if obs.collides_circle(bullet.x, bullet.y, coll_r):
-                    if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
-                        continue   # 投擲物 / 手裡劍 / 迷你手雷 / 毒氣泡無視障礙物
-                    else:
-                        # 一般子彈：碰到障礙物即消失，可能破壞
-                        # 毒液彈（type 8）不對障礙物造成傷害
-                        if obstacle_hp is not None and obs.destructible and does_damage \
-                                and bullet.bullet_type != 8:
-                            obstacle_hp[oid] -= self._roll_damage(shooter)
-                            if obstacle_hp[oid] <= 0:
-                                self.destroyed_obstacles.add(oid)
-                                self._handle_obstacle_drop(obs)
-                        expired.append(bid)
-                        break
-
-            # ── 子彈 vs 木頭障礙物 ──────────────────────────────────────
+            hit = self._bullet_vs_players(bullet, bid, coll_r, does_damage, shooter, expired)
             if not hit:
-                for lid in list(self.log_barriers):
-                    lb = self.log_barriers.get(lid)
-                    if lb is None:
-                        continue
-                    if math.hypot(bullet.x - lb.x, bullet.y - lb.y) < lb.radius + coll_r:
-                        if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
-                            continue   # 投擲物/手裡劍/迷你手雷/毒氣泡穿透
-                        if does_damage and shooter:
-                            lb.hp -= self._roll_damage(shooter)
-                            if lb.hp <= 0:
-                                self.log_barriers.pop(lid, None)
-                        expired.append(bid)
-                        break
-
-            # ── 子彈 vs 機槍台（敵方普攻命中扣血）────────────────────────
-            if not hit:
-                from game.chars.marksman.turret_state import TURRET_HITBOX_R
-                for tid in list(self.turrets):
-                    turret = self.turrets.get(tid)
-                    if turret is None:
-                        continue
-                    # 只有敵方子彈才傷害機槍台
-                    if bullet.owner_id == turret.owner_id:
-                        continue
-                    if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
-                        continue   # 投擲物/手裡劍/迷你手雷/毒氣泡穿透
-                    if math.hypot(bullet.x - turret.x, bullet.y - turret.y) < TURRET_HITBOX_R + coll_r:
-                        if does_damage and shooter:
-                            turret.hp -= self._roll_damage(shooter)
-                            if turret.hp <= 0:
-                                self.turrets.pop(tid, None)
-                        expired.append(bid)
-                        hit = True
-                        break
+                self._bullet_vs_obstacles(bullet, bid, coll_r, does_damage, shooter,
+                                          obstacles, obstacle_hp, expired)
+                self._bullet_vs_barriers(bullet, bid, coll_r, does_damage, shooter, expired)
+                self._bullet_vs_turrets(bullet, bid, coll_r, does_damage, shooter, expired)
 
         for bid in expired:
             b = self.bullets.get(bid)
-            # 投擲物 linger 結束時爆炸
-            if b and b.decel > 0 and b.dx == 0.0 and b.dy == 0.0:
-                if b.bullet_type == 1:
-                    self._trigger_flash_explosion(b.x, b.y, b.owner_id)
-                elif b.bullet_type == 2:
-                    self._trigger_grenade_explosion(b.x, b.y, b.owner_id)
-                elif b.bullet_type == 4:
-                    self._trigger_smoke_explosion(b.x, b.y)
-                elif b.bullet_type == 5:
-                    self._trigger_mini_grenade_explosion(b.x, b.y, b.owner_id)
-            # 暈眩彈：任何原因消失都爆炸（包含射程耗盡、碰到玩家/障礙物）
-            if b and b.bullet_type == 6:
-                from game.chars.pioneer.stun_bullet_state import trigger_stun_explosion
-                trigger_stun_explosion(self, b.x, b.y, b.owner_id)
-            # 爆炸彈：任何原因消失都爆炸
-            if b and b.bullet_type == 7:
-                self._trigger_explosion_bullet(b.x, b.y, b.owner_id)
-            # 毒液彈：命中物體（射程未耗盡）才生成毒液池
-            if b and b.bullet_type == 8 and b.distance_travelled < b.max_range:
-                self._create_poison_pool(b.x, b.y, b.owner_id)
+            if b:
+                self._trigger_bullet_expiry(b)
             self.bullets.pop(bid, None)
             for k in self._dot_keys_by_bid.pop(bid, ()):
                 self._dot_cooldown.pop(k, None)
