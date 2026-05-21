@@ -1263,13 +1263,20 @@ def _draw_low_hp_vignette(screen: pygame.Surface,
 _poison_overlay_cache: dict = {}
 
 
+_poison_stack_font: list = []   # lazy-loaded Bold 15 font
+
+
 def _draw_poison_stack_label(screen: pygame.Surface,
                               font: pygame.font.Font,
                               stacks: int, sx: int, bar_y: int) -> None:
     """在對手頭頂血條上方繪製毒素層數數字（無邊框、無前綴符號）。"""
+    if not _poison_stack_font:
+        import os
+        _poison_stack_font.append(
+            pygame.font.Font(
+                os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf"), 15))
     text = str(stacks)
-    # 亮黃綠色，與地面草地綠區隔
-    surf = font.render(text, True, (30, 140, 45))
+    surf = _poison_stack_font[0].render(text, True, (30, 140, 45))
     tx   = sx - surf.get_width() // 2
     ty   = bar_y - surf.get_height() - 4
     screen.blit(surf, (tx, ty))
