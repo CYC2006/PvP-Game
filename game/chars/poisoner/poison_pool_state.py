@@ -67,9 +67,9 @@ def create_small_poison_pool(state, x: float, y: float,
 def step_poison_pools(state) -> None:
     from game.chars.poisoner.poison_stack_state import add_poison_stack
 
-    # 每 tick 重置速度懲罰，RMB 池在下方重新設定
+    # 每 tick 依毒素層數設定速度懲罰：1 - 0.1 × stacks（最低 0.5，即 5 層）
     for player in state.players.values():
-        player.speed_penalty = 1.0
+        player.speed_penalty = max(0.5, 1.0 - 0.1 * player.poison_stacks)
 
     to_remove = []
     for ppid, pool in state.poison_pools.items():
@@ -88,7 +88,6 @@ def step_poison_pools(state) -> None:
             continue
 
         if pool.pool_source == 'rmb':
-            opp.speed_penalty = 0.8
             if age > 0 and age % DOT_INTERVAL == 0:
                 dmg = random.randint(DOT_MIN, DOT_MAX)
                 if opp.giant_tick >= 0:
