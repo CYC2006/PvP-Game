@@ -1043,6 +1043,8 @@ class GameState:
             return
         if p.rune_cd_until > self.tick:
             return   # 冷卻中
+        if p.hp >= p.max_hp:
+            return   # 滿血時不啟動、不進入冷卻
         p.rune_cd_until = self.tick + self._RUNE_CD_TICKS
 
         if p.rune_id == 0:   # 一般恢復：每秒 5% 持續 6 秒，首 tick 立即恢復
