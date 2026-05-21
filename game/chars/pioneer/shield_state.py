@@ -15,7 +15,6 @@ SHIELD_LINGER           = 8      # 破壞後繼續留在 state 的 tick 數（�
 
 SHOCKWAVE_RADIUS        = 350    # 衝擊波最大半徑（與 shield_fx 同步）
 SHOCKWAVE_DURATION_TICKS = 30   # 0.5 s × 60 fps
-SHOCKWAVE_KB_FORCE      = 10.0   # px/tick（robot 為 18）
 SHOCKWAVE_STUN_TICKS    = 30     # 0.5 s（robot 為 60 = 1 s）
 
 
@@ -24,7 +23,7 @@ def _start_shockwave(state, owner_id: int, *,
                      end_r: float = SHOCKWAVE_RADIUS,
                      duration_ticks: int = SHOCKWAVE_DURATION_TICKS,
                      stun_ticks: int = SHOCKWAVE_STUN_TICKS,
-                     kb_force: float = SHOCKWAVE_KB_FORCE,
+                     kb_force: float = 1.0,
                      pull_source_id: int = -1,
                      pull_speed: float = 0.0,
                      damage: int = 0,
@@ -79,7 +78,7 @@ def step_shockwaves(state) -> None:
         s_r        = sw.get('start_r',    SHIELD_RADIUS)
         e_r        = sw.get('end_r',      SHOCKWAVE_RADIUS)
         stun_ticks = sw.get('stun_ticks', SHOCKWAVE_STUN_TICKS)
-        kb_force   = sw.get('kb_force',   SHOCKWAVE_KB_FORCE)
+        kb_force   = sw.get('kb_force',   1.0)
 
         # 當前圓環半徑（線性擴張）
         frac   = t / dur
@@ -106,13 +105,10 @@ def step_shockwaves(state) -> None:
             opp.pull_speed     = pull_spd
         else:
             if kb_force > 0:
-                if dist > 0:
-                    ux = (opp.x - sw['cx']) / dist
-                    uy = (opp.y - sw['cy']) / dist
-                else:
-                    ux, uy = 1.0, 0.0
-                opp.kb_vx = ux * kb_force
-                opp.kb_vy = uy * kb_force
+                dx = opp.x - sw['cx']
+                dy = opp.y - sw['cy']
+                state.apply_knockback(opponent_id, dx if dist > 0 else 1.0,
+                                                   dy if dist > 0 else 0.0)
 
         if stun_ticks > 0:
             state.apply_stun(opponent_id, stun_ticks)

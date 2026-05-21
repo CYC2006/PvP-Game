@@ -5,6 +5,10 @@ import random
 MAP_WIDTH  = 1920
 MAP_HEIGHT = 1080
 
+KB_FORCE   = 10.0   # standard knockback initial speed (px/tick); ~45 px total displacement
+KB_DECAY   = 0.78   # per-tick multiplier (shared with step_knockback)
+KB_STOP    = 0.3    # stop threshold
+
 PLAYER_SPEED     = 3.0
 PLAYER_RADIUS    = 16
 BULLET_SPEED     = 8.0
@@ -104,6 +108,8 @@ class Player:
     mercury_aim_x: float      = 0.0  # locked aim direction (unit vector)
     mercury_aim_y: float      = 0.0
     mercury_volley_fired: int = 0    # volleys fired so far (0–7)
+    # ── Hunter RMB 空氣炮命中序號 ─────────────────────────────────────────────
+    air_cannon_hit_seq: int   = 0    # increments each time owner's air cannon hits; client resets RMB CD
 
     def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -247,6 +253,19 @@ class LogBarrier:
 
 
 @dataclass
+class AirCannon:
+    id:           int
+    owner_id:     int
+    x:            float
+    y:            float
+    dx:           float        # velocity x (px/tick)
+    dy:           float        # velocity y (px/tick)
+    spawn_tick:   int
+    dist_traveled: float = 0.0
+    max_range:    float  = 400.0
+
+
+@dataclass
 class Bullet:
     id: int
     owner_id: int
@@ -329,6 +348,8 @@ class GameState:
     push_zones: dict         = field(default_factory=dict)   # pzid → PushZone
     _next_push_zone_id: int  = 0
     robot_marks: dict        = field(default_factory=dict)   # owner_id → RobotMark（每個 Robot 最多一筆）
+    air_cannons: dict        = field(default_factory=dict)   # cid → AirCannon
+    _next_air_cannon_id: int = 0
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -629,10 +650,7 @@ class GameState:
                         damage = int(damage * 0.8)
                     self.apply_damage(pid, damage)
                     if bullet.bullet_scale > 1.0:   # Agent RMB 放大子彈：施加擊退
-                        spd = math.hypot(bullet.dx, bullet.dy)
-                        if spd > 0:
-                            player.kb_vx = (bullet.dx / spd) * 10.0
-                            player.kb_vy = (bullet.dy / spd) * 10.0
+                        self.apply_knockback(pid, bullet.dx, bullet.dy)
                     expired.append(bid)
                     return True
 
@@ -989,6 +1007,17 @@ class GameState:
         if player.hp <= 0:
             player.respawn()
 
+    def apply_knockback(self, player_id: int, dir_x: float, dir_y: float) -> None:
+        """施加標準擊退。dir_x/dir_y 為擊退方向（自動正規化），力道使用全域 KB_FORCE。"""
+        player = self.players.get(player_id)
+        if player is None:
+            return
+        dist = math.hypot(dir_x, dir_y)
+        if dist == 0:
+            return
+        player.kb_vx = (dir_x / dist) * KB_FORCE
+        player.kb_vy = (dir_y / dist) * KB_FORCE
+
     def step_knockback(self) -> None:
         """每 tick 執行：套用並衰減所有玩家的擊退速度（kb_vx / kb_vy）。
         暈眩期間玩家無法自主移動，但擊退位移照常執行。
@@ -1001,11 +1030,11 @@ class GameState:
                                               player.x + player.kb_vx))
             player.y = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS,
                                               player.y + player.kb_vy))
-            player.kb_vx *= 0.78
-            player.kb_vy *= 0.78
-            if abs(player.kb_vx) < 0.3:
+            player.kb_vx *= KB_DECAY
+            player.kb_vy *= KB_DECAY
+            if abs(player.kb_vx) < KB_STOP:
                 player.kb_vx = 0.0
-            if abs(player.kb_vy) < 0.3:
+            if abs(player.kb_vy) < KB_STOP:
                 player.kb_vy = 0.0
 
     def _activate_clones(self, owner_id: int) -> None:
@@ -1193,3 +1222,58 @@ class GameState:
                            player.x + (dx / dist) * player.pull_speed))
             player.y = max(PLAYER_RADIUS, min(MAP_HEIGHT - PLAYER_RADIUS,
                            player.y + (dy / dist) * player.pull_speed))
+
+    # ── Hunter RMB：空氣炮 ───────────────────────────────────────────────────
+
+    _AIR_CANNON_SPEED = 800.0 / 60.0   # px/tick
+    _AIR_CANNON_RADIUS = 35.0          # 碰撞半徑 px
+    _AIR_CANNON_DMG    = 15
+
+    def _spawn_air_cannon(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        player = self.players.get(owner_id)
+        if player is None:
+            return
+        dist = math.hypot(aim_x, aim_y)
+        if dist == 0:
+            return
+        spd = self._AIR_CANNON_SPEED
+        ux, uy = aim_x / dist, aim_y / dist
+        cid = self._next_air_cannon_id
+        self._next_air_cannon_id = (self._next_air_cannon_id + 1) % 256
+        self.air_cannons[cid] = AirCannon(
+            id=cid, owner_id=owner_id,
+            x=player.x, y=player.y,
+            dx=ux * spd, dy=uy * spd,
+            spawn_tick=self.tick,
+        )
+
+    def step_air_cannons(self) -> None:
+        to_remove = []
+        for cid, cannon in self.air_cannons.items():
+            cannon.x += cannon.dx
+            cannon.y += cannon.dy
+            cannon.dist_traveled += self._AIR_CANNON_SPEED
+
+            opponent_id = 3 - cannon.owner_id
+            opp = self.players.get(opponent_id)
+            if opp and not (opp.giant_tick >= 0):  # giant 時不受空氣炮影響（可選設計）
+                pass
+            if opp:
+                hit_r = PLAYER_RADIUS + self._AIR_CANNON_RADIUS
+                if math.hypot(opp.x - cannon.x, opp.y - cannon.y) < hit_r:
+                    dmg = int(self._AIR_CANNON_DMG * 0.8) if opp.giant_tick >= 0 else self._AIR_CANNON_DMG
+                    self.apply_damage(opponent_id, dmg)
+                    self.apply_knockback(opponent_id, cannon.dx, cannon.dy)
+                    owner = self.players.get(cannon.owner_id)
+                    if owner:
+                        owner.air_cannon_hit_seq = (owner.air_cannon_hit_seq + 1) % 256
+                    to_remove.append(cid)
+                    continue
+
+            if (cannon.dist_traveled >= cannon.max_range or
+                    cannon.x < 0 or cannon.x > MAP_WIDTH or
+                    cannon.y < 0 or cannon.y > MAP_HEIGHT):
+                to_remove.append(cid)
+
+        for cid in to_remove:
+            self.air_cannons.pop(cid, None)

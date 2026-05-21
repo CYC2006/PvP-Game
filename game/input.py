@@ -56,9 +56,10 @@ class InputState:
     mercury_aim_angle:   float = 0.0  # aim_angle_deg locked at barrage activation
     rune_id:             int   = 0
     # ── 每幀由 client.py 推入（伺服器狀態鏡像）─────────────────────────────
-    giant_age:           int   = -1
-    burst_shots_left:    int   = 0
-    cloak_ticks_left:    int   = 0
+    giant_age:              int   = -1
+    burst_shots_left:       int   = 0
+    cloak_ticks_left:       int   = 0
+    air_cannon_hit_seq:     int   = -1   # -1 = 尚未初始化；偵測變化以刷新 RMB 冷卻
     last_aim_x:          float = 0.0
     last_aim_y:          float = 0.0
     # ── 衝刺狀態 ─────────────────────────────────────────────────────────────
@@ -91,6 +92,18 @@ def set_burst_shots_left(n: int) -> None:
 
 def set_cloak_ticks(n: int) -> None:
     _state.cloak_ticks_left = n
+
+
+def notify_air_cannon_hit(seq: int) -> None:
+    """由 client.py 呼叫：偵測到本玩家的空氣炮命中序號變化時，立即刷新 RMB 冷卻。"""
+    if _state.air_cannon_hit_seq == -1:
+        # 首次初始化，不觸發刷新
+        _state.air_cannon_hit_seq = seq
+        return
+    if seq != _state.air_cannon_hit_seq:
+        _state.air_cannon_hit_seq = seq
+        # 將上次施放時間設為超早，使冷卻立即到期
+        _state.skill_last_ms['rmb'] = 0
 
 
 def get_mercury_aim_angle():

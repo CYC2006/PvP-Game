@@ -6,8 +6,6 @@ PUSH_ACTIVE   = 15     # ticks: 觸發後矩形視覺持續時間
 PUSH_WIDTH    = 100.0  # px，垂直方向（左右各 50）
 PUSH_HEIGHT   = 160.0  # px，朝滑鼠方向
 STUN_TICKS    = 60     # 1 秒暈眩
-KB_FORCE      = 18.0   # 初速 px/tick；中間（80 px）約 12 tick 飛出矩形外
-KB_DECAY      = 0.78   # 每 tick 速度乘數
 
 
 def _in_rect(px: float, py: float,
@@ -68,6 +66,5 @@ def _apply_push_effect(state, zone) -> None:
     if not opp:
         return
     if _in_rect(opp.x, opp.y, zone.x, zone.y, fwd_x, fwd_y, right_x, right_y):
-        opp.kb_vx = fwd_x * KB_FORCE
-        opp.kb_vy = fwd_y * KB_FORCE
+        state.apply_knockback(opponent_id, fwd_x, fwd_y)
         state.apply_stun(opponent_id, STUN_TICKS)

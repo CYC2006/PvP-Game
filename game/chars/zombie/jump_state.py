@@ -15,7 +15,6 @@ _SW_START_R   = 60
 _SW_END_R     = 150
 _SW_DUR_TICKS = 18    # 0.3 s × 60 fps
 _SW_STUN      = 30    # 0.5 s
-_SW_KB        = 12.0  # px/tick
 
 
 def activate_zombie_jump(state: GameState, owner_id: int,
@@ -53,5 +52,5 @@ def step_zombie_jumps(state: GameState) -> None:
                              end_r=_SW_END_R,
                              duration_ticks=_SW_DUR_TICKS,
                              stun_ticks=_SW_STUN,
-                             kb_force=_SW_KB,
+                             kb_force=1.0,
                              cx=lx, cy=ly)

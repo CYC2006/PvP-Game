@@ -30,6 +30,7 @@ _SKILL_RMB: dict = {
     'Pioneer':  lambda s, pid, ax, ay: s._spawn_stun_bullet(pid, ax, ay),
     'Marksman': lambda s, pid, ax, ay: s._spawn_explosion_bullet(pid, ax, ay),
     'Poisoner': lambda s, pid, ax, ay: s._spawn_pool_bullet(pid, ax, ay),
+    'Hunter':   lambda s, pid, ax, ay: s._spawn_air_cannon(pid, ax, ay),
 }
 
 _SKILL_SPACE: dict = {
@@ -286,6 +287,7 @@ def run():
                 state.step_knockback()
                 state.step_push_zones()
                 state.step_robot_marks()
+                state.step_air_cannons()
                 state.step_rune_recovery()
 
                 payload = pack_state(state)

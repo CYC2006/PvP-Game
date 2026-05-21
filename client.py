@@ -6,7 +6,7 @@ import time
 import threading
 import pygame
 
-from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left, set_cloak_ticks, get_mercury_aim_angle
+from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left, set_cloak_ticks, get_mercury_aim_angle, notify_air_cannon_hit
 from game.renderer   import draw, handle_settings_click, reset_game_state, settings_blocks_click, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
@@ -412,6 +412,8 @@ def run() -> None:
                 if local_player and local_player.cloak_until > state.tick
                 else 0
             )
+            if local_player:
+                notify_air_cannon_hit(local_player.air_cannon_hit_seq)
             draw(screen, state, player_id, font_sm, obstacles,
                  effective_stance, aim_angle_deg, ammo, is_reloading,
                  player_chars, skill_cooldowns,
