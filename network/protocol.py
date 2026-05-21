@@ -33,7 +33,7 @@ _BLADE_ENTRY      = struct.Struct("!BhhBbB")   # id x_i16 y_i16 age dir owner_id
 _AIRSTRIKE_ENTRY  = struct.Struct("!BhhBB")    # id cx_i16 cy_i16 age(u8) owner_id
 _LOG_BARRIER_ENTRY = struct.Struct("!BhhBB")  # id x_i16 y_i16 hp(u8) owner_id
 _MINE_ENTRY        = struct.Struct("!BhhHB")  # id x_i16 y_i16 triggered_age_u16(65535=idle) owner_id
-_POOL_ENTRY        = struct.Struct("!BhhHBB") # id x_i16 y_i16 age_u16 owner_id source_u8(0=rmb,1=space)
+_POOL_ENTRY        = struct.Struct("!BhhHBBB") # id x_i16 y_i16 age_u16 owner_id source_u8(0=rmb,1=space) radius_u8
 _PUSH_ENTRY        = struct.Struct("!BhhHhB") # id x_i16 y_i16 age_u16 angle_i16 owner_id
 _ROBOT_MARK_ENTRY  = struct.Struct("!BhhH")  # owner_id x_i16 y_i16 age_u16
 _TURRET_ENTRY      = struct.Struct("!BhhHB")  # id x_i16 y_i16 hp_u16 owner_id
@@ -186,7 +186,7 @@ def pack_state(state: GameState) -> bytes:
     pool_data = bytes([len(pool_list)]) + b"".join(
         _POOL_ENTRY.pack(p.id, int(p.x), int(p.y),
                          min(65534, state.tick - p.spawn_tick), p.owner_id,
-                         1 if p.pool_source == 'space' else 0)
+                         1 if p.pool_source == 'space' else 0, int(p.radius))
         for p in pool_list
     )
 
@@ -337,12 +337,12 @@ def unpack_state(data: bytes) -> GameState:
     if offset < len(data):
         pool_count = data[offset]; offset += 1
         for _ in range(pool_count):
-            ppid, px, py, page, powner, src_b = _POOL_ENTRY.unpack(
+            ppid, px, py, page, powner, src_b, r_u8 = _POOL_ENTRY.unpack(
                 data[offset: offset + _POOL_ENTRY.size])
             src = 'space' if src_b == 1 else 'rmb'
             pp  = PoisonPool(id=ppid, owner_id=powner, x=float(px), y=float(py),
                              spawn_tick=state.tick - page,
-                             radius=25.0 if src == 'space' else 150.0,
+                             radius=float(r_u8),
                              pool_source=src)
             state.poison_pools[ppid] = pp
             offset += _POOL_ENTRY.size
