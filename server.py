@@ -50,6 +50,7 @@ _SKILL_R: dict = {
     'Pioneer':  lambda s, pid, ax, ay: s._activate_clones(pid),
     'Hunter':   lambda s, pid, ax, ay: s._activate_cloak(pid),
     'Marksman': lambda s, pid, ax, ay: s._activate_barrage(pid, ax, ay),
+    'Agent':    lambda s, pid, ax, ay: s._activate_mercury_barrage(pid, ax, ay),
 }
 
 
@@ -200,26 +201,28 @@ def run():
                     # 技能觸發（依 dispatch 表查角色名稱）
                     p        = state.players.get(cmd.player_id)
                     r_active = p and p.r_skill_phase > 0
+                    _mercury = p and p.mercury_start_tick >= 0
                     if p and not r_active:
                         pid, ax, ay = cmd.player_id, cmd.aim_x, cmd.aim_y
-                        if cmd.use_skill_e:
-                            fn = _SKILL_E.get(p.char_name)
-                            if fn:
-                                fn(state, pid, ax, ay)
-                        _bursting = p.burst_next_tick >= 0
-                        if cmd.use_skill_rmb:
-                            fn = _SKILL_RMB.get(p.char_name)
-                            if fn:
-                                fn(state, pid, ax, ay)
-                        if not _bursting:
-                            if cmd.use_skill_space:
-                                fn = _SKILL_SPACE.get(p.char_name)
+                        if not _mercury:
+                            if cmd.use_skill_e:
+                                fn = _SKILL_E.get(p.char_name)
                                 if fn:
                                     fn(state, pid, ax, ay)
-                            if cmd.use_skill_r:
-                                fn = _SKILL_R.get(p.char_name)
+                            _bursting = p.burst_next_tick >= 0
+                            if cmd.use_skill_rmb:
+                                fn = _SKILL_RMB.get(p.char_name)
                                 if fn:
                                     fn(state, pid, ax, ay)
+                            if not _bursting:
+                                if cmd.use_skill_space:
+                                    fn = _SKILL_SPACE.get(p.char_name)
+                                    if fn:
+                                        fn(state, pid, ax, ay)
+                                if cmd.use_skill_r:
+                                    fn = _SKILL_R.get(p.char_name)
+                                    if fn:
+                                        fn(state, pid, ax, ay)
                         if cmd.use_rune:
                             state._activate_rune(pid)
                     state.apply_command(
@@ -269,6 +272,7 @@ def run():
                 state.step_air_strikes()
                 state.step_giant()
                 state.step_burst()
+                state.step_mercury_barrage()
                 state.step_mines()
                 state.step_turrets(obstacles, obstacle_hp)
                 state.step_barrage()

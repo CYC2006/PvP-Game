@@ -409,6 +409,9 @@ def run() -> None:
                 if local_player and local_player.cloak_until > state.tick
                 else 0
             )
+            # Mercury Barrage: lock visual aim to the server-authoritative angle
+            if local_player and local_player.mercury_start_tick >= 0:
+                aim_angle_deg = local_player.aim_angle
 
             draw(screen, state, player_id, font_sm, obstacles,
                  effective_stance, aim_angle_deg, ammo, is_reloading,

@@ -52,6 +52,7 @@ class InputState:
     r_skill_start_ms:    int   = 0
     r_skill_start_angle: float = 0.0
     robot_mark_until_ms: int   = 0
+    mercury_end_ms:      int   = 0   # ms when Agent barrage ends (0=inactive)
     rune_id:             int   = 0
     # ── 每幀由 client.py 推入（伺服器狀態鏡像）─────────────────────────────
     giant_age:           int   = -1
@@ -339,10 +340,11 @@ def read_input(player_id: int, keys_held: set,
     _state.q_prev      = q_held
 
     # ── 衍生狀態（每幀計算，不持久化）────────────────────────────────────
-    r_skill_active = (_state.r_skill_start_ms > 0
-                      and (now - _state.r_skill_start_ms) < 500)
-    giant_frozen   = (_state.giant_age >= 0
-                      and not (GROW_TICKS <= _state.giant_age < GROW_TICKS + ACTIVE_TICKS))
+    r_skill_active      = (_state.r_skill_start_ms > 0
+                           and (now - _state.r_skill_start_ms) < 500)
+    giant_frozen        = (_state.giant_age >= 0
+                           and not (GROW_TICKS <= _state.giant_age < GROW_TICKS + ACTIVE_TICKS))
+    _mercury_ult_active = _state.char_name == 'Agent' and now < _state.mercury_end_ms
 
     # ── 位移 / speed_mult 初始化 ──────────────────────────────────────────
     dx, dy          = 0.0, 0.0
@@ -393,6 +395,7 @@ def read_input(player_id: int, keys_held: set,
         if pygame.K_d in keys_held or pygame.K_RIGHT in keys_held: dx += 1.0
 
         if (not r_skill_active
+                and not _mercury_ult_active
                 and space_just_pressed
                 and not robot_recall
                 and _state.skill_cds_ms.get('space', -1) >= 0):
@@ -412,6 +415,7 @@ def read_input(player_id: int, keys_held: set,
     # ── E 技能 ────────────────────────────────────────────────────────────
     use_skill_e = False
     if (not r_skill_active and not giant_frozen and not _state.burst_shots_left
+            and not _mercury_ult_active
             and e_just_pressed
             and _state.skill_cds_ms.get('e', -1) >= 0):
         cd_remaining = _state.skill_cds_ms['e'] - (now - _state.skill_last_ms['e'])
@@ -422,6 +426,7 @@ def read_input(player_id: int, keys_held: set,
     # ── RMB 技能（Vince：蓄力放開；其他：按下即發）───────────────────────
     use_skill_rmb = False
     if (not r_skill_active and not giant_frozen and not _state.burst_shots_left
+            and not _mercury_ult_active
             and _state.skill_cds_ms.get('rmb', -1) >= 0):
         rmb_cd_ms = _state.skill_cds_ms['rmb']
         if _state.char_name == 'Vince':
@@ -451,6 +456,7 @@ def read_input(player_id: int, keys_held: set,
     # ── F 鍵：大招（按下即發）────────────────────────────────────────────
     use_skill_r = False
     if (not r_skill_active and not giant_frozen and not _state.burst_shots_left
+            and not _mercury_ult_active
             and _state.skill_cds_ms.get('r', -1) >= 0):
         if f_just_pressed and (_state.skill_cds_ms['r'] - (now - _state.skill_last_ms['r'])) <= 0:
             use_skill_r = True
@@ -458,6 +464,8 @@ def read_input(player_id: int, keys_held: set,
             if _state.char_name == 'Assassin':
                 _state.r_skill_start_ms    = now
                 _state.r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
+            if _state.char_name == 'Agent':
+                _state.mercury_end_ms = now + 1250  # 72 ticks × ~17ms + safety margin
 
     # ── R 鍵：手動換彈 ────────────────────────────────────────────────────
     _NO_RELOAD = {'Robot', 'Assassin', 'Zombie'}
@@ -486,6 +494,7 @@ def read_input(player_id: int, keys_held: set,
     # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────────────
     shooting = False
     if (not suppress_lmb
+            and not _mercury_ult_active
             and not _state.reloading
             and not r_skill_active
             and not _state.burst_shots_left

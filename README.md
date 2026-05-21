@@ -64,7 +64,7 @@ Skill descriptions are shortened to fit the table; see the in-game **Characters*
 
 | Character | RMB | SPACE | E | R |
 |---|---|---|---|---|
-| **Agent** | 2× dmg power bullet | Sprint in move dir. | Stun grenade; blinds | — |
+| **Agent** | 2× dmg power bullet | Sprint in move dir. | Stun grenade; blinds | 35-bullet fan barrage |
 | **Vince** | Bombs drop in a line | Rush toward cursor | Blast grenade throw | Transform into giant |
 | **Marksman** | Explosive bullet hit | — | Deploy auto turret | 18 rapid airstrikes |
 | **Hunter** | — | Mini grenade cluster | Place wooden walls | Vanish for 3 seconds |

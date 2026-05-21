@@ -44,8 +44,13 @@ _SKILLS: dict = {
         ("FLASH GRENADE", "E",     8,
          "Lobs a stun grenade that detonates on landing. "
          "Any enemy inside the blast radius is briefly blinded and disoriented."),
-        ("—",             "R",     0,
-         "Skill under development."),
+        ("MERCURY BARRAGE","R",    15,
+         "Lock your aim and unleash 7 volleys of 5 bullets in a spread fan "
+         "(-6° / -3° / 0° / +3° / +6°), one volley every 12 ticks. "
+         "35 bullets total over 1.2 seconds. "
+         "No spread, same damage and range as normal shots. "
+         "Aim is fixed for the full duration; LMB, RMB, SPACE, and E are locked. "
+         "Q (rune) and movement remain available."),
     ],
     'Vince': [
         ("AIRSTRIKE",     "RMB",   5,

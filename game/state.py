@@ -99,6 +99,11 @@ class Player:
     poisoner_e_last_check_tick: int     = -1  # 上次 30-tick 檢查的 tick
     poisoner_e_check_count: int         = 0   # 本次已檢查次數
     poisoner_e_shockwave_seq: int       = 0   # 每次釋放衝擊波時遞增（供 client FX 偵測）
+    # ── Agent 大招：水銀彈幕 ───────────────────────────────────────────────────
+    mercury_start_tick: int   = -1   # -1=inactive; tick when barrage started
+    mercury_aim_x: float      = 0.0  # locked aim direction (unit vector)
+    mercury_aim_y: float      = 0.0
+    mercury_volley_fired: int = 0    # volleys fired so far (0–7)
 
     def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -431,6 +436,9 @@ class GameState:
         if player.jump_tick < 0 and player.vince_dash_tick < 0 and player.zombie_jump_tick < 0:
             player.move(dx, dy, speed_mult=mult)
         player.stance = stance
+        # Mercury Barrage active: aim locked, LMB blocked
+        if player.mercury_start_tick >= 0:
+            return
         # 連射期間：禁止普攻（避免與連射子彈重疊）
         if player.burst_next_tick >= 0:
             shooting = False
@@ -792,6 +800,14 @@ class GameState:
     def _trigger_flash_explosion(self, x: float, y: float, owner_id: int) -> None:
         from game.chars.agent.flash_state import trigger_flash_explosion
         trigger_flash_explosion(self, x, y, owner_id)
+
+    def _activate_mercury_barrage(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.agent.mercury_state import activate_mercury
+        activate_mercury(self, owner_id, aim_x, aim_y)
+
+    def step_mercury_barrage(self) -> None:
+        from game.chars.agent.mercury_state import step_mercury
+        step_mercury(self)
 
     def _spawn_shuriken(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.assassin.shuriken_state import spawn_shuriken
