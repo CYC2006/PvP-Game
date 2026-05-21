@@ -561,6 +561,9 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
 
     # ── 殘血紅色暈邊（HUD 之前，保持 UI 在最上層）
     _draw_low_hp_vignette(screen, me.hp, me.max_hp)
+    # ── 毒素感染綠色覆蓋（本地玩家有層數時顯示）
+    if me.poison_stacks > 0:
+        _draw_poison_vignette(screen, me.poison_stacks)
 
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns,
               font_hud=font_hud or font)
@@ -911,6 +914,9 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         if pid != my_id:
             head_y = sy - rotated.get_height() // 2 - 10
             _draw_opponent_hp_bar(screen, player.hp, player.max_hp, sx, head_y)
+            if player.poison_stacks > 0:
+                _draw_poison_stack_label(screen, font_hud or font,
+                                         player.poison_stacks, sx, head_y)
 
         # 暈眩指示：三顆黃色小球繞頭頂旋轉
         if player.stun_until > state.tick:
@@ -1021,15 +1027,15 @@ def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
 
 
 def _draw_skill_hud(screen, font, skill_cooldowns: dict) -> None:
-    """畫面中下方五個技能冷卻方塊（MB / SP / E / F / Q）。"""
-    SIDE = SKILL_CIRCLE_R * 2   # 68 px
-    BRAD = 9
-    cy   = SCREEN_H - SIDE // 2 - 22
-    x0   = SCREEN_W // 2 - 2 * SKILL_STEP   # 5 格居中
+    """畫面中下方五個技能冷卻圓圈（MB / SP / E / F / Q）。
+    冷卻時以從 12 點鐘順時針掃描的扇形遮罩表示剩餘冷卻時間。
+    """
+    R  = SKILL_CIRCLE_R   # 34
+    cy = SCREEN_H - R - 22
+    x0 = SCREEN_W // 2 - 2 * SKILL_STEP   # 5 格居中
 
     for i, (slot, label) in enumerate(zip(_SKILL_SLOTS, _SKILL_LABELS)):
-        cx   = x0 + i * SKILL_STEP
-        rect = pygame.Rect(cx - SIDE // 2, cy - SIDE // 2, SIDE, SIDE)
+        cx = x0 + i * SKILL_STEP
 
         remaining_ms, max_ms = skill_cooldowns.get(slot, (-1, -1))
         is_rune = (slot == 'q')
@@ -1044,39 +1050,40 @@ def _draw_skill_hud(screen, font, skill_cooldowns: dict) -> None:
             text_col   = COL_SKILL_NONE_TEXT
             text       = '?'
         elif remaining_ms == 0:               # 就緒
-            border_col = COL_RUNE_READY_BORDER   if is_rune else COL_SKILL_READY_BORDER
-            text_col   = COL_RUNE_READY_TEXT     if is_rune else COL_SKILL_READY_TEXT
+            border_col = COL_RUNE_READY_BORDER if is_rune else COL_SKILL_READY_BORDER
+            text_col   = COL_RUNE_READY_TEXT   if is_rune else COL_SKILL_READY_TEXT
             text       = label
         else:                                 # 冷卻中
-            border_col = COL_RUNE_CD_BORDER      if is_rune else COL_SKILL_CD_BORDER
-            text_col   = COL_RUNE_CD_TEXT        if is_rune else COL_SKILL_CD_TEXT
+            border_col = COL_RUNE_CD_BORDER if is_rune else COL_SKILL_CD_BORDER
+            text_col   = COL_RUNE_CD_TEXT   if is_rune else COL_SKILL_CD_TEXT
             secs       = remaining_ms / 1000.0
             text       = f"{secs:.0f}" if secs >= 1.0 else f"{secs:.1f}"
 
-        # ── 背景填充（使用預建 Surface，省掉每幀 allocation）──────
-        global _skill_bg_surf
-        if _skill_bg_surf is None:
-            _skill_bg_surf = pygame.Surface((SIDE, SIDE), pygame.SRCALPHA)
-            pygame.draw.rect(_skill_bg_surf, (*COL_SKILL_FILL, 200),
-                             (0, 0, SIDE, SIDE), border_radius=BRAD)
-        screen.blit(_skill_bg_surf, rect.topleft)
+        # ── 背景填充圓 ────────────────────────────────────────────
+        pygame.draw.circle(screen, COL_SKILL_FILL, (cx, cy), R)
 
-        # ── 冷卻覆蓋（由上往下填滿矩形，覆蓋整個方塊）────────────
+        # ── 冷卻扇形（從 12 點鐘出發順時針，扇形 = 剩餘時間比例）──
         if 0 < remaining_ms and max_ms > 0:
-            fraction = remaining_ms / max_ms
-            fill_h   = max(1, int(SIDE * fraction))
+            fraction  = remaining_ms / max_ms
+            sweep_deg = fraction * 360.0
+            steps     = max(4, int(sweep_deg / 2) + 1)
+            # 扇形多邊形：局部座標圓心 (R,R) + 從 -90° 順時針到 -90°+sweep_deg°
+            pts = [(R, R)]
+            for j in range(steps + 1):
+                angle_rad = math.radians(-90.0 + j * sweep_deg / steps)
+                pts.append((R + R * math.cos(angle_rad),
+                             R + R * math.sin(angle_rad)))
             global _skill_pie_surf
             if _skill_pie_surf is None:
-                _skill_pie_surf = pygame.Surface((SIDE, SIDE), pygame.SRCALPHA)
+                _skill_pie_surf = pygame.Surface((R * 2, R * 2), pygame.SRCALPHA)
             _skill_pie_surf.fill((0, 0, 0, 0))
-            pygame.draw.rect(_skill_pie_surf, (10, 10, 20, 180),
-                             (0, 0, SIDE, fill_h), border_radius=BRAD)
-            screen.blit(_skill_pie_surf, rect.topleft)
+            pygame.draw.polygon(_skill_pie_surf, (10, 10, 20, 185), pts)
+            screen.blit(_skill_pie_surf, (cx - R, cy - R))
 
-        # ── 外框 ──────────────────────────────────────────────────
-        pygame.draw.rect(screen, border_col, rect, 2, border_radius=BRAD)
+        # ── 外框圓 ────────────────────────────────────────────────
+        pygame.draw.circle(screen, border_col, (cx, cy), R, 2)
 
-        # ── 文字（居中）──────────────────────────────────────────────
+        # ── 文字（居中）──────────────────────────────────────────
         txt = font.render(text, True, text_col)
         screen.blit(txt, (cx - txt.get_width() // 2, cy - txt.get_height() // 2))
 
@@ -1241,3 +1248,63 @@ def _draw_low_hp_vignette(screen: pygame.Surface,
             _vignette_cache.pop(next(iter(_vignette_cache)))
 
     screen.blit(_vignette_cache[bucket], (0, 0))
+
+
+# ── 毒素感染視覺 ──────────────────────────────────────────────────────────────
+
+_poison_overlay_cache: dict = {}
+
+
+def _draw_poison_stack_label(screen: pygame.Surface,
+                              font: pygame.font.Font,
+                              stacks: int, sx: int, bar_y: int) -> None:
+    """在對手頭頂血條上方繪製綠色毒素層數數字（如 ☠ 3）。"""
+    text  = f"☠ {stacks}"   # ☠ skull
+    # 主體文字（亮綠）
+    surf  = font.render(text, True, (80, 240, 80))
+    # 黑色描邊（向四個方向各偏 1px）
+    shadow = font.render(text, True, (0, 0, 0))
+    tx = sx - surf.get_width() // 2
+    ty = bar_y - surf.get_height() - 4
+    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        screen.blit(shadow, (tx + dx, ty + dy))
+    screen.blit(surf, (tx, ty))
+
+
+def _build_poison_overlay(alpha: int) -> pygame.Surface:
+    """建立一張半透明綠色感染覆蓋 Surface。"""
+    W, H = LOGICAL_W, LOGICAL_H
+    surf = pygame.Surface((W, H), pygame.SRCALPHA)
+    # 全畫面平鋪淡綠底色
+    surf.fill((30, 140, 30, alpha))
+    # 四邊額外加深邊緣暈染（各 12% 畫面寬 / 高）
+    edge_w = W // 8
+    edge_h = H // 8
+    steps  = 18
+    for i in range(steps):
+        t      = i / (steps - 1)
+        e_alpha = int(alpha * 1.8 * (1.0 - t) ** 1.4)
+        if e_alpha <= 0:
+            continue
+        inset = int(min(edge_w, edge_h) * t)
+        thick = max(1, min(edge_w, edge_h) // steps + 2)
+        pygame.draw.rect(surf, (20, 160, 20, e_alpha),
+                         (inset, inset, W - 2 * inset, H - 2 * inset), thick)
+    return surf
+
+
+def _draw_poison_vignette(screen: pygame.Surface, stacks: int) -> None:
+    """本地玩家中毒時的綠色感染視覺，層數越高越明顯，帶輕微脈動。"""
+    # 基礎 alpha：每層 +6（1層=6, 5層=30），脈動振幅 ±每層3
+    pulse     = 0.5 + 0.5 * math.sin(time.perf_counter() * math.pi * 1.2)
+    alpha_f   = stacks * 6 + pulse * stacks * 3
+    alpha     = max(1, min(60, int(alpha_f)))
+
+    # 以 2 為步進快取
+    bucket = (alpha // 2) * 2
+    if bucket not in _poison_overlay_cache:
+        _poison_overlay_cache[bucket] = _build_poison_overlay(bucket)
+        if len(_poison_overlay_cache) > 40:
+            _poison_overlay_cache.pop(next(iter(_poison_overlay_cache)))
+
+    screen.blit(_poison_overlay_cache[bucket], (0, 0))
