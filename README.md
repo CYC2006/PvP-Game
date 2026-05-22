@@ -68,7 +68,7 @@ Skill descriptions are shortened to fit the table; see the in-game **Characters*
 | **Vince** | Bombs drop in a line | Rush toward cursor | Blast grenade throw | Transform into giant |
 | **Marksman** | Explosive bullet hit | — | Deploy auto turret | 18 rapid airstrikes |
 | **Hunter** | — | Mini grenade cluster | Place wooden walls | Vanish for 3 seconds |
-| **Robot** | — | Dash; recall to mark | — | Launch enemies away |
+| **Robot** | — | Dash; recall to mark | Pulse ring stun + orbiting teleport mark | Launch enemies away |
 | **Pioneer** |  Stun bullet on hit | Leap + refill ammo | 120 HP absorb shield | Clones fire with you |
 | **Assassin** | Throw a shuriken | Short speed boost | Deploy smoke cloud | Dash + blade sweep |
 | **Poisoner** | Toxic splash zone (pool) | +20% speed, afterimage, 9 mini pools | Shockwave from pool; heals caster | — |

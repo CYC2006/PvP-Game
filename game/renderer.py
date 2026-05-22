@@ -30,6 +30,7 @@ from game.chars.marksman     import barrage_fx as marksman_barrage_fx
 from game.chars.pioneer  import shield_fx as pioneer_shield_fx
 from game.chars.robot    import push_fx as robot_push_fx
 from game.chars.robot    import mark_fx as robot_mark_fx
+from game.chars.robot    import e_fx as robot_e_fx
 
 # colours
 COL_BG         = (30,  30,  30)
@@ -556,6 +557,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     poisoner_e_fx.draw(screen, cx, cy)
     robot_push_fx.draw(screen, state, my_id, cx, cy)
     robot_mark_fx.draw(screen, state, my_id, cx, cy)
+    robot_e_fx.draw(screen, state, my_id, cx, cy)
     air_cannon_fx.draw(screen, state, cx, cy)
     airstrike_fx.update(state)
     airstrike_fx.draw(screen, state, cx, cy)

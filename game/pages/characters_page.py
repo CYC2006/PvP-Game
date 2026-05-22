@@ -103,9 +103,14 @@ _SKILLS: dict = {
         ("—", "RMB",   0, "Skill under development."),
         ("MARK RECALL", "SPACE", 6,
          "Dashes in your movement direction and plants a mark at the origin. "
-         "Press Space again within 3 seconds to instantly teleport back. "
+         "Press Space again within 4 seconds to instantly teleport back. "
          "A yellow timer bar above your head shows the recall window — only you can see it."),
-        ("—", "E",     0, "Skill under development."),
+        ("PULSE RING", "E",  9,
+         "Instantly expands a 200 px electromagnetic ring centered on you. "
+         "Any enemy caught inside is stunned for 1 second. "
+         "A glowing marker is also placed at a random cardinal point on the ring and orbits clockwise — "
+         "press E again within 4 seconds to instantly blink to the marker's current position. "
+         "If your Space mark is active, the ring still fires and stuns, but no orbiting marker is created."),
         ("PUSH ZONE", "R", 5,
          "Projects a 160×100 px force field toward the cursor. "
          "Enemies caught inside are launched away and stunned for 1 second. "

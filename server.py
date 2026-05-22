@@ -21,6 +21,7 @@ _SKILL_E: dict = {
     'Marksman': lambda s, pid, ax, ay: s._place_turret(pid),
     'Pioneer':  lambda s, pid, ax, ay: s._activate_shield(pid),
     'Poisoner': lambda s, pid, ax, ay: s._activate_poisoner_e(pid),
+    'Robot':    lambda s, pid, ax, ay: s._activate_robot_e(pid),
 }
 
 _SKILL_RMB: dict = {
@@ -203,7 +204,8 @@ def run():
                     p        = state.players.get(cmd.player_id)
                     r_active = p and p.r_skill_phase > 0
                     _mercury = p and p.mercury_start_tick >= 0
-                    if p and not r_active:
+                    _stunned = p and state.tick < p.stun_until
+                    if p and not r_active and not _stunned:
                         pid, ax, ay = cmd.player_id, cmd.aim_x, cmd.aim_y
                         if not _mercury:
                             if cmd.use_skill_e:
@@ -287,6 +289,7 @@ def run():
                 state.step_knockback()
                 state.step_push_zones()
                 state.step_robot_marks()
+                state.step_robot_e()
                 state.step_air_cannons()
                 state.step_rune_recovery()
 

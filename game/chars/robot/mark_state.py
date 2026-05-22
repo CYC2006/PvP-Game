@@ -1,6 +1,6 @@
 import math
 
-MARK_TICKS = 180   # 3 秒（60 tick/s）
+MARK_TICKS = 240   # 4 秒（60 tick/s）
 
 
 def activate_robot_space(state, owner_id: int) -> None:
@@ -19,6 +19,11 @@ def activate_robot_space(state, owner_id: int) -> None:
         player.y = mark.y
         del state.robot_marks[owner_id]
     else:
+        # Block if E rotating mark is active
+        from game.chars.robot.e_state import E_MARK_TICKS
+        e_mark = state.robot_e_marks.get(owner_id)
+        if e_mark is not None and state.tick - e_mark.spawn_tick < E_MARK_TICKS:
+            return
         # ── 建立印記 ──────────────────────────────────
         state.robot_marks[owner_id] = RobotMark(
             owner_id=owner_id,

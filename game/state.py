@@ -195,6 +195,23 @@ class RobotMark:
 
 
 @dataclass
+class RobotEMark:
+    owner_id:    int
+    center_x:    float
+    center_y:    float
+    start_angle: int     # degrees: 0, 90, 180, or 270
+    spawn_tick:  int
+
+
+@dataclass
+class RobotERing:
+    owner_id:   int
+    x:          float
+    y:          float
+    spawn_tick: int
+
+
+@dataclass
 class PushZone:
     id:         int
     owner_id:   int
@@ -349,6 +366,8 @@ class GameState:
     push_zones: dict         = field(default_factory=dict)   # pzid → PushZone
     _next_push_zone_id: int  = 0
     robot_marks: dict        = field(default_factory=dict)   # owner_id → RobotMark（每個 Robot 最多一筆）
+    robot_e_marks: dict      = field(default_factory=dict)   # owner_id → RobotEMark
+    robot_e_rings: dict      = field(default_factory=dict)   # owner_id → RobotERing
     air_cannons: dict        = field(default_factory=dict)   # cid → AirCannon
     _next_air_cannon_id: int = 0
 
@@ -1055,6 +1074,14 @@ class GameState:
     def step_robot_marks(self) -> None:
         from game.chars.robot.mark_state import step_robot_marks
         step_robot_marks(self)
+
+    def _activate_robot_e(self, owner_id: int) -> None:
+        from game.chars.robot.e_state import activate_robot_e
+        activate_robot_e(self, owner_id)
+
+    def step_robot_e(self) -> None:
+        from game.chars.robot.e_state import step_robot_e
+        step_robot_e(self)
 
     def _activate_push_zone(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.robot.push_state import activate_push

@@ -1,6 +1,6 @@
 import struct
 from game.command import PlayerCommand
-from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool, PushZone, RobotMark, Turret, BarrageStrike, Shield
+from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool, PushZone, RobotMark, RobotEMark, RobotERing, Turret, BarrageStrike, Shield
 
 # --- Packet types ---
 PKT_JOIN        = 0x01
@@ -40,6 +40,8 @@ _ROBOT_MARK_ENTRY  = struct.Struct("!BhhH")  # owner_id x_i16 y_i16 age_u16
 _TURRET_ENTRY      = struct.Struct("!BhhHB")  # id x_i16 y_i16 hp_u16 owner_id
 _BARRAGE_ENTRY     = struct.Struct("!BhhBB")  # id x_i16 y_i16 age_u8 owner_id
 _SHIELD_ENTRY      = struct.Struct("!BHHB")   # owner_id hp_u16 max_hp_u16 status_u8(0=active,1=broken)
+_E_RING_ENTRY      = struct.Struct("!BhhH")  # owner_id cx_i16 cy_i16 age_u16
+_E_MARK_ENTRY      = struct.Struct("!BhhHB") # owner_id cx_i16 cy_i16 age_u16 start_angle_u8(idx: 0=0°,1=90°,2=180°,3=270°)
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -235,7 +237,22 @@ def pack_state(state: GameState) -> bytes:
         for c in cannon_list
     )
 
-    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data + mark_data + turret_data + barrage_data + shield_data + cannon_data
+    _E_ANGLE_IDX = {0: 0, 90: 1, 180: 2, 270: 3}
+    e_ring_list = list(state.robot_e_rings.values())
+    e_ring_data = bytes([len(e_ring_list)]) + b"".join(
+        _E_RING_ENTRY.pack(r.owner_id, int(r.x), int(r.y),
+                           min(65534, state.tick - r.spawn_tick))
+        for r in e_ring_list
+    )
+    e_mark_list = list(state.robot_e_marks.values())
+    e_mark_data = bytes([len(e_mark_list)]) + b"".join(
+        _E_MARK_ENTRY.pack(m.owner_id, int(m.center_x), int(m.center_y),
+                           min(65534, state.tick - m.spawn_tick),
+                           _E_ANGLE_IDX.get(m.start_angle, 0))
+        for m in e_mark_list
+    )
+
+    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data + mark_data + turret_data + barrage_data + shield_data + cannon_data + e_ring_data + e_mark_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -420,6 +437,29 @@ def unpack_state(data: bytes) -> GameState:
                 x=float(cx), y=float(cy),
                 dx=0.0, dy=0.0, spawn_tick=state.tick)
             offset += _AIR_CANNON_ENTRY.size
+
+    _E_IDX_ANGLE = {0: 0, 1: 90, 2: 180, 3: 270}
+    if offset < len(data):
+        er_count = data[offset]; offset += 1
+        for _ in range(er_count):
+            er_owner, er_cx, er_cy, er_age = _E_RING_ENTRY.unpack(
+                data[offset: offset + _E_RING_ENTRY.size])
+            state.robot_e_rings[er_owner] = RobotERing(
+                owner_id=er_owner, x=float(er_cx), y=float(er_cy),
+                spawn_tick=state.tick - er_age)
+            offset += _E_RING_ENTRY.size
+
+    if offset < len(data):
+        em_count = data[offset]; offset += 1
+        for _ in range(em_count):
+            em_owner, em_cx, em_cy, em_age, em_aidx = _E_MARK_ENTRY.unpack(
+                data[offset: offset + _E_MARK_ENTRY.size])
+            state.robot_e_marks[em_owner] = RobotEMark(
+                owner_id=em_owner,
+                center_x=float(em_cx), center_y=float(em_cy),
+                start_angle=_E_IDX_ANGLE.get(em_aidx, 0),
+                spawn_tick=state.tick - em_age)
+            offset += _E_MARK_ENTRY.size
 
     return state
 

@@ -51,7 +51,8 @@ class InputState:
     speed_boost_end_ms:  int   = 0
     r_skill_start_ms:    int   = 0
     r_skill_start_angle: float = 0.0
-    robot_mark_until_ms: int   = 0
+    robot_mark_until_ms:   int   = 0
+    robot_e_mark_until_ms: int   = 0
     mercury_end_ms:      int   = 0   # ms when Agent barrage ends (0=inactive)
     mercury_aim_angle:   float = 0.0  # aim_angle_deg locked at barrage activation
     rune_id:             int   = 0
@@ -92,6 +93,11 @@ def set_burst_shots_left(n: int) -> None:
 
 def set_cloak_ticks(n: int) -> None:
     _state.cloak_ticks_left = n
+
+
+def cancel_mercury_barrage() -> None:
+    """由 client.py 呼叫：server 廣播大招已結束（被暈眩中斷）時清除本地鎖定狀態。"""
+    _state.mercury_end_ms = 0
 
 
 def notify_air_cannon_hit(seq: int) -> None:
@@ -181,7 +187,7 @@ def _space_robot(st: InputState, dx: float, dy: float,
     st.dash_dy                = ndy
     st.dash_speed             = _DASH_V0 - _DASH_DECEL
     st.skill_last_ms['space'] = now
-    st.robot_mark_until_ms    = now + 3000
+    st.robot_mark_until_ms    = now + 4000
     speed_mult = _DASH_V0 / max(st.player_speed, 0.001)
     return True, ndx, ndy, speed_mult
 
@@ -312,7 +318,8 @@ def init_rune(rune_id: int) -> None:
 def read_input(player_id: int, keys_held: set,
                logical_mouse: tuple,
                shift_held: bool,
-               suppress_lmb: bool = False) -> tuple:
+               suppress_lmb: bool = False,
+               is_stunned: bool = False) -> tuple:
     """
     回傳 (PlayerCommand, effective_stance, ammo, is_reloading, skill_cooldowns)
 
@@ -409,14 +416,15 @@ def read_input(player_id: int, keys_held: set,
             dx, dy             = _state.dash_dx, _state.dash_dy
             _state.dash_speed -= _DASH_DECEL
 
-    # ── WASD 移動 + Space 技能（不在衝刺 / 巨人凍結 / 連射中）──────────
+    # ── WASD 移動 + Space 技能（不在衝刺 / 巨人凍結 / 連射中 / 暈眩中）──
     if not _state.dash_active and not giant_frozen and not _state.burst_shots_left:
         if pygame.K_w in keys_held or pygame.K_UP    in keys_held: dy -= 1.0
         if pygame.K_s in keys_held or pygame.K_DOWN  in keys_held: dy += 1.0
         if pygame.K_a in keys_held or pygame.K_LEFT  in keys_held: dx -= 1.0
         if pygame.K_d in keys_held or pygame.K_RIGHT in keys_held: dx += 1.0
 
-        if (not r_skill_active
+        if (not is_stunned
+                and not r_skill_active
                 and not _mercury_ult_active
                 and space_just_pressed
                 and not robot_recall
@@ -434,9 +442,20 @@ def read_input(player_id: int, keys_held: set,
 
     running = shift_held and not _state.dash_active
 
+    # ── Robot E 旋轉標誌回傳（繞過冷卻，需先於主要 E 區塊）─────────────
+    use_skill_e    = False
+    robot_e_recall = False
+    if (_state.char_name == 'Robot'
+            and e_just_pressed
+            and _state.robot_e_mark_until_ms > now):
+        use_skill_e                    = True
+        _state.robot_e_mark_until_ms   = 0
+        robot_e_recall                 = True
+
     # ── E 技能 ────────────────────────────────────────────────────────────
-    use_skill_e = False
-    if (not r_skill_active and not giant_frozen and not _state.burst_shots_left
+    if (not robot_e_recall
+            and not is_stunned
+            and not r_skill_active and not giant_frozen and not _state.burst_shots_left
             and not _mercury_ult_active
             and e_just_pressed
             and _state.skill_cds_ms.get('e', -1) >= 0):
@@ -444,10 +463,13 @@ def read_input(player_id: int, keys_held: set,
         if cd_remaining <= 0:
             use_skill_e = True
             _state.skill_last_ms['e'] = now
+            if _state.char_name == 'Robot':
+                _state.robot_e_mark_until_ms = now + 4000
 
     # ── RMB 技能（Vince：蓄力放開；其他：按下即發）───────────────────────
     use_skill_rmb = False
-    if (not r_skill_active and not giant_frozen and not _state.burst_shots_left
+    if (not is_stunned
+            and not r_skill_active and not giant_frozen and not _state.burst_shots_left
             and not _mercury_ult_active
             and _state.skill_cds_ms.get('rmb', -1) >= 0):
         rmb_cd_ms = _state.skill_cds_ms['rmb']
@@ -464,9 +486,13 @@ def read_input(player_id: int, keys_held: set,
             if rmb_just_pressed and (rmb_cd_ms - (now - _state.skill_last_ms['rmb'])) <= 0:
                 use_skill_rmb = True
                 _state.skill_last_ms['rmb'] = now
+    elif is_stunned and rmb_just_released:
+        # 暈眩中放開 RMB：清除 Vince 蓄力狀態，但不觸發技能
+        _state.r_holding = False
 
     # ── Assassin Space：速度提升（可在衝刺中觸發，獨立於主要 Space 區塊）─
-    if (not r_skill_active and not giant_frozen
+    if (not is_stunned
+            and not r_skill_active and not giant_frozen
             and _state.char_name == 'Assassin'
             and space_just_pressed
             and _state.skill_cds_ms.get('space', -1) >= 0):
@@ -477,7 +503,8 @@ def read_input(player_id: int, keys_held: set,
 
     # ── F 鍵：大招（按下即發）────────────────────────────────────────────
     use_skill_r = False
-    if (not r_skill_active and not giant_frozen and not _state.burst_shots_left
+    if (not is_stunned
+            and not r_skill_active and not giant_frozen and not _state.burst_shots_left
             and not _mercury_ult_active
             and _state.skill_cds_ms.get('r', -1) >= 0):
         if f_just_pressed and (_state.skill_cds_ms['r'] - (now - _state.skill_last_ms['r'])) <= 0:
