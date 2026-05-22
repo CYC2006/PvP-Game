@@ -6,7 +6,7 @@ import time
 import threading
 import pygame
 
-from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left, set_cloak_ticks, get_mercury_aim_angle, notify_air_cannon_hit
+from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left, set_cloak_ticks, get_mercury_aim_angle, notify_air_cannon_hit, cancel_mercury_barrage
 from game.renderer   import draw, handle_settings_click, reset_game_state, settings_blocks_click, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
@@ -366,8 +366,10 @@ def run() -> None:
             mx, my_pos    = logical_mouse
             shift_held    = (pygame.K_LSHIFT in keys_held or pygame.K_RSHIFT in keys_held)
             suppress_lmb  = settings_blocks_click(mx, my_pos)
+            _lp_prev      = state.players.get(player_id)
+            _is_stunned   = bool(_lp_prev and _lp_prev.stun_until > state.tick)
             cmd, effective_stance, ammo, is_reloading, skill_cooldowns = read_input(
-                player_id, keys_held, logical_mouse, shift_held, suppress_lmb)
+                player_id, keys_held, logical_mouse, shift_held, suppress_lmb, _is_stunned)
             aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
             _mercury_locked = get_mercury_aim_angle()
             if _mercury_locked is not None:
@@ -414,6 +416,9 @@ def run() -> None:
             )
             if local_player:
                 notify_air_cannon_hit(local_player.air_cannon_hit_seq)
+                # 大招被中斷（server 已清除 mercury_start_tick）：同步清除本地鎖定
+                if local_player.mercury_start_tick < 0 and _is_stunned:
+                    cancel_mercury_barrage()
             draw(screen, state, player_id, font_sm, obstacles,
                  effective_stance, aim_angle_deg, ammo, is_reloading,
                  player_chars, skill_cooldowns,

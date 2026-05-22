@@ -39,6 +39,10 @@ def step_mercury(state) -> None:
     for player in state.players.values():
         if player.mercury_start_tick < 0:
             continue
+        if state.tick < player.stun_until:
+            player.mercury_start_tick   = -1
+            player.mercury_volley_fired = 0
+            continue
         elapsed     = state.tick - player.mercury_start_tick
         volleys_due = elapsed // VOLLEY_INTERVAL + 1
         while (player.mercury_volley_fired < volleys_due
