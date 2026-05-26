@@ -541,13 +541,14 @@ def read_input(player_id: int, keys_held: set,
             use_rune = True
             _state.skill_last_ms['q'] = now
 
-    # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止）────────────────
+    # ── 射擊（換彈中禁止 / R 技能期間禁止 / 連射中禁止 / 暈眩中禁止）────
     shooting = False
     if (not suppress_lmb
             and not _mercury_ult_active
             and not _state.reloading
             and not r_skill_active
             and not _state.burst_shots_left
+            and not is_stunned
             and pygame.mouse.get_pressed()[0]
             and (now - _state.last_shot_time) >= _state.shoot_cooldown_ms):
         shooting              = True
