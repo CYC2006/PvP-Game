@@ -914,17 +914,19 @@ def _draw_players(screen, state, my_id, cx, cy, font,
         if pid == my_id:
             r_dash_fx.maybe_spawn_afterimage(player.x, player.y, rotated, state.tick)
 
-        # 頭頂毒素層數（自己 + 對方都顯示）
+        # 頭頂血條（對手）——始終顯示
+        head_y = sy - rotated.get_height() // 2 - 10
+        if pid != my_id:
+            _draw_opponent_hp_bar(screen, player.hp, player.max_hp, sx, head_y)
+
+        # 頭頂毒素層數（中毒時才顯示，自己 + 對方）
         if player.poison_stacks > 0:
-            head_y = sy - rotated.get_height() // 2 - 10
-            if pid != my_id:
-                _draw_opponent_hp_bar(screen, player.hp, player.max_hp, sx, head_y)
             _draw_poison_stack_label(screen, font,
                                      player.poison_stacks, sx, head_y)
 
         # 暈眩指示：三顆黃色小球繞頭頂旋轉
         if player.stun_until > state.tick:
-            _draw_stun_indicator(screen, sx, sy - rotated.get_height() // 2 - 8)
+            _draw_stun_indicator(screen, sx, head_y + 2)
 
 
 
