@@ -6,11 +6,16 @@ import time
 import threading
 import pygame
 
-from game.input      import read_input, set_giant_age, set_dash_context, set_burst_shots_left, set_cloak_ticks, get_mercury_aim_angle, notify_air_cannon_hit, cancel_mercury_barrage
+from game.input      import (read_input, set_giant_age, set_dash_context,
+                             set_burst_shots_left, set_cloak_ticks,
+                             get_mercury_aim_angle, notify_air_cannon_hit,
+                             cancel_mercury_barrage, init_char, init_rune)
 from game.renderer   import draw, handle_settings_click, reset_game_state, settings_blocks_click, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
 import game.charselect as charselect
+from game.charselect import CHARACTERS as _CHAR_LIST
+from game.chars.vince.giant_state import TOTAL_TICKS as _GIANT_TOTAL_TICKS
 from game.lobby      import lobby_screen
 from network.protocol import (
     PKT_JOINED, PKT_STATE, PKT_GAME_START, PKT_ALL_JOINED,
@@ -207,10 +212,9 @@ def char_select_loop(sock, server_addr, screen,
                 data, _ = sock.recvfrom(BUF_SIZE)
                 if packet_type(data) == PKT_GAME_START:
                     raw_chars = unpack_game_start(data)
-                    from game.charselect import CHARACTERS
-                    player_chars = {pid: CHARACTERS[cid]["name"]
+                    player_chars = {pid: _CHAR_LIST[cid]["name"]
                                     for pid, cid in raw_chars.items()
-                                    if 0 <= cid < len(CHARACTERS)}
+                                    if 0 <= cid < len(_CHAR_LIST)}
                     return player_chars, charselect.selected_char()["name"], charselect.selected_rune()
             except (BlockingIOError, ConnectionResetError, OSError):
                 break
@@ -313,7 +317,6 @@ def run() -> None:
             pygame.display.set_caption("PvP Game")
             continue
 
-        from game.input import init_char, init_rune
         init_char(my_char_name)
         init_rune(my_rune_id)
 
@@ -401,9 +404,8 @@ def run() -> None:
                                  obstacles, state.destroyed_obstacles)
             if local_player:
                 gt = local_player.giant_tick
-                from game.chars.vince.giant_state import TOTAL_TICKS
                 age = state.tick - gt if gt >= 0 else -1
-                set_giant_age(age if 0 <= age < TOTAL_TICKS else -1)
+                set_giant_age(age if 0 <= age < _GIANT_TOTAL_TICKS else -1)
             else:
                 set_giant_age(-1)
             set_burst_shots_left(max(0, 3 - local_player.burst_shots_fired)

@@ -1,5 +1,5 @@
 import math
-from game.state import Bullet, PLAYER_RADIUS
+from game.state import Bullet, BType, PLAYER_RADIUS
 
 EXPL_RADIUS  = 120.0
 EXPL_DMG_MAX = 50
@@ -26,7 +26,7 @@ def spawn_explosion_bullet(state, owner_id: int, aim_x: float, aim_y: float) -> 
         dx=ux * spd, dy=uy * spd,
         aim_angle=math.degrees(math.atan2(uy, ux)),
         max_range=player.bullet_range,
-        bullet_type=7,
+        bullet_type=BType.EXPLOSION,
     )
 
 

@@ -1,5 +1,5 @@
 import math
-from game.state import Bullet, PLAYER_RADIUS, BULLET_MAX_RANGE
+from game.state import Bullet, BType, PLAYER_RADIUS, BULLET_MAX_RANGE
 
 STUN_RADIUS = 100.0
 STUN_DMG    = 10
@@ -29,7 +29,7 @@ def spawn_stun_bullet(state, owner_id: int, aim_x: float, aim_y: float) -> None:
         dx=ux * spd, dy=uy * spd,
         aim_angle=math.degrees(math.atan2(uy, ux)),
         max_range=player.bullet_range,
-        bullet_type=6,
+        bullet_type=BType.STUN,
     )
 
 

@@ -1,4 +1,6 @@
 from dataclasses import dataclass, field
+from enum import IntEnum
+import bisect
 import math
 import random
 
@@ -15,6 +17,38 @@ BULLET_SPEED     = 8.0
 BULLET_RADIUS    = 5
 DEFAULT_MAX_HP   = 100      # 預設血量（未設定角色時使用）
 BULLET_MAX_RANGE = 900
+
+
+class BType(IntEnum):
+    """子彈類型常數（取代散落各處的魔術數字）。"""
+    NORMAL       = 0
+    FLASH        = 1   # 閃光彈（Agent E）
+    GRENADE      = 2   # 手榴彈（Vince E）
+    SHURIKEN     = 3   # 手裡劍（Assassin RMB）
+    SMOKE        = 4   # 煙霧彈（Assassin E）
+    MINI_GRENADE = 5   # 迷你手雷（Hunter Space）
+    STUN         = 6   # 暈眩彈（Pioneer RMB）
+    EXPLOSION    = 7   # 爆炸彈（Marksman RMB）
+    POISON_BALL  = 8   # 毒液彈（Poisoner RMB）
+    ROBOT_LASER  = 9   # Robot 雷射普攻
+
+
+# 穿透牆壁/屏障的子彈類型集合（投擲物、手裡劍、毒氣泡）
+_THROWABLE: frozenset = frozenset({
+    BType.FLASH, BType.GRENADE, BType.SHURIKEN,
+    BType.SMOKE, BType.MINI_GRENADE,
+})
+
+# 不造成接觸傷害的子彈類型集合（傷害由爆炸/觸發效果處理）
+_NON_CONTACT: frozenset = frozenset({
+    BType.FLASH, BType.GRENADE, BType.MINI_GRENADE,
+    BType.STUN, BType.EXPLOSION, BType.POISON_BALL,
+})
+
+# 碰觸玩家即觸發的特殊彈（傷害/效果在 expiry 時處理）
+_TRIGGER_ON_TOUCH: frozenset = frozenset({
+    BType.STUN, BType.EXPLOSION, BType.POISON_BALL,
+})
 
 
 @dataclass
@@ -110,6 +144,9 @@ class Player:
     mercury_volley_fired: int = 0    # volleys fired so far (0–7)
     # ── Hunter RMB 空氣炮命中序號 ─────────────────────────────────────────────
     air_cannon_hit_seq: int   = 0    # increments each time owner's air cannon hits; client resets RMB CD
+    # ── Server-side 射速限制 ──────────────────────────────────────────────────
+    last_shot_tick: int       = -9999  # tick of last successful shot spawn
+    fire_interval_ticks: int  = 0      # min ticks between shots（由 apply_char_stats 設定）
 
     def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -329,6 +366,18 @@ class Bullet:
         )
 
 
+# ── 射擊行為 dispatch 表（char name → callable(state, pid, aim_x, aim_y)）──────
+# 不在表中的角色使用預設普攻（_spawn_bullet）。
+_SHOOT_HANDLERS: dict = {
+    'Zombie': lambda s, pid, ax, ay: s._activate_blade_arc(pid, ax, ay),
+}
+
+# Robot 普攻使用特殊子彈類型（雷射），其餘角色用 NORMAL
+_BULLET_TYPE_BY_CHAR: dict = {
+    'Robot': BType.ROBOT_LASER,
+}
+
+
 @dataclass
 class GameState:
     players: dict            = field(default_factory=dict)
@@ -414,6 +463,9 @@ class GameState:
         p._shoot_slow_ticks  = int(char_cfg.get("shoot_slow_dur", 0))
         p._shoot_slow_timer  = 0
         p.pellet_interval    = float(char_cfg.get("pellet_interval", 0.0))
+        # server-side 最短射擊間隔（tick），防止重複封包造成連發
+        fi = get_stat(char_name, "fire_interval")
+        p.fire_interval_ticks = max(1, int(fi * 60)) if fi and fi > 0 else 1
 
         # 血量上限魔紋（rune_id=2）：遊戲開始即 +30% max_hp
         if rune_id == 2:
@@ -486,11 +538,17 @@ class GameState:
         if math.hypot(aim_x, aim_y) > 0:
             player.aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
         if shooting:
-            if player.char_name == 'Zombie':
-                self._activate_blade_arc(player_id, aim_x, aim_y)
+            # Server-side rate limiting：防止重複封包或客戶端異常造成連發
+            if self.tick - player.last_shot_tick < player.fire_interval_ticks:
+                shooting = False   # 本幀忽略，不產生子彈
+        if shooting:
+            player.last_shot_tick = self.tick
+            fn = _SHOOT_HANDLERS.get(player.char_name)
+            if fn:
+                fn(self, player_id, aim_x, aim_y)
             else:
                 self._spawn_bullet(player_id, aim_x, aim_y)
-                # Soldier1 R：分身同步射擊（只在普攻觸發，不在技能路徑）
+                # Pioneer R：分身同步射擊（只在普攻觸發，不在技能路徑）
                 if player.clone_until > self.tick:
                     self._spawn_clone_bullets(player_id, aim_x, aim_y)
 
@@ -555,7 +613,7 @@ class GameState:
                 self._next_bullet_id = (self._next_bullet_id + 1) % 256
             bid = self._next_bullet_id
             self._next_bullet_id = (self._next_bullet_id + 1) % 256
-            _btype = 9 if player.char_name == 'Robot' else 0
+            _btype = _BULLET_TYPE_BY_CHAR.get(player.char_name, BType.NORMAL)
             bullet = Bullet(
                 id=bid, owner_id=owner_id,
                 x=spawn_x, y=spawn_y,
@@ -614,7 +672,7 @@ class GameState:
     def _calc_coll_radius(self, bullet: "Bullet") -> float:
         """計算本 tick 的碰撞半徑（依子彈類型與成長狀態動態變化）。"""
         from game.chars.assassin.shuriken_state import SHURIKEN_GROW_RATE
-        if bullet.bullet_type == 3:   # 手裡劍：半徑隨時間線性成長
+        if bullet.bullet_type == BType.SHURIKEN:   # 手裡劍：半徑隨時間線性成長
             age = self.tick - bullet.spawn_tick
             return BULLET_RADIUS + age * SHURIKEN_GROW_RATE
         if bullet.dot_interval > 0 and bullet.bubble_radius_max > 0:   # 毒氣泡
@@ -661,7 +719,7 @@ class GameState:
                 if pid == bullet.owner_id or _invincible(player):
                     continue
                 if math.hypot(bullet.x - player.x, bullet.y - player.y) < PLAYER_RADIUS + coll_r:
-                    if bullet.bullet_type == 3:   # 手裡劍：傷害隨半徑線性成長
+                    if bullet.bullet_type == BType.SHURIKEN:   # 手裡劍：傷害隨半徑線性成長
                         damage = int(SHURIKEN_BASE_DMG
                                      + SHURIKEN_DMG_SCALE * (coll_r - BULLET_RADIUS))
                     else:
@@ -676,8 +734,8 @@ class GameState:
                     expired.append(bid)
                     return True
 
-        # 暈眩彈(6)/爆炸彈(7)/毒液彈(8)：碰觸玩家即觸發（傷害由爆炸效果處理）
-        if bullet.bullet_type in (6, 7, 8):
+        # 暈眩彈/爆炸彈/毒液彈：碰觸玩家即觸發（傷害由爆炸效果處理）
+        if bullet.bullet_type in _TRIGGER_ON_TOUCH:
             for pid, player in self.players.items():
                 if pid == bullet.owner_id or _invincible(player):
                     continue
@@ -696,10 +754,10 @@ class GameState:
             if oid in self.destroyed_obstacles or not obs.solid:
                 continue
             if obs.collides_circle(bullet.x, bullet.y, coll_r):
-                if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
+                if bullet.bullet_type in _THROWABLE or bullet.dot_interval > 0:
                     continue   # 投擲物 / 手裡劍 / 迷你手雷 / 毒氣泡穿透
                 if obstacle_hp is not None and obs.destructible and does_damage \
-                        and bullet.bullet_type != 8:   # 毒液彈不破壞障礙物
+                        and bullet.bullet_type != BType.POISON_BALL:   # 毒液彈不破壞障礙物
                     obstacle_hp[oid] -= self._roll_damage(shooter)
                     if obstacle_hp[oid] <= 0:
                         self.destroyed_obstacles.add(oid)
@@ -716,7 +774,7 @@ class GameState:
             if lb is None:
                 continue
             if math.hypot(bullet.x - lb.x, bullet.y - lb.y) < lb.radius + coll_r:
-                if bullet.bullet_type in (1, 2, 3, 4, 5) or bullet.dot_interval > 0:
+                if bullet.bullet_type in _THROWABLE or bullet.dot_interval > 0:
                     continue   # 投擲物 / 手裡劍 / 迷你手雷 / 毒氣泡穿透
                 if does_damage and shooter:
                     lb.hp -= self._roll_damage(shooter)
@@ -748,21 +806,21 @@ class GameState:
         """子彈消失時的副作用（爆炸、毒液池等）。"""
         # 停在地上 linger 結束後才引爆的投擲物
         if b.decel > 0 and b.dx == 0.0 and b.dy == 0.0:
-            if b.bullet_type == 1:
+            if b.bullet_type == BType.FLASH:
                 self._trigger_flash_explosion(b.x, b.y, b.owner_id)
-            elif b.bullet_type == 2:
+            elif b.bullet_type == BType.GRENADE:
                 self._trigger_grenade_explosion(b.x, b.y, b.owner_id)
-            elif b.bullet_type == 4:
+            elif b.bullet_type == BType.SMOKE:
                 self._trigger_smoke_explosion(b.x, b.y)
-            elif b.bullet_type == 5:
+            elif b.bullet_type == BType.MINI_GRENADE:
                 self._trigger_mini_grenade_explosion(b.x, b.y, b.owner_id)
         # 以下無論何種原因消失都觸發
-        if b.bullet_type == 6:   # 暈眩彈
+        if b.bullet_type == BType.STUN:
             from game.chars.pioneer.stun_bullet_state import trigger_stun_explosion
             trigger_stun_explosion(self, b.x, b.y, b.owner_id)
-        if b.bullet_type == 7:   # 爆炸彈
+        if b.bullet_type == BType.EXPLOSION:
             self._trigger_explosion_bullet(b.x, b.y, b.owner_id)
-        if b.bullet_type == 8 and b.distance_travelled < b.max_range:   # 毒液彈命中物體才生成毒液池
+        if b.bullet_type == BType.POISON_BALL and b.distance_travelled < b.max_range:
             self._create_poison_pool(b.x, b.y, b.owner_id)
 
     # ── 主要更新方法 ─────────────────────────────────────────────────────────
@@ -782,7 +840,7 @@ class GameState:
             shooter     = self.players.get(bullet.owner_id)
             does_damage = not (shooter and shooter.damage_min == 0
                                and shooter.damage_max == 0)
-            if bullet.bullet_type in (1, 2, 5, 6, 7, 8):
+            if bullet.bullet_type in _NON_CONTACT:
                 does_damage = False   # 投擲物 / 特殊彈不造成接觸傷害
             coll_r = self._calc_coll_radius(bullet)
 

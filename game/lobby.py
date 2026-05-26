@@ -21,7 +21,7 @@ from game.pages.layout import (
     COL_IP_VAL, COL_IP_DIM, COL_INPUT_BG, COL_INPUT_BD,
     IC_USER, IC_COG, IC_VOLUME, IC_BOLT, IC_SERVER, IC_SIGNIN, IC_GAMEPAD,
     IC_CART, IC_TASKS, IC_GAMEPAD as _IC_GAME,
-    btn, cx,
+    btn, cx, draw_back_btn,
 )
 from game.pages import game_page, characters_page, map_page, shop_page, missions_page
 
@@ -198,11 +198,7 @@ def _draw_host(screen, font_lg, font_sm, local_ip, pub_ip, back_r, start_r, mx, 
         font_lg, f"{IC_BOLT}  START WAITING", COL_HOST_TXT, radius=10)
     cx(screen, font_sm, "or press  Enter", CX, start_r.bottom + 10, (68, 85, 110))
 
-    hov_b = back_r.collidepoint(mx, my)
-    btn(screen, back_r,
-        COL_BTN_HOV if hov_b else COL_BTN, COL_BTN_BD,
-        font_sm, "< BACK", COL_BTN_TXT)
-    cx(screen, font_sm, "ESC to go back", CX, LOGICAL_H - 26, (52, 65, 90))
+    draw_back_btn(screen, font_sm, back_r, mx, my)
 
 
 # ── Join sub-screen ───────────────────────────────────────────────────────────
@@ -234,11 +230,7 @@ def _draw_join(screen, font_lg, font_sm, ip_text, cursor_on, back_r, conn_r, mx,
     tc  = COL_JOIN_TXT                           if ip_valid else (58, 68, 88)
     btn(screen, conn_r, bg, bd, font_lg, f"{IC_SIGNIN}  CONNECT", tc, radius=10)
 
-    hov_b = back_r.collidepoint(mx, my)
-    btn(screen, back_r,
-        COL_BTN_HOV if hov_b else COL_BTN, COL_BTN_BD,
-        font_sm, "< BACK", COL_BTN_TXT)
-    cx(screen, font_sm, "ESC to go back", CX, LOGICAL_H - 26, (52, 65, 90))
+    draw_back_btn(screen, font_sm, back_r, mx, my)
 
 
 # ── Quit confirm dialog ───────────────────────────────────────────────────────

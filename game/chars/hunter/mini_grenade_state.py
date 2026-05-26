@@ -1,6 +1,6 @@
 import math
 import random
-from game.state import Bullet, BULLET_MAX_RANGE
+from game.state import Bullet, BType, BULLET_MAX_RANGE
 
 MINI_RADIUS  = 60.0
 MINI_DMG_MIN = 5
@@ -31,7 +31,7 @@ def spawn_mini_grenades(state, owner_id: int) -> None:
             max_range=BULLET_MAX_RANGE * 999,
             decel=0.2,
             linger_ticks=random.randint(_LINGER_MIN, _LINGER_MAX),
-            bullet_type=5,
+            bullet_type=BType.MINI_GRENADE,
         )
 
 

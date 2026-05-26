@@ -1,5 +1,5 @@
 import math
-from game.state import Bullet, PLAYER_RADIUS, BULLET_MAX_RANGE
+from game.state import Bullet, BType, PLAYER_RADIUS, BULLET_MAX_RANGE
 
 SHURIKEN_GROW_RATE = 0.3    # px/tick，碰撞半徑每 tick 增加量
 SHURIKEN_BASE_DMG  = 15     # 初始傷害
@@ -28,5 +28,5 @@ def spawn_shuriken(state, owner_id: int, aim_x: float, aim_y: float) -> None:
         aim_angle=math.degrees(math.atan2(uy, ux)),
         max_range=float('inf'),
         spawn_tick=state.tick,
-        bullet_type=3,
+        bullet_type=BType.SHURIKEN,
     )

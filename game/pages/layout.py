@@ -80,3 +80,13 @@ def cx(surf: pygame.Surface, font: pygame.font.Font,
     """Draw horizontally-centred text."""
     s = font.render(text, True, color)
     surf.blit(s, (centre_x - s.get_width() // 2, y))
+
+
+def draw_back_btn(surf: pygame.Surface, font: pygame.font.Font,
+                  rect: pygame.Rect, mx: int, my: int) -> None:
+    """Draw the standard '< BACK' button and the ESC hint below it."""
+    hov = rect.collidepoint(mx, my)
+    btn(surf, rect,
+        COL_BTN_HOV if hov else COL_BTN, COL_BTN_BD,
+        font, "< BACK", COL_BTN_TXT)
+    cx(surf, font, "ESC to go back", LOGICAL_W // 2, LOGICAL_H - 26, (52, 65, 90))

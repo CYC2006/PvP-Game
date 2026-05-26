@@ -1,6 +1,6 @@
 import math
 import random
-from game.state import Bullet, PLAYER_RADIUS, BULLET_MAX_RANGE
+from game.state import Bullet, BType, PLAYER_RADIUS, BULLET_MAX_RANGE
 
 GRENADE_RADIUS  = 120.0
 GRENADE_DMG_MAX = 50
@@ -36,7 +36,7 @@ def spawn_grenade(state, owner_id: int, aim_x: float, aim_y: float) -> None:
             max_range=BULLET_MAX_RANGE * 999,
             decel=DECEL,
             linger_ticks=LINGER,
-            bullet_type=2,
+            bullet_type=BType.GRENADE,
         )
         if delay == 0:
             state.bullets[bid] = b

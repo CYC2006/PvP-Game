@@ -1,6 +1,6 @@
 import math
 import random
-from game.state import Bullet, PoisonPool, PLAYER_RADIUS
+from game.state import Bullet, BType, PoisonPool, PLAYER_RADIUS
 
 POOL_RADIUS    = 150.0   # RMB 大毒液池碰撞半徑
 POOL_TICKS     = 300     # 5s（RMB 與 Space 小池共用）
@@ -33,7 +33,7 @@ def spawn_pool_bullet(state, owner_id: int, aim_x: float, aim_y: float) -> None:
         dy=uy * POOL_BULLET_SPEED,
         aim_angle=math.degrees(math.atan2(uy, ux)),
         max_range=POOL_BULLET_RANGE,
-        bullet_type=8,
+        bullet_type=BType.POISON_BALL,
     )
 
 

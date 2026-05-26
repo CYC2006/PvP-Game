@@ -1,6 +1,6 @@
 import math
 import random
-from game.state import Bullet, SmokePatch, PLAYER_RADIUS, BULLET_MAX_RANGE
+from game.state import Bullet, BType, SmokePatch, PLAYER_RADIUS, BULLET_MAX_RANGE
 
 SMOKE_DURATION = 360   # 6s × 60 fps
 SMOKE_FADE     = 60    # 1s 淡出
@@ -39,7 +39,7 @@ def spawn_smoke_grenade(state, owner_id: int, aim_x: float, aim_y: float) -> Non
             max_range=BULLET_MAX_RANGE * 999,
             decel=DECEL,
             linger_ticks=LINGER,
-            bullet_type=4,
+            bullet_type=BType.SMOKE,
             spawn_tick=state.tick,
         )
         if delay == 0:
