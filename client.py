@@ -282,6 +282,12 @@ def run() -> None:
                 _start_server_thread()
                 _server_started = True
             server_ip = "127.0.0.1"
+        elif mode == "online":
+            from network.cloud_config import CLOUD_SERVER_IP, CLOUD_SERVER_PORT
+            if not CLOUD_SERVER_IP:
+                print("[Client] cloud_config.py 的 CLOUD_SERVER_IP 尚未填入！")
+                continue
+            server_ip = CLOUD_SERVER_IP
         else:
             server_ip = entered_ip
 

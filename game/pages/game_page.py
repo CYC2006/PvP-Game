@@ -11,6 +11,12 @@ from game.pages.layout import (
     btn,
 )
 
+# ── Online button colours ─────────────────────────────────────────────────────
+COL_ONLINE     = ( 22,  88, 112)
+COL_ONLINE_HOV = ( 32, 118, 148)
+COL_ONLINE_BD  = ( 60, 195, 235)
+COL_ONLINE_TXT = (155, 225, 248)
+
 # ── Mode colours ──────────────────────────────────────────────────────────────
 COL_M_SEL     = (22,  54,  92)
 COL_M_SEL_BD  = (68, 150, 238)
@@ -53,8 +59,11 @@ MODE_RS: list[pygame.Rect] = [
     for i in range(len(MODES))
 ]
 
-HOST_R = pygame.Rect(_hj_x,                  _HJBY, _HJBW, _HJBH)
-JOIN_R = pygame.Rect(_hj_x + _HJBW + _GGAP, _HJBY, _HJBW, _HJBH)
+# 保留 HOST_R / JOIN_R 定義供還原使用（見 RESTORE.md）
+HOST_R   = pygame.Rect(_hj_x,                  _HJBY, _HJBW, _HJBH)
+JOIN_R   = pygame.Rect(_hj_x + _HJBW + _GGAP, _HJBY, _HJBW, _HJBH)
+# ONLINE 按鈕橫跨原本 HOST + JOIN 的完整寬度
+ONLINE_R = pygame.Rect(_hj_x, _HJBY, _GTW, _HJBH)
 
 
 # ── Draw ──────────────────────────────────────────────────────────────────────
@@ -91,11 +100,7 @@ def draw(screen: pygame.Surface,
                             ty + (nm_s.get_height() - ic_s.get_height()) // 2))
         screen.blit(nm_s, (r.x + 16 + ic_s.get_width() + 10, ty))
 
-    # HOST / JOIN
-    btn(screen, HOST_R,
-        COL_HOST_HOV if HOST_R.collidepoint(mx, my) else COL_HOST,
-        COL_HOST_BD, font_lg, f"{IC_SERVER}  HOST", COL_HOST_TXT, radius=10)
-
-    btn(screen, JOIN_R,
-        COL_JOIN_HOV if JOIN_R.collidepoint(mx, my) else COL_JOIN,
-        COL_JOIN_BD, font_lg, f"{IC_SIGNIN}  JOIN", COL_JOIN_TXT, radius=10)
+    # ONLINE（還原成 HOST / JOIN 請見 RESTORE.md）
+    btn(screen, ONLINE_R,
+        COL_ONLINE_HOV if ONLINE_R.collidepoint(mx, my) else COL_ONLINE,
+        COL_ONLINE_BD, font_lg, f"{IC_SERVER}  ONLINE", COL_ONLINE_TXT, radius=10)

@@ -381,10 +381,9 @@ def lobby_screen(screen: pygame.Surface,
                         for i, r in enumerate(game_page.MODE_RS):
                             if r.collidepoint(mx, my):
                                 sel_mode = i
-                        if game_page.HOST_R.collidepoint(mx, my):
-                            state = "host"
-                        elif game_page.JOIN_R.collidepoint(mx, my):
-                            state = "join"
+                        # 還原成 HOST / JOIN 請見 RESTORE.md
+                        if game_page.ONLINE_R.collidepoint(mx, my):
+                            return "online", None
 
                     elif page == "characters":
                         for i, r in enumerate(characters_page.CHAR_THUMB_RS):
