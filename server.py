@@ -158,6 +158,7 @@ def run():
                     # 雙方都選完 → 套用角色數值 → 開始遊戲
                     if len(player_chars) == MAX_PLAYERS:
                         game_started = True
+                        next_tick = time.perf_counter()   # 重置計時器：防止遊戲開始前的積壓 tick 導致子彈暴速
                         from game.char_data import CHAR_ORDER, reload
                         reload()   # 每局開始重新讀取 chars.csv
                         for p_id, c_id in player_chars.items():
@@ -258,6 +259,10 @@ def run():
         if game_started and not paused:
             now = time.perf_counter()
             if now >= next_tick:
+                # 防止追趕螺旋：積壓超過 1 tick 就直接跳到「僅剩 1 tick 待補」
+                # 避免 GIL 競爭、系統卡頓時子彈以超速移動
+                if now - next_tick > TICK_DT:
+                    next_tick = now - TICK_DT
                 next_tick += TICK_DT
                 state.tick += 1
                 state.step_bullets(obstacles, obstacle_hp)
