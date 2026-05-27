@@ -162,10 +162,12 @@ def _cancel_matchmaking(sock, server_addr, player_id):
 def char_select_loop(sock, server_addr, player_id, screen,
                      font_lg, font_sm, clock) -> tuple:
     charselect.reset()
-    my_ready     = False
-    last_time    = pygame.time.get_ticks()
-    resend_timer = 0.0          # periodic PKT_CHAR_SELECT retry (Bug fix #5)
-    RESEND_INTERVAL = 1.5       # resend every 1.5s while confirmed
+    my_ready        = False
+    last_time       = pygame.time.get_ticks()
+    resend_timer    = 0.0    # PKT_CHAR_SELECT retry every 1.5s while confirmed
+    heartbeat_timer = 0.0    # PKT_JOIN heartbeat every 1s (keep-alive for server)
+    RESEND_INTERVAL    = 1.5
+    HEARTBEAT_INTERVAL = 1.0
 
     while True:
         now = pygame.time.get_ticks()
@@ -190,11 +192,19 @@ def char_select_loop(sock, server_addr, player_id, screen,
                 idx     = charselect.selected_idx()
                 rune_id = charselect.selected_rune()
                 sock.sendto(pack_char_select(idx, rune_id), server_addr)
-                resend_timer = 0.0   # reset retry timer on manual confirm
+                resend_timer = 0.0
             my_ready = charselect.is_confirmed()
 
-        # Periodically resend PKT_CHAR_SELECT while confirmed (Bug fix #5)
-        # Handles UDP packet loss so server always receives the selection.
+        # Heartbeat: send PKT_JOIN every second so server can detect if we vanish
+        heartbeat_timer += dt
+        if heartbeat_timer >= HEARTBEAT_INTERVAL:
+            heartbeat_timer = 0.0
+            try:
+                sock.sendto(pack_join(), server_addr)
+            except Exception:
+                pass
+
+        # Periodically resend PKT_CHAR_SELECT while confirmed (survive packet loss)
         if my_ready:
             resend_timer += dt
             if resend_timer >= RESEND_INTERVAL:
@@ -207,16 +217,20 @@ def char_select_loop(sock, server_addr, player_id, screen,
                 except Exception:
                     pass
 
-        # Drain socket — look for PKT_GAME_START
+        # Drain socket
         while True:
             try:
                 data, _ = sock.recvfrom(BUF_SIZE)
-                if packet_type(data) == PKT_GAME_START:
+                pkt = packet_type(data)
+                if pkt == PKT_GAME_START:
                     raw_chars    = unpack_game_start(data)
                     player_chars = {pid: _CHAR_LIST[cid]["name"]
                                     for pid, cid in raw_chars.items()
                                     if 0 <= cid < len(_CHAR_LIST)}
                     return player_chars, charselect.selected_char()["name"], charselect.selected_rune()
+                elif pkt == PKT_GAME_OVER:
+                    # Opponent left (PKT_QUIT) or server force-reset — go back to lobby
+                    return None, None, 0
             except (BlockingIOError, ConnectionResetError, OSError):
                 break
 

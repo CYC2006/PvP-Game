@@ -259,29 +259,42 @@ def run():
                         cmd.speed_mult,
                     )
 
-        # ── Disconnect detection (game only) ──────────────────────────
-        if game_started:
+        # ── Disconnect detection ──────────────────────────────────────
+        # Covers both char-select phase and in-game phase.
+        # Client sends PKT_JOIN heartbeat every 1s during char select,
+        # and PKT_CMD every frame during game — both update last_seen.
+        if len(clients) == MAX_PLAYERS:
             now = time.perf_counter()
             any_dc = any(
                 now - last_seen.get(pid, now) > TIMEOUT
                 for pid in clients
             )
-            if any_dc and not paused:
-                paused       = True
-                paused_since = now
-                dc_pids = [
-                    pid for pid in clients
-                    if now - last_seen.get(pid, now) > TIMEOUT
-                ]
-                print(f"[Server] Player {dc_pids} disconnected — game paused")
-            elif not any_dc and paused:
-                paused = False
-                print("[Server] All players reconnected — game resumed")
-            elif paused and (now - paused_since) > PAUSE_RESET_TIMEOUT:
-                print(f"[Server] Pause timeout ({PAUSE_RESET_TIMEOUT}s) — force resetting")
-                _broadcast_game_over()
-                _reset_session()
-                _try_match()
+
+            if not game_started:
+                # Char-select phase: no pause buffer — reset immediately on timeout
+                if any_dc:
+                    dc_pids = [pid for pid in clients
+                               if now - last_seen.get(pid, now) > TIMEOUT]
+                    print(f"[Server] Player {dc_pids} disconnected during char select — resetting")
+                    _broadcast_game_over()
+                    _reset_session()
+                    _try_match()
+            else:
+                # In-game phase: pause briefly before force-reset
+                if any_dc and not paused:
+                    paused       = True
+                    paused_since = now
+                    dc_pids = [pid for pid in clients
+                               if now - last_seen.get(pid, now) > TIMEOUT]
+                    print(f"[Server] Player {dc_pids} disconnected — game paused")
+                elif not any_dc and paused:
+                    paused = False
+                    print("[Server] All players reconnected — game resumed")
+                elif paused and (now - paused_since) > PAUSE_RESET_TIMEOUT:
+                    print(f"[Server] Pause timeout ({PAUSE_RESET_TIMEOUT}s) — force resetting")
+                    _broadcast_game_over()
+                    _reset_session()
+                    _try_match()
 
         # ── Game tick ─────────────────────────────────────────────────
         if game_started and not paused:
