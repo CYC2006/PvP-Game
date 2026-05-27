@@ -101,7 +101,9 @@ def run():
     game_started: bool        = False
     last_seen: dict[int, float] = {}  # pid → 最後收到封包的時間
     paused: bool              = False
+    paused_since: float       = 0.0   # 進入暫停的時間點
     TIMEOUT                   = 3.0   # 超過幾秒沒收到封包視為斷線
+    PAUSE_RESET_TIMEOUT       = 20.0  # 暫停超過幾秒自動重置 session（玩家斷線未送 PKT_QUIT）
 
     import threading
     _pub = ["fetching..."]
@@ -246,6 +248,7 @@ def run():
             )
             if any_disconnected and not paused:
                 paused = True
+                paused_since = now
                 disconnected = [
                     pid for pid in clients
                     if now - last_seen.get(pid, now) > TIMEOUT
@@ -254,6 +257,26 @@ def run():
             elif not any_disconnected and paused:
                 paused = False
                 print("[Server] All players reconnected — game resumed")
+            elif paused and (now - paused_since) > PAUSE_RESET_TIMEOUT:
+                # 暫停太久（玩家關程式沒送 PKT_QUIT）→ 強制重置 session
+                print(f"[Server] Pause timeout ({PAUSE_RESET_TIMEOUT}s) — force resetting session")
+                for a in list(clients.values()):
+                    try:
+                        sock.sendto(pack_game_over(), a)
+                    except Exception:
+                        pass
+                clients.clear()
+                addr_to_id.clear()
+                player_chars.clear()
+                player_runes.clear()
+                last_seen.clear()
+                game_started = False
+                paused       = False
+                state        = GameState()
+                obstacle_hp.clear()
+                obstacle_hp.update({oid: obs.hp for oid, obs in obstacles.items()})
+                next_tick = time.perf_counter()
+                print("[Server] Session reset — waiting for new players")
 
         # ── Tick（遊戲進行中且未暫停才跑）───────────────────────
         if game_started and not paused:

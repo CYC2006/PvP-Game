@@ -128,4 +128,7 @@ particles, shake timers, and the map surface cache.
 
 ## Notes added by user
 
+### Git Commit Messages
+**All commit messages must be written entirely in English — no Chinese, no mixed language.**
+
 <!-- Add your own notes below this line -->

@@ -122,6 +122,8 @@ def connect_screen(sock: socket.socket, server_addr: tuple,
 # ── 等待第二位玩家 ────────────────────────────────────────────────────────
 
 def wait_for_all_players(sock: socket.socket,
+                         server_addr: tuple,
+                         player_id: int,
                          screen: pygame.Surface,
                          font_lg: pygame.font.Font,
                          font_sm: pygame.font.Font,
@@ -146,11 +148,23 @@ def wait_for_all_players(sock: socket.socket,
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                try:
+                    sock.sendto(pack_quit(player_id), server_addr)
+                except Exception:
+                    pass
                 return False
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                try:
+                    sock.sendto(pack_quit(player_id), server_addr)
+                except Exception:
+                    pass
                 return False
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if BACK_R.collidepoint(mx, my):
+                    try:
+                        sock.sendto(pack_quit(player_id), server_addr)
+                    except Exception:
+                        pass
                     return False
 
         try:
@@ -183,7 +197,7 @@ def wait_for_all_players(sock: socket.socket,
 
 # ── 選角畫面 ──────────────────────────────────────────────────────────────
 
-def char_select_loop(sock, server_addr, screen,
+def char_select_loop(sock, server_addr, player_id, screen,
                      font_lg, font_sm, clock) -> tuple:
     charselect.reset()
     my_ready  = False
@@ -196,8 +210,16 @@ def char_select_loop(sock, server_addr, screen,
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                try:
+                    sock.sendto(pack_quit(player_id), server_addr)
+                except Exception:
+                    pass
                 return None, None, 0
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                try:
+                    sock.sendto(pack_quit(player_id), server_addr)
+                except Exception:
+                    pass
                 return None, None, 0
             just_confirmed = charselect.handle_event(event)
             if just_confirmed:
@@ -307,7 +329,7 @@ def run() -> None:
         pygame.display.set_caption(f"PvP Game — Player {player_id}")
 
         # ── 等待所有玩家連線 ─────────────────────────────────────────
-        if not wait_for_all_players(sock, screen, font_lg, font_sm, clock):
+        if not wait_for_all_players(sock, server_addr, player_id, screen, font_lg, font_sm, clock):
             sock.close()
             pygame.display.set_caption("PvP Game")
             continue
@@ -317,7 +339,7 @@ def run() -> None:
 
         # ── 選角 ────────────────────────────────────────────────────
         player_chars, my_char_name, my_rune_id = char_select_loop(
-            sock, server_addr, screen, font_lg, font_sm, clock)
+            sock, server_addr, player_id, screen, font_lg, font_sm, clock)
         if player_chars is None:
             sock.close()
             pygame.display.set_caption("PvP Game")
@@ -347,6 +369,10 @@ def run() -> None:
 
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
+                        try:
+                            sock.sendto(pack_quit(player_id), server_addr)
+                        except Exception:
+                            pass
                         game_running = False
                     elif event.key == pygame.K_F11:
                         fullscreen = not fullscreen
