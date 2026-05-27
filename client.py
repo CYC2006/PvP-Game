@@ -3,7 +3,6 @@ import os
 import socket
 import sys
 import time
-import threading
 import pygame
 
 from game.input      import (read_input, set_giant_age, set_dash_context,
@@ -25,37 +24,33 @@ from network.protocol import (
     packet_type,
 )
 
-PORT                = 5000
-BUF_SIZE            = 8192
-FPS                 = 60
-MAP_PATH            = "maps/map_01.json"
+PORT     = 5000
+BUF_SIZE = 8192
+FPS      = 60
+MAP_PATH = "maps/map_01.json"
 
 COL_BG   = (20, 24, 32)
 COL_TEXT = (220, 220, 220)
 COL_HINT = (110, 130, 160)
 
 
-# ── Server 背景執行緒 ─────────────────────────────────────────────────────
+# ── Matchmaking screen ────────────────────────────────────────────────────────
 
-def _start_server_thread() -> None:
-    """以 daemon thread 啟動 server，主程式結束時自動停止。"""
-    from server import run as server_run
-    t = threading.Thread(target=server_run, daemon=True)
-    t.start()
-    time.sleep(0.4)   # 給 server 時間 bind port
-
-
-# ── 連線中畫面 ───────────────────────────────────────────────────────────
-
-def connect_screen(sock: socket.socket, server_addr: tuple,
-                   screen: pygame.Surface,
-                   font_lg: pygame.font.Font,
-                   font_sm: pygame.font.Font,
-                   clock: pygame.time.Clock):
+def matchmaking_screen(sock: socket.socket, server_addr: tuple,
+                       screen: pygame.Surface,
+                       font_lg: pygame.font.Font,
+                       font_sm: pygame.font.Font,
+                       clock: pygame.time.Clock):
     """
-    顯示「連線中…」畫面並持續嘗試連線。
-    成功回傳 player_id；使用者關閉則回傳 None。
+    Send PKT_JOIN until server matches us with an opponent.
+    Waits for PKT_JOINED (our pid) + PKT_ALL_JOINED (match confirmed).
+    Both arrive together when a match is made, so this usually resolves
+    within one frame after the second player connects.
+
+    Returns player_id on success, None if cancelled.
     """
+    player_id  = None   # set when PKT_JOINED received
+    all_joined = False  # set when PKT_ALL_JOINED received
     last_sent  = 0.0
     dot_count  = 0
     dot_timer  = 0.0
@@ -74,14 +69,17 @@ def connect_screen(sock: socket.socket, server_addr: tuple,
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                _cancel_matchmaking(sock, server_addr, player_id)
                 return None
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                _cancel_matchmaking(sock, server_addr, player_id)
                 return None
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if BACK_R.collidepoint(mx, my):
+                    _cancel_matchmaking(sock, server_addr, player_id)
                     return None
 
-        # 每秒發一次 JOIN
+        # Send PKT_JOIN heartbeat every second
         if now_perf - last_sent >= 1.0:
             try:
                 sock.sendto(pack_join(), server_addr)
@@ -89,23 +87,36 @@ def connect_screen(sock: socket.socket, server_addr: tuple,
                 pass
             last_sent = now_perf
 
-        # 看有沒有收到 JOINED
-        try:
-            data, _ = sock.recvfrom(BUF_SIZE)
-            if packet_type(data) == PKT_JOINED:
-                return unpack_joined(data)
-        except (BlockingIOError, ConnectionResetError, OSError):
-            pass
+        # Drain socket — handles any arrival order of PKT_JOINED / PKT_ALL_JOINED
+        while True:
+            try:
+                data, _ = sock.recvfrom(BUF_SIZE)
+                pkt = packet_type(data)
+                if pkt == PKT_JOINED:
+                    player_id = unpack_joined(data)
+                    if all_joined:
+                        return player_id   # both arrived (uncommon order)
+                elif pkt == PKT_ALL_JOINED:
+                    all_joined = True
+                    if player_id is not None:
+                        return player_id   # match complete
+                # Other packets (stale GAME_OVER etc.): discard
+            except (BlockingIOError, ConnectionResetError, OSError):
+                break
 
-        # 繪製
+        # ── Draw ─────────────────────────────────────────────────────
         screen.fill(COL_BG)
         dots = "." * dot_count
-        t = font_lg.render(f"Connecting{dots}", True, COL_TEXT)
+        if player_id is None:
+            msg = f"Searching for opponent{dots}"
+        else:
+            msg = f"Match found! Starting{dots}"
+        t = font_lg.render(msg, True, COL_TEXT)
         screen.blit(t, (CX - t.get_width() // 2, CY - 30))
+
         s = font_sm.render(f"{server_addr[0]}:{server_addr[1]}", True, COL_HINT)
         screen.blit(s, (CX - s.get_width() // 2, CY + 15))
 
-        # BACK 按鈕
         hov = BACK_R.collidepoint(mx, my)
         pygame.draw.rect(screen, (36, 46, 68) if hov else (24, 30, 46),
                          BACK_R, border_radius=9)
@@ -115,103 +126,27 @@ def connect_screen(sock: socket.socket, server_addr: tuple,
                               (200, 215, 248) if hov else (130, 150, 195))
         screen.blit(lbl, (BACK_R.centerx - lbl.get_width()  // 2,
                           BACK_R.centery - lbl.get_height() // 2))
-
         pygame.display.flip()
 
 
-# ── 等待第二位玩家 ────────────────────────────────────────────────────────
-
-def wait_for_all_players(sock: socket.socket,
-                         server_addr: tuple,
-                         player_id: int,
-                         screen: pygame.Surface,
-                         font_lg: pygame.font.Font,
-                         font_sm: pygame.font.Font,
-                         clock: pygame.time.Clock) -> bool:
-    """
-    顯示「等待玩家加入…」畫面，收到 PKT_ALL_JOINED 後回傳 True；
-    玩家關閉視窗則回傳 False。
-    每秒重發一次 PKT_JOIN，讓 server 補送漏掉的 PKT_ALL_JOINED。
-    """
-    dot_count = 0
-    dot_timer = 0.0
-    join_timer = 0.0   # 重發 JOIN 計時器
-    CX, CY    = LOGICAL_W // 2, LOGICAL_H // 2
-    BACK_R    = pygame.Rect(CX - 80, CY + 80, 160, 44)
-
-    while True:
-        dt = clock.tick(FPS) / 1000.0
-        dot_timer  += dt
-        join_timer += dt
-        # 每秒重發一次 JOIN，觸發 server 補送 PKT_ALL_JOINED（防止漏包）
-        if join_timer >= 1.0:
-            join_timer = 0.0
-            try:
-                sock.sendto(pack_join(), server_addr)
-            except Exception:
-                pass
-        if dot_timer >= 0.4:
-            dot_timer  = 0.0
-            dot_count  = (dot_count + 1) % 4
-
-        mx, my = pygame.mouse.get_pos()
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                try:
-                    sock.sendto(pack_quit(player_id), server_addr)
-                except Exception:
-                    pass
-                return False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                try:
-                    sock.sendto(pack_quit(player_id), server_addr)
-                except Exception:
-                    pass
-                return False
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if BACK_R.collidepoint(mx, my):
-                    try:
-                        sock.sendto(pack_quit(player_id), server_addr)
-                    except Exception:
-                        pass
-                    return False
-
+def _cancel_matchmaking(sock, server_addr, player_id):
+    """Send PKT_QUIT if already assigned a pid (in session), else just return."""
+    if player_id is not None:
         try:
-            data, _ = sock.recvfrom(BUF_SIZE)
-            if packet_type(data) == PKT_ALL_JOINED:
-                return True
-        except (BlockingIOError, ConnectionResetError, OSError):
+            sock.sendto(pack_quit(player_id), server_addr)
+        except Exception:
             pass
 
-        screen.fill(COL_BG)
-        dots = "." * dot_count
-        t = font_lg.render(f"Waiting for player{dots}", True, COL_TEXT)
-        screen.blit(t, (CX - t.get_width() // 2, CY - 20))
-        hint = font_sm.render("Share your IP with the other player", True, COL_HINT)
-        screen.blit(hint, (CX - hint.get_width() // 2, CY + 20))
 
-        # BACK 按鈕
-        hov = BACK_R.collidepoint(mx, my)
-        pygame.draw.rect(screen, (36, 46, 68) if hov else (24, 30, 46),
-                         BACK_R, border_radius=9)
-        pygame.draw.rect(screen, (72, 92, 138) if hov else (48, 62, 95),
-                         BACK_R, 2, border_radius=9)
-        lbl = font_sm.render("← BACK", True,
-                              (200, 215, 248) if hov else (130, 150, 195))
-        screen.blit(lbl, (BACK_R.centerx - lbl.get_width()  // 2,
-                          BACK_R.centery - lbl.get_height() // 2))
-
-        pygame.display.flip()
-
-
-# ── 選角畫面 ──────────────────────────────────────────────────────────────
+# ── 選角畫面 ──────────────────────────────────────────────────────────────────
 
 def char_select_loop(sock, server_addr, player_id, screen,
                      font_lg, font_sm, clock) -> tuple:
     charselect.reset()
-    my_ready  = False
-    last_time = pygame.time.get_ticks()
+    my_ready     = False
+    last_time    = pygame.time.get_ticks()
+    resend_timer = 0.0          # periodic PKT_CHAR_SELECT retry (Bug fix #5)
+    RESEND_INTERVAL = 1.5       # resend every 1.5s while confirmed
 
     while True:
         now = pygame.time.get_ticks()
@@ -233,17 +168,32 @@ def char_select_loop(sock, server_addr, player_id, screen,
                 return None, None, 0
             just_confirmed = charselect.handle_event(event)
             if just_confirmed:
-                # 每次確認（含重新確認）都送一次選角封包
                 idx     = charselect.selected_idx()
                 rune_id = charselect.selected_rune()
                 sock.sendto(pack_char_select(idx, rune_id), server_addr)
+                resend_timer = 0.0   # reset retry timer on manual confirm
             my_ready = charselect.is_confirmed()
 
+        # Periodically resend PKT_CHAR_SELECT while confirmed (Bug fix #5)
+        # Handles UDP packet loss so server always receives the selection.
+        if my_ready:
+            resend_timer += dt
+            if resend_timer >= RESEND_INTERVAL:
+                resend_timer = 0.0
+                try:
+                    sock.sendto(
+                        pack_char_select(charselect.selected_idx(),
+                                         charselect.selected_rune()),
+                        server_addr)
+                except Exception:
+                    pass
+
+        # Drain socket — look for PKT_GAME_START
         while True:
             try:
                 data, _ = sock.recvfrom(BUF_SIZE)
                 if packet_type(data) == PKT_GAME_START:
-                    raw_chars = unpack_game_start(data)
+                    raw_chars    = unpack_game_start(data)
                     player_chars = {pid: _CHAR_LIST[cid]["name"]
                                     for pid, cid in raw_chars.items()
                                     if 0 <= cid < len(_CHAR_LIST)}
@@ -257,7 +207,7 @@ def char_select_loop(sock, server_addr, player_id, screen,
         clock.tick(FPS)
 
 
-# ── 遊戲結束提示畫面（短暫顯示後回到 lobby）────────────────────────────
+# ── 遊戲結束提示畫面 ─────────────────────────────────────────────────────────
 
 def _show_game_over_msg(screen: pygame.Surface,
                         font_lg: pygame.font.Font,
@@ -265,7 +215,7 @@ def _show_game_over_msg(screen: pygame.Surface,
                         clock: pygame.time.Clock,
                         message: str,
                         duration: float = 2.5) -> None:
-    CX, CY = LOGICAL_W // 2, LOGICAL_H // 2
+    CX, CY  = LOGICAL_W // 2, LOGICAL_H // 2
     elapsed = 0.0
     while elapsed < duration:
         dt = clock.tick(FPS) / 1000.0
@@ -274,7 +224,7 @@ def _show_game_over_msg(screen: pygame.Surface,
             if event.type == pygame.QUIT:
                 return
             if event.type == pygame.KEYDOWN:
-                return   # 任意鍵跳過
+                return
         screen.fill((15, 18, 26))
         t = font_lg.render(message, True, (220, 180, 80))
         screen.blit(t, (CX - t.get_width() // 2, CY - 20))
@@ -283,7 +233,7 @@ def _show_game_over_msg(screen: pygame.Surface,
         pygame.display.flip()
 
 
-# ── 主流程 ────────────────────────────────────────────────────────────────
+# ── 主流程 ────────────────────────────────────────────────────────────────────
 
 def run() -> None:
     os.environ['SDL_WINDOW_ALLOW_HIGHDPI'] = '1'
@@ -297,57 +247,37 @@ def run() -> None:
     font_lg  = pygame.font.Font(_font_bold, 24)
     font_sm  = pygame.font.Font(_font_reg,  15)
     font_hud = pygame.font.Font(_font_bold, 24)
-    clock   = pygame.time.Clock()
+    clock    = pygame.time.Clock()
 
-    _server_started = False   # server daemon 只啟動一次
-    app_running     = True    # False → 離開整個程式
+    app_running = True
 
     while app_running:
 
-        # ── Lobby：Host / Join 選擇 ──────────────────────────────────
-        mode, entered_ip = lobby_screen(screen, font_lg, font_sm, clock)
+        # ── Lobby ────────────────────────────────────────────────────
+        mode, _ = lobby_screen(screen, font_lg, font_sm, clock)
         if mode is None:
-            break   # 使用者關閉視窗 → 結束程式
+            break   # user closed window
 
-        if mode == "host":
-            if not _server_started:
-                _start_server_thread()
-                _server_started = True
-            server_ip = "127.0.0.1"
-        elif mode == "online":
-            from network.cloud_config import CLOUD_SERVER_IP, CLOUD_SERVER_PORT
-            if not CLOUD_SERVER_IP:
-                print("[Client] cloud_config.py 的 CLOUD_SERVER_IP 尚未填入！")
-                continue
-            server_ip = CLOUD_SERVER_IP
-        else:
-            server_ip = entered_ip
+        # ── Resolve server address ───────────────────────────────────
+        from network.cloud_config import CLOUD_SERVER_IP, CLOUD_SERVER_PORT
+        server_addr = (CLOUD_SERVER_IP, CLOUD_SERVER_PORT)
 
-        server_addr = (server_ip, PORT)
-
-        # ── 連線 ────────────────────────────────────────────────────
+        # ── Matchmaking ──────────────────────────────────────────────
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setblocking(False)
 
-        player_id = connect_screen(sock, server_addr, screen, font_lg, font_sm, clock)
+        player_id = matchmaking_screen(sock, server_addr,
+                                       screen, font_lg, font_sm, clock)
         if player_id is None:
             sock.close()
-            # 若是視窗關閉事件，connect_screen 回傳 None
-            # 這裡直接 continue 回 lobby（不結束程式）
             continue
 
         pygame.display.set_caption(f"PvP Game — Player {player_id}")
 
-        # ── 等待所有玩家連線 ─────────────────────────────────────────
-        if not wait_for_all_players(sock, server_addr, player_id, screen, font_lg, font_sm, clock):
-            sock.close()
-            pygame.display.set_caption("PvP Game")
-            continue
-
-        # ── 載入地圖 ────────────────────────────────────────────────
+        # ── Load map ─────────────────────────────────────────────────
         obstacles = load_map(MAP_PATH)
 
-        # ── 選角 ────────────────────────────────────────────────────
+        # ── Char select ──────────────────────────────────────────────
         player_chars, my_char_name, my_rune_id = char_select_loop(
             sock, server_addr, player_id, screen, font_lg, font_sm, clock)
         if player_chars is None:
@@ -358,18 +288,17 @@ def run() -> None:
         init_char(my_char_name)
         init_rune(my_rune_id)
 
-        # ── 遊戲主迴圈 ──────────────────────────────────────────────
-        reset_game_state()          # 清除上一局的殘骸、粒子、震動等視覺狀態
-        state          = GameState()
-        keys_held      = set()
-        fullscreen     = False
-        game_running   = True
-        opponent_quit  = False   # 對方先離開
+        # ── Game loop ────────────────────────────────────────────────
+        reset_game_state()
+        state         = GameState()
+        keys_held     = set()
+        fullscreen    = False
+        game_running  = True
+        opponent_quit = False
 
         while game_running:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    # 關閉視窗 → 通知 server + 結束程式
                     try:
                         sock.sendto(pack_quit(player_id), server_addr)
                     except Exception:
@@ -388,10 +317,12 @@ def run() -> None:
                         fullscreen = not fullscreen
                         if fullscreen:
                             screen = pygame.display.set_mode(
-                                (LOGICAL_W, LOGICAL_H), pygame.SCALED | pygame.FULLSCREEN)
+                                (LOGICAL_W, LOGICAL_H),
+                                pygame.SCALED | pygame.FULLSCREEN)
                         else:
                             screen = pygame.display.set_mode(
-                                (LOGICAL_W, LOGICAL_H), pygame.SCALED | pygame.RESIZABLE)
+                                (LOGICAL_W, LOGICAL_H),
+                                pygame.SCALED | pygame.RESIZABLE)
                     keys_held.add(event.key)
 
                 elif event.type == pygame.KEYUP:
@@ -409,12 +340,14 @@ def run() -> None:
 
             logical_mouse = pygame.mouse.get_pos()
             mx, my_pos    = logical_mouse
-            shift_held    = (pygame.K_LSHIFT in keys_held or pygame.K_RSHIFT in keys_held)
+            shift_held    = (pygame.K_LSHIFT in keys_held
+                             or pygame.K_RSHIFT in keys_held)
             suppress_lmb  = settings_blocks_click(mx, my_pos)
             _lp_prev      = state.players.get(player_id)
             _is_stunned   = bool(_lp_prev and _lp_prev.stun_until > state.tick)
             cmd, effective_stance, ammo, is_reloading, skill_cooldowns = read_input(
-                player_id, keys_held, logical_mouse, shift_held, suppress_lmb, _is_stunned)
+                player_id, keys_held, logical_mouse, shift_held,
+                suppress_lmb, _is_stunned)
             aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
             _mercury_locked = get_mercury_aim_angle()
             if _mercury_locked is not None:
@@ -445,22 +378,21 @@ def run() -> None:
                 set_dash_context(local_player.x, local_player.y,
                                  obstacles, state.destroyed_obstacles)
             if local_player:
-                gt = local_player.giant_tick
+                gt  = local_player.giant_tick
                 age = state.tick - gt if gt >= 0 else -1
                 set_giant_age(age if 0 <= age < _GIANT_TOTAL_TICKS else -1)
             else:
                 set_giant_age(-1)
-            set_burst_shots_left(max(0, 3 - local_player.burst_shots_fired)
-                                 if local_player and local_player.burst_next_tick >= 0
-                                 else 0)
+            set_burst_shots_left(
+                max(0, 3 - local_player.burst_shots_fired)
+                if local_player and local_player.burst_next_tick >= 0
+                else 0)
             set_cloak_ticks(
                 max(0, local_player.cloak_until - state.tick)
                 if local_player and local_player.cloak_until > state.tick
-                else 0
-            )
+                else 0)
             if local_player:
                 notify_air_cannon_hit(local_player.air_cannon_hit_seq)
-                # 大招被中斷（server 已清除 mercury_start_tick）：同步清除本地鎖定
                 if local_player.mercury_start_tick < 0 and _is_stunned:
                     cancel_mercury_barrage()
             draw(screen, state, player_id, font_sm, obstacles,
@@ -470,18 +402,16 @@ def run() -> None:
             pygame.display.flip()
             clock.tick(FPS)
 
-        # ── 遊戲結束後處理 ───────────────────────────────────────────
+        # ── Post-game ────────────────────────────────────────────────
         sock.close()
         pygame.display.set_caption("PvP Game")
 
         if not app_running:
-            break   # 視窗被關閉 → 直接離開
+            break
 
         if opponent_quit:
             _show_game_over_msg(screen, font_lg, font_sm, clock,
                                 "Opponent has left the game")
-
-        # 否則直接 continue → 回到 lobby
 
     pygame.quit()
 

@@ -11,8 +11,7 @@ from network.protocol import (
 )
 
 
-# ── 技能 dispatch 表（char name → callable(state, pid, aim_x, aim_y)）────────
-# 新增角色時只需在對應欄位加一行，不用改動 run() 本體
+# ── Skill dispatch tables (char name → callable) ─────────────────────────────
 _SKILL_E: dict = {
     'Agent':    lambda s, pid, ax, ay: s._spawn_flash_grenade(pid, ax, ay),
     'Vince':    lambda s, pid, ax, ay: s._spawn_grenade(pid, ax, ay),
@@ -56,35 +55,19 @@ _SKILL_R: dict = {
 }
 
 
-HOST        = "0.0.0.0"
-PORT        = 5000
-TICK_RATE   = 60
-TICK_DT     = 1.0 / TICK_RATE
-MAX_PLAYERS = 2
-BUF_SIZE    = 8192
-MAP_PATH    = "maps/map_01.json"
-
-
-def get_local_ip() -> str:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
-    finally:
-        s.close()
-
-
-def get_public_ip() -> str:
-    try:
-        import urllib.request
-        with urllib.request.urlopen("https://api.ipify.org", timeout=3) as r:
-            return r.read().decode().strip()
-    except Exception:
-        return "unavailable"
+HOST                = "0.0.0.0"
+PORT                = 5000
+TICK_RATE           = 60
+TICK_DT             = 1.0 / TICK_RATE
+MAX_PLAYERS         = 2
+BUF_SIZE            = 8192
+MAP_PATH            = "maps/map_01.json"
+TIMEOUT             = 5.0    # secs without packet during game → pause
+PAUSE_RESET_TIMEOUT = 5.0    # secs paused before force-reset  (was 20)
+QUEUE_TIMEOUT       = 12.0   # secs without JOIN heartbeat → remove from queue
 
 
 def run():
-    # 載入地圖
     obstacles   = load_map(MAP_PATH)
     obstacle_hp = {oid: obs.hp for oid, obs in obstacles.items()}
     print(f"[Server] Loaded map: {len(obstacles)} obstacles")
@@ -92,33 +75,75 @@ def run():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((HOST, PORT))
     sock.setblocking(False)
+    print(f"[Server] Listening on {HOST}:{PORT}")
 
-    state: GameState          = GameState()
-    clients: dict[int, tuple] = {}   # pid → addr
-    addr_to_id: dict          = {}   # addr → pid
-    player_chars: dict        = {}   # pid → char_id（選角完成後才有）
-    player_runes: dict        = {}   # pid → rune_id
-    game_started: bool        = False
-    last_seen: dict[int, float] = {}  # pid → 最後收到封包的時間
-    paused: bool              = False
-    paused_since: float       = 0.0   # 進入暫停的時間點
-    TIMEOUT                   = 3.0   # 超過幾秒沒收到封包視為斷線
-    PAUSE_RESET_TIMEOUT       = 20.0  # 暫停超過幾秒自動重置 session（玩家斷線未送 PKT_QUIT）
+    # ── Session state ──────────────────────────────────────────────────────
+    state: GameState            = GameState()
+    clients: dict[int, tuple]   = {}   # pid → addr
+    addr_to_id: dict            = {}   # addr → pid
+    player_chars: dict          = {}   # pid → char_id
+    player_runes: dict          = {}   # pid → rune_id
+    game_started: bool          = False
+    last_seen: dict[int, float] = {}   # pid → perf_counter time
+    paused: bool                = False
+    paused_since: float         = 0.0
+    next_tick: float            = time.perf_counter()
 
-    import threading
-    _pub = ["fetching..."]
-    def _fetch():
-        _pub[0] = get_public_ip()
-        print(f"[Server] Public IP : {_pub[0]}:{PORT}")
-    threading.Thread(target=_fetch, daemon=True).start()
+    # ── Matchmaking queue: addr → timestamp of last PKT_JOIN ──────────────
+    waiting: dict               = {}
 
-    print(f"[Server] Local  IP : {get_local_ip()}:{PORT}")
-    print(f"[Server] Waiting for {MAX_PLAYERS} players...")
+    # ── Helpers ───────────────────────────────────────────────────────────
 
-    next_tick = time.perf_counter()
+    def _broadcast_game_over() -> None:
+        for a in list(clients.values()):
+            try:
+                sock.sendto(pack_game_over(), a)
+            except Exception:
+                pass
 
+    def _reset_session() -> None:
+        nonlocal state, game_started, paused, next_tick
+        clients.clear()
+        addr_to_id.clear()
+        player_chars.clear()
+        player_runes.clear()
+        last_seen.clear()
+        game_started = False
+        paused       = False
+        state        = GameState()
+        obstacle_hp.clear()
+        obstacle_hp.update({oid: obs.hp for oid, obs in obstacles.items()})
+        next_tick    = time.perf_counter()
+        print("[Server] Session reset — waiting for players")
+
+    def _try_match() -> None:
+        """Pull players from waiting queue into the current session."""
+        while waiting and len(clients) < MAX_PLAYERS:
+            addr = next(iter(waiting))   # FIFO: oldest entry first
+            del waiting[addr]
+            pid              = len(clients) + 1
+            clients[pid]     = addr
+            addr_to_id[addr] = pid
+            state.add_player(pid)
+            sock.sendto(pack_joined(pid), addr)
+            last_seen[pid] = time.perf_counter()
+            print(f"[Server] Player {pid} matched from queue ({addr})")
+        if len(clients) == MAX_PLAYERS:
+            for a in clients.values():
+                sock.sendto(pack_all_joined(), a)
+            print("[Server] All players matched — sending PKT_ALL_JOINED")
+
+    # ── Main loop ─────────────────────────────────────────────────────────
     while True:
-        # ── 收封包 ────────────────────────────────────────────────
+        now = time.perf_counter()
+
+        # Remove stale waiting entries (no PKT_JOIN heartbeat)
+        stale = [a for a, t in waiting.items() if now - t > QUEUE_TIMEOUT]
+        for a in stale:
+            del waiting[a]
+            print(f"[Server] Removed stale queue entry {a}")
+
+        # ── Receive all pending packets ────────────────────────────────
         while True:
             try:
                 data, addr = sock.recvfrom(BUF_SIZE)
@@ -127,90 +152,78 @@ def run():
 
             ptype = packet_type(data)
 
-            # ── 更新最後收到封包時間 ──────────────────────────────
+            # Refresh last_seen for in-session players
             if addr in addr_to_id:
                 last_seen[addr_to_id[addr]] = time.perf_counter()
 
-            # ── 加入 ──────────────────────────────────────────────
+            # ── PKT_JOIN ───────────────────────────────────────────────
             if ptype == PKT_JOIN:
-                if addr not in addr_to_id:
-                    if len(clients) < MAX_PLAYERS:
-                        pid = len(clients) + 1
-                        clients[pid]     = addr
-                        addr_to_id[addr] = pid
-                        state.add_player(pid)
-                        sock.sendto(pack_joined(pid), addr)
-                        last_seen[pid] = time.perf_counter()
-                        print(f"[Server] Player {pid} joined from {addr}")
-                        if len(clients) == MAX_PLAYERS:
-                            for a in clients.values():
-                                sock.sendto(pack_all_joined(), a)
-                            print("[Server] All players joined — sending PKT_ALL_JOINED")
-                else:
-                    # 已連線的玩家重發 JOIN（可能漏了 JOINED 或 ALL_JOINED）
-                    # 補送一次，讓客戶端可以繼續往下走
+                if addr in addr_to_id:
+                    # Already in session — resend relevant packet(s)
                     pid = addr_to_id[addr]
                     sock.sendto(pack_joined(pid), addr)
                     if len(clients) == MAX_PLAYERS and not game_started:
                         sock.sendto(pack_all_joined(), addr)
+                    elif game_started and player_chars:
+                        # Client may have missed PKT_GAME_START (Bug fix #2)
+                        sock.sendto(pack_game_start(player_chars), addr)
+                else:
+                    # Not in session: add / refresh queue entry
+                    waiting[addr] = time.perf_counter()
+                    if len(clients) < MAX_PLAYERS:
+                        _try_match()
 
-            # ── 選角 ──────────────────────────────────────────────
+            # ── PKT_CHAR_SELECT ────────────────────────────────────────
             elif ptype == PKT_CHAR_SELECT:
-                if addr in addr_to_id and not game_started and len(data) >= 2:
-                    pid     = addr_to_id[addr]
-                    char_id = data[1]
-                    rune_id = data[2] if len(data) >= 3 else 0
-                    player_chars[pid] = char_id
-                    player_runes[pid] = rune_id
-                    print(f"[Server] Player {pid} selected char {char_id}, rune {rune_id}")
+                if addr in addr_to_id and len(data) >= 2:
+                    if game_started:
+                        # Client missed PKT_GAME_START — resend (Bug fix #2)
+                        if player_chars:
+                            sock.sendto(pack_game_start(player_chars), addr)
+                    else:
+                        pid     = addr_to_id[addr]
+                        char_id = data[1]
+                        rune_id = data[2] if len(data) >= 3 else 0
+                        player_chars[pid] = char_id
+                        player_runes[pid] = rune_id
+                        print(f"[Server] Player {pid} selected char {char_id}, rune {rune_id}")
 
-                    # 雙方都選完 → 套用角色數值 → 開始遊戲
-                    if len(player_chars) == MAX_PLAYERS:
-                        game_started = True
-                        next_tick = time.perf_counter()   # 重置計時器：防止遊戲開始前的積壓 tick 導致子彈暴速
-                        from game.char_data import CHAR_ORDER, reload
-                        reload()   # 每局開始重新讀取 chars.csv
-                        for p_id, c_id in player_chars.items():
-                            char_name = CHAR_ORDER[c_id]
-                            r_id      = player_runes.get(p_id, 0)
-                            state.apply_char_stats(p_id, char_name, r_id)
-                            print(f"[Server] Player {p_id} → {char_name}, rune {r_id}")
-                        payload = pack_game_start(player_chars)
-                        for a in clients.values():
-                            try:
-                                sock.sendto(payload, a)
-                            except Exception:
-                                pass
-                        print("[Server] Both selected — Game start!")
+                        if len(player_chars) == MAX_PLAYERS:
+                            game_started = True
+                            next_tick    = time.perf_counter()
+                            from game.char_data import CHAR_ORDER, reload
+                            reload()
+                            for p_id, c_id in player_chars.items():
+                                char_name = CHAR_ORDER[c_id]
+                                r_id      = player_runes.get(p_id, 0)
+                                state.apply_char_stats(p_id, char_name, r_id)
+                                print(f"[Server] Player {p_id} → {char_name}, rune {r_id}")
+                            payload = pack_game_start(player_chars)
+                            for a in clients.values():
+                                try:
+                                    sock.sendto(payload, a)
+                                except Exception:
+                                    pass
+                            print("[Server] Both selected — Game start!")
 
-            # ── 主動離場：重置 session，廣播 GAME_OVER ───────────
+            # ── PKT_QUIT ───────────────────────────────────────────────
             elif ptype == PKT_QUIT:
-                pid_who = addr_to_id.get(addr, "?")
-                print(f"[Server] Player {pid_who} quit — broadcasting GAME_OVER and resetting session")
-                for a in list(clients.values()):
-                    try:
-                        sock.sendto(pack_game_over(), a)
-                    except Exception:
-                        pass
-                clients.clear()
-                addr_to_id.clear()
-                player_chars.clear()
-                player_runes.clear()
-                last_seen.clear()
-                game_started = False
-                paused       = False
-                state        = GameState()
-                obstacle_hp.clear()
-                obstacle_hp.update({oid: obs.hp for oid, obs in obstacles.items()})
-                next_tick = time.perf_counter()
-                print("[Server] Session reset — waiting for new players")
-                break   # 跳出本輪封包迴圈，回到外層 while True 繼續等待
+                if addr in addr_to_id:
+                    pid_who = addr_to_id.get(addr, "?")
+                    print(f"[Server] Player {pid_who} quit — broadcasting GAME_OVER")
+                    _broadcast_game_over()
+                    _reset_session()
+                    _try_match()   # immediately fill from queue if waiting
+                    break          # exit inner recv loop; restart outer loop
+                elif addr in waiting:
+                    # Waiting player cancelled matchmaking
+                    del waiting[addr]
+                    print(f"[Server] Waiting player {addr} cancelled queue")
 
-            # ── 指令（遊戲進行中才處理）──────────────────────────
+            # ── PKT_CMD ────────────────────────────────────────────────
             elif ptype == PKT_CMD:
                 if addr in addr_to_id and game_started:
-                    cmd = unpack_command(data)
-                    # 技能觸發（依 dispatch 表查角色名稱）
+                    cmd      = unpack_command(data)
                     p        = state.players.get(cmd.player_id)
                     r_active = p and p.r_skill_phase > 0
                     _mercury = p and p.mercury_start_tick >= 0
@@ -246,51 +259,34 @@ def run():
                         cmd.speed_mult,
                     )
 
-        # ── 斷線偵測（遊戲中才檢查）─────────────────────────────
+        # ── Disconnect detection (game only) ──────────────────────────
         if game_started:
             now = time.perf_counter()
-            any_disconnected = any(
+            any_dc = any(
                 now - last_seen.get(pid, now) > TIMEOUT
                 for pid in clients
             )
-            if any_disconnected and not paused:
-                paused = True
+            if any_dc and not paused:
+                paused       = True
                 paused_since = now
-                disconnected = [
+                dc_pids = [
                     pid for pid in clients
                     if now - last_seen.get(pid, now) > TIMEOUT
                 ]
-                print(f"[Server] Player {disconnected} disconnected — game paused")
-            elif not any_disconnected and paused:
+                print(f"[Server] Player {dc_pids} disconnected — game paused")
+            elif not any_dc and paused:
                 paused = False
                 print("[Server] All players reconnected — game resumed")
             elif paused and (now - paused_since) > PAUSE_RESET_TIMEOUT:
-                # 暫停太久（玩家關程式沒送 PKT_QUIT）→ 強制重置 session
-                print(f"[Server] Pause timeout ({PAUSE_RESET_TIMEOUT}s) — force resetting session")
-                for a in list(clients.values()):
-                    try:
-                        sock.sendto(pack_game_over(), a)
-                    except Exception:
-                        pass
-                clients.clear()
-                addr_to_id.clear()
-                player_chars.clear()
-                player_runes.clear()
-                last_seen.clear()
-                game_started = False
-                paused       = False
-                state        = GameState()
-                obstacle_hp.clear()
-                obstacle_hp.update({oid: obs.hp for oid, obs in obstacles.items()})
-                next_tick = time.perf_counter()
-                print("[Server] Session reset — waiting for new players")
+                print(f"[Server] Pause timeout ({PAUSE_RESET_TIMEOUT}s) — force resetting")
+                _broadcast_game_over()
+                _reset_session()
+                _try_match()
 
-        # ── Tick（遊戲進行中且未暫停才跑）───────────────────────
+        # ── Game tick ─────────────────────────────────────────────────
         if game_started and not paused:
             now = time.perf_counter()
             if now >= next_tick:
-                # 防止追趕螺旋：積壓超過 1 tick 就直接跳到「僅剩 1 tick 待補」
-                # 避免 GIL 競爭、系統卡頓時子彈以超速移動
                 if now - next_tick > TICK_DT:
                     next_tick = now - TICK_DT
                 next_tick += TICK_DT
@@ -329,9 +325,9 @@ def run():
                 state.step_rune_recovery()
 
                 payload = pack_state(state)
-                for addr in clients.values():
+                for a in clients.values():
                     try:
-                        sock.sendto(payload, addr)
+                        sock.sendto(payload, a)
                     except Exception:
                         pass
 
