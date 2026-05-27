@@ -40,6 +40,6 @@ rsync -avz --progress \
 echo "[Deploy] Done. Restarting server..."
 
 ssh -i "$KEY" "$REMOTE" \
-  "pkill -f server.py; sleep 1; nohup python3 server.py > server.log 2>&1 &"
+  "pkill -f server.py; sleep 1; nohup python3 -u server.py > server.log 2>&1 &"
 
 echo "[Deploy] Server restarted."
