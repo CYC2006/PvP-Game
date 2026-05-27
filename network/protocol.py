@@ -12,6 +12,8 @@ PKT_GAME_START  = 0x06   # server → clients: 雙方都選完，遊戲開始
 PKT_ALL_JOINED  = 0x07   # server → clients: 所有玩家都已連線，可進入選角
 PKT_QUIT        = 0x08   # client → server: 玩家主動離開
 PKT_GAME_OVER   = 0x09   # server → clients: 一方離開，遊戲結束
+PKT_PING        = 0x0A   # client → server: liveness probe（不改任何 session 狀態）
+PKT_PONG        = 0x0B   # server → client: probe 回應
 
 # PKT_STATE 格式:
 #   | type(1) | tick(I) |
@@ -498,6 +500,11 @@ def pack_quit(player_id: int) -> bytes:
 def pack_game_over() -> bytes:
     """server → clients: 廣播遊戲結束。"""
     return bytes([PKT_GAME_OVER])
+
+
+def pack_ping() -> bytes:
+    """client → server: liveness probe, no session state change."""
+    return bytes([PKT_PING])
 
 
 def packet_type(data: bytes) -> int:

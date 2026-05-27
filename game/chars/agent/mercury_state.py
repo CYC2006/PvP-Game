@@ -1,7 +1,7 @@
 import math
 
 VOLLEY_COUNT    = 7
-VOLLEY_INTERVAL = 12                               # ticks between volleys
+VOLLEY_INTERVAL = 6                                # ticks between volleys
 ULT_DURATION    = VOLLEY_INTERVAL * (VOLLEY_COUNT - 1)   # 72 ticks
 _ANGLES_DEG     = (-6.0, -3.0, 0.0, 3.0, 6.0)
 

@@ -5,7 +5,7 @@ import sys
 from game.state    import GameState
 from game.obstacle import load_map
 from network.protocol import (
-    PKT_JOIN, PKT_CMD, PKT_CHAR_SELECT, PKT_QUIT,
+    PKT_JOIN, PKT_CMD, PKT_CHAR_SELECT, PKT_QUIT, PKT_PING, PKT_PONG,
     pack_joined, pack_all_joined, pack_state, pack_game_start, pack_game_over,
     unpack_command, packet_type,
 )
@@ -155,6 +155,12 @@ def run():
             # Refresh last_seen for in-session players
             if addr in addr_to_id:
                 last_seen[addr_to_id[addr]] = time.perf_counter()
+
+            # ── PKT_PING ──────────────────────────────────────────────
+            if ptype == PKT_PING:
+                # Liveness probe — respond immediately, no session state change
+                sock.sendto(bytes([PKT_PONG]), addr)
+                continue
 
             # ── PKT_JOIN ───────────────────────────────────────────────
             if ptype == PKT_JOIN:
