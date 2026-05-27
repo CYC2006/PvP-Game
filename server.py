@@ -146,6 +146,13 @@ def run():
                             for a in clients.values():
                                 sock.sendto(pack_all_joined(), a)
                             print("[Server] All players joined — sending PKT_ALL_JOINED")
+                else:
+                    # 已連線的玩家重發 JOIN（可能漏了 JOINED 或 ALL_JOINED）
+                    # 補送一次，讓客戶端可以繼續往下走
+                    pid = addr_to_id[addr]
+                    sock.sendto(pack_joined(pid), addr)
+                    if len(clients) == MAX_PLAYERS and not game_started:
+                        sock.sendto(pack_all_joined(), addr)
 
             # ── 選角 ──────────────────────────────────────────────
             elif ptype == PKT_CHAR_SELECT:

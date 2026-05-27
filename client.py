@@ -131,15 +131,25 @@ def wait_for_all_players(sock: socket.socket,
     """
     顯示「等待玩家加入…」畫面，收到 PKT_ALL_JOINED 後回傳 True；
     玩家關閉視窗則回傳 False。
+    每秒重發一次 PKT_JOIN，讓 server 補送漏掉的 PKT_ALL_JOINED。
     """
     dot_count = 0
     dot_timer = 0.0
+    join_timer = 0.0   # 重發 JOIN 計時器
     CX, CY    = LOGICAL_W // 2, LOGICAL_H // 2
     BACK_R    = pygame.Rect(CX - 80, CY + 80, 160, 44)
 
     while True:
         dt = clock.tick(FPS) / 1000.0
-        dot_timer += dt
+        dot_timer  += dt
+        join_timer += dt
+        # 每秒重發一次 JOIN，觸發 server 補送 PKT_ALL_JOINED（防止漏包）
+        if join_timer >= 1.0:
+            join_timer = 0.0
+            try:
+                sock.sendto(pack_join(), server_addr)
+            except Exception:
+                pass
         if dot_timer >= 0.4:
             dot_timer  = 0.0
             dot_count  = (dot_count + 1) % 4
