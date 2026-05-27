@@ -1,8 +1,9 @@
-# ── 雲端伺服器設定 ────────────────────────────────────────────────────────────
-# Oracle Cloud Reserved IP（建立 VM 後填入此處）。
-# Reserved IP 永遠不變，可以安全寫死。
+# ── 伺服器設定 ────────────────────────────────────────────────────────────────
+# 同機測試（兩個終端機）：  CLOUD_SERVER_IP = "127.0.0.1"
+#   → client 自動在背景啟動本機 server，兩個視窗都點 ONLINE 即可撮合。
 #
-# 填入後，兩位玩家只需選 ONLINE 即可連線，不需要 port forwarding。
+# 跨網路（Oracle VM）：     CLOUD_SERVER_IP = "161.33.6.210"
+#   → 先執行 bash deploy.sh 部署 server，兩台電腦點 ONLINE 即可撮合。
 
-CLOUD_SERVER_IP   = "161.33.6.210"
+CLOUD_SERVER_IP   = "127.0.0.1"   # ← 改成 Oracle IP 即切換至線上模式
 CLOUD_SERVER_PORT = 5000

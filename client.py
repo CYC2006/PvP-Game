@@ -3,6 +3,7 @@ import os
 import socket
 import sys
 import time
+import threading
 import pygame
 
 from game.input      import (read_input, set_giant_age, set_dash_context,
@@ -32,6 +33,24 @@ MAP_PATH = "maps/map_01.json"
 COL_BG   = (20, 24, 32)
 COL_TEXT = (220, 220, 220)
 COL_HINT = (110, 130, 160)
+
+
+# ── Local server thread (used when CLOUD_SERVER_IP = "127.0.0.1") ────────────
+
+_local_server_started = False
+
+def _start_server_thread() -> None:
+    """Start server.py as a daemon thread for local / same-machine testing.
+    Silently ignores bind errors (another terminal may already own the port)."""
+    def _run_safe():
+        try:
+            from server import run as server_run
+            server_run()
+        except OSError as e:
+            print(f"[Server] Could not bind port (already in use?): {e}")
+    t = threading.Thread(target=_run_safe, daemon=True)
+    t.start()
+    time.sleep(0.4)   # give the server time to bind
 
 
 # ── Matchmaking screen ────────────────────────────────────────────────────────
@@ -250,6 +269,17 @@ def run() -> None:
     clock    = pygame.time.Clock()
 
     app_running = True
+    global _local_server_started
+
+    from network.cloud_config import CLOUD_SERVER_IP, CLOUD_SERVER_PORT
+    server_addr = (CLOUD_SERVER_IP, CLOUD_SERVER_PORT)
+
+    # Auto-start a local server thread when connecting to localhost.
+    # This lets two terminals on the same machine test without Oracle VM.
+    # For production (Oracle VM IP), this block is skipped entirely.
+    if CLOUD_SERVER_IP in ("127.0.0.1", "localhost") and not _local_server_started:
+        _start_server_thread()
+        _local_server_started = True
 
     while app_running:
 
@@ -257,10 +287,6 @@ def run() -> None:
         mode, _ = lobby_screen(screen, font_lg, font_sm, clock)
         if mode is None:
             break   # user closed window
-
-        # ── Resolve server address ───────────────────────────────────
-        from network.cloud_config import CLOUD_SERVER_IP, CLOUD_SERVER_PORT
-        server_addr = (CLOUD_SERVER_IP, CLOUD_SERVER_PORT)
 
         # ── Matchmaking ──────────────────────────────────────────────
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
