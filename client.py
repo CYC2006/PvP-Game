@@ -19,8 +19,8 @@ from game.chars.vince.giant_state import TOTAL_TICKS as _GIANT_TOTAL_TICKS
 from game.lobby      import lobby_screen
 from network.protocol import (
     PKT_JOINED, PKT_STATE, PKT_GAME_START, PKT_ALL_JOINED,
-    PKT_QUIT, PKT_GAME_OVER, PKT_PING, PKT_PONG,
-    pack_join, pack_command, pack_char_select, pack_quit, pack_ping,
+    PKT_QUIT, PKT_GAME_OVER,
+    pack_join, pack_command, pack_char_select, pack_quit,
     unpack_joined, unpack_state, unpack_game_start,
     packet_type,
 )
@@ -55,45 +55,19 @@ def _start_server_thread() -> None:
 
 # ── Matchmaking screen ────────────────────────────────────────────────────────
 
-_PROBE_TIMEOUT  = 2.0    # seconds to wait for Oracle VM PKT_PONG
-_PROBE_INTERVAL = 0.5    # seconds between PKT_PING retries during probe
-
-def matchmaking_screen(sock: socket.socket, oracle_addr: tuple,
+def matchmaking_screen(sock: socket.socket, server_addr: tuple,
                        screen: pygame.Surface,
                        font_lg: pygame.font.Font,
                        font_sm: pygame.font.Font,
                        clock: pygame.time.Clock):
     """
-    Phase 1 — Server auto-detection (up to _PROBE_TIMEOUT seconds):
-      Send PKT_PING to Oracle VM; simultaneously pre-start local server thread.
-      PKT_PONG received → use Oracle VM.
-      Timeout          → Oracle VM unreachable, use 127.0.0.1 (local server).
-
-    Phase 2 — Matchmaking:
-      Send PKT_JOIN every second to the resolved server.
-      Wait for PKT_JOINED + PKT_ALL_JOINED.
-
+    Send PKT_JOIN every second to server_addr.
+    Wait for PKT_JOINED + PKT_ALL_JOINED from the server.
     Returns (player_id, server_addr) on success, (None, None) on cancel.
-    cloud_config.py never needs to be changed manually.
     """
-    global _local_server_started
-
-    LOCAL_ADDR = ("127.0.0.1", oracle_addr[1])
-
-    # Pre-start local server in background so it's ready if Oracle VM probe fails.
-    # Silently ignores bind errors (another terminal may already own the port).
-    if not _local_server_started:
-        _start_server_thread()
-        _local_server_started = True
-
-    # ── State ─────────────────────────────────────────────────────────
-    server_addr  = None      # determined in Phase 1
-    probe_elapsed = 0.0
-    probe_sent    = -999.0   # force immediate first probe
-
-    player_id  = None        # Phase 2: set on PKT_JOINED
-    all_joined = False       # Phase 2: set on PKT_ALL_JOINED
-    last_join  = -999.0      # Phase 2: throttle PKT_JOIN sends
+    player_id  = None
+    all_joined = False
+    last_join  = -999.0
 
     dot_count = 0
     dot_timer = 0.0
@@ -101,8 +75,8 @@ def matchmaking_screen(sock: socket.socket, oracle_addr: tuple,
     BACK_R    = pygame.Rect(CX - 80, CY + 110, 160, 44)
 
     while True:
-        dt       = clock.tick(FPS) / 1000.0
-        now      = time.perf_counter()
+        dt    = clock.tick(FPS) / 1000.0
+        now   = time.perf_counter()
         dot_timer += dt
         if dot_timer >= 0.4:
             dot_timer = 0.0
@@ -122,77 +96,39 @@ def matchmaking_screen(sock: socket.socket, oracle_addr: tuple,
                     _cancel_matchmaking(sock, server_addr, player_id)
                     return None, None
 
-        # ── Phase 1: probe ────────────────────────────────────────────
-        if server_addr is None:
-            probe_elapsed += dt
+        # Send PKT_JOIN every second
+        if now - last_join >= 1.0:
+            try:
+                sock.sendto(pack_join(), server_addr)
+            except Exception:
+                pass
+            last_join = now
 
-            # Send PKT_PING every _PROBE_INTERVAL seconds
-            if now - probe_sent >= _PROBE_INTERVAL:
-                try:
-                    sock.sendto(pack_ping(), oracle_addr)
-                except Exception:
-                    pass
-                probe_sent = now
-
-            # Drain socket for PKT_PONG
-            while True:
-                try:
-                    data, _ = sock.recvfrom(BUF_SIZE)
-                    if packet_type(data) == PKT_PONG:
-                        server_addr = oracle_addr
-                        print(f"[Client] Oracle VM reachable → {oracle_addr[0]}")
-                        break
-                except (BlockingIOError, ConnectionResetError, OSError):
-                    break
-
-            # Timed out → fall back to local server
-            if server_addr is None and probe_elapsed >= _PROBE_TIMEOUT:
-                server_addr = LOCAL_ADDR
-                print("[Client] Oracle VM unreachable → using localhost")
-
-        # ── Phase 2: matchmaking ──────────────────────────────────────
-        else:
-            # Send PKT_JOIN every second
-            if now - last_join >= 1.0:
-                try:
-                    sock.sendto(pack_join(), server_addr)
-                except Exception:
-                    pass
-                last_join = now
-
-            # Drain socket — handles either arrival order
-            while True:
-                try:
-                    data, _ = sock.recvfrom(BUF_SIZE)
-                    pkt = packet_type(data)
-                    if pkt == PKT_JOINED:
-                        player_id = unpack_joined(data)
-                        if all_joined:
-                            return player_id, server_addr
-                    elif pkt == PKT_ALL_JOINED:
-                        all_joined = True
-                        if player_id is not None:
-                            return player_id, server_addr
-                    # PKT_PONG (late), PKT_GAME_OVER (stale), etc. → discard
-                except (BlockingIOError, ConnectionResetError, OSError):
-                    break
+        # Drain socket
+        while True:
+            try:
+                data, _ = sock.recvfrom(BUF_SIZE)
+                pkt = packet_type(data)
+                if pkt == PKT_JOINED:
+                    player_id = unpack_joined(data)
+                    if all_joined:
+                        return player_id, server_addr
+                elif pkt == PKT_ALL_JOINED:
+                    all_joined = True
+                    if player_id is not None:
+                        return player_id, server_addr
+            except (BlockingIOError, ConnectionResetError, OSError):
+                break
 
         # ── Draw ──────────────────────────────────────────────────────
         screen.fill(COL_BG)
         dots = "." * dot_count
-        if server_addr is None:
-            msg       = f"Connecting to server{dots}"
-            addr_hint = f"{oracle_addr[0]}:{oracle_addr[1]}"
-        elif player_id is None:
-            msg       = f"Searching for opponent{dots}"
-            addr_hint = f"{server_addr[0]}:{server_addr[1]}"
-        else:
-            msg       = f"Match found! Starting{dots}"
-            addr_hint = f"{server_addr[0]}:{server_addr[1]}"
+        msg  = (f"Match found! Starting{dots}" if player_id is not None
+                else f"Waiting for opponent{dots}")
 
         t = font_lg.render(msg, True, COL_TEXT)
         screen.blit(t, (CX - t.get_width() // 2, CY - 30))
-        s = font_sm.render(addr_hint, True, COL_HINT)
+        s = font_sm.render(f"{server_addr[0]}:{server_addr[1]}", True, COL_HINT)
         screen.blit(s, (CX - s.get_width() // 2, CY + 15))
 
         hov = BACK_R.collidepoint(mx, my)
@@ -342,23 +278,29 @@ def run() -> None:
     clock    = pygame.time.Clock()
 
     app_running  = True
-
-    from network.cloud_config import CLOUD_SERVER_IP, CLOUD_SERVER_PORT
-    oracle_addr = (CLOUD_SERVER_IP, CLOUD_SERVER_PORT)
-    # Local server auto-start is handled inside matchmaking_screen (probe fallback).
+    global _local_server_started
 
     while app_running:
 
         # ── Lobby ────────────────────────────────────────────────────
-        mode, _ = lobby_screen(screen, font_lg, font_sm, clock)
+        mode, join_ip = lobby_screen(screen, font_lg, font_sm, clock)
         if mode is None:
             break   # user closed window
+
+        # ── Resolve server address ────────────────────────────────────
+        if mode == "host":
+            if not _local_server_started:
+                _start_server_thread()
+                _local_server_started = True
+            server_addr = ("127.0.0.1", PORT)
+        else:   # "join"
+            server_addr = (join_ip, PORT)
 
         # ── Matchmaking ──────────────────────────────────────────────
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setblocking(False)
 
-        player_id, server_addr = matchmaking_screen(sock, oracle_addr,
+        player_id, server_addr = matchmaking_screen(sock, server_addr,
                                                     screen, font_lg, font_sm, clock)
         if player_id is None:
             sock.close()

@@ -100,7 +100,11 @@ def draw(screen: pygame.Surface,
                             ty + (nm_s.get_height() - ic_s.get_height()) // 2))
         screen.blit(nm_s, (r.x + 16 + ic_s.get_width() + 10, ty))
 
-    # ONLINE（還原成 HOST / JOIN 請見 RESTORE.md）
-    btn(screen, ONLINE_R,
-        COL_ONLINE_HOV if ONLINE_R.collidepoint(mx, my) else COL_ONLINE,
-        COL_ONLINE_BD, font_lg, f"{IC_SERVER}  ONLINE", COL_ONLINE_TXT, radius=10)
+    # HOST / JOIN
+    btn(screen, HOST_R,
+        COL_HOST_HOV if HOST_R.collidepoint(mx, my) else COL_HOST,
+        COL_HOST_BD, font_lg, f"{IC_SERVER}  HOST", COL_HOST_TXT, radius=10)
+
+    btn(screen, JOIN_R,
+        COL_JOIN_HOV if JOIN_R.collidepoint(mx, my) else COL_JOIN,
+        COL_JOIN_BD, font_lg, f"{IC_SIGNIN}  JOIN", COL_JOIN_TXT, radius=10)

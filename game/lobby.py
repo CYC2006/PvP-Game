@@ -2,22 +2,23 @@
 Main menu / lobby screen — primary controller.
 
 Returns:
-  ("online", None)  – user clicked ONLINE (auto-matchmaking)
-  (None,     None)  – user closed the window
+  ("host", None)    – user clicked HOST (caller starts local server → 127.0.0.1)
+  ("join", ip_str)  – user entered IP and confirmed JOIN
+  (None,   None)    – user closed the window
 """
-import socket
-import threading
 import pygame
 
 from game.pages.layout import (
     LOGICAL_W, LOGICAL_H,
     _TB, _SW,
-    COL_BG, COL_SEP, COL_HINT, COL_TITLE,
+    COL_BG, COL_SEP, COL_HINT,
     COL_BTN, COL_BTN_HOV, COL_BTN_BD, COL_BTN_TXT,
     COL_PL_BG, COL_PL_BD, COL_PL_NAME, COL_LEVEL,
+    COL_JOIN, COL_JOIN_HOV, COL_JOIN_BD, COL_JOIN_TXT,
+    COL_IP_VAL, COL_IP_DIM, COL_INPUT_BG, COL_INPUT_BD,
     IC_USER, IC_COG, IC_VOLUME, IC_BOLT, IC_SERVER, IC_GAMEPAD,
-    IC_CART, IC_TASKS,
-    btn, cx,
+    IC_CART, IC_TASKS, IC_SIGNIN,
+    btn, cx, draw_back_btn,
 )
 from game.pages import game_page, characters_page, map_page, shop_page, missions_page
 
@@ -29,7 +30,7 @@ _TAB_X    = 10
 _TAB_Y0   = _TB + 18
 _TAB_STEP = _TAB_H + 8
 
-IC_MAP = ''   # nf-fa-map (Nerd Fonts)
+IC_MAP = ''   # nf-fa-map
 
 SIDEBAR_TABS = [
     ("game",       IC_GAMEPAD, "GAME"),
@@ -44,7 +45,6 @@ TAB_RS = [
     for i in range(len(SIDEBAR_TABS))
 ]
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 # ── Persistent chrome ─────────────────────────────────────────────────────────
 
@@ -52,63 +52,49 @@ def _draw_topbar(screen, font_lg, font_sm, sfx_r, set_r, mx, my,
                  gold: int = 0, gems: int = 0):
     pygame.draw.line(screen, COL_SEP, (0, _TB), (LOGICAL_W, _TB), 1)
 
-    PY, PH = 10, 48   # vertical position & height shared by all containers
-    PAD    = 12        # inner horizontal padding
+    PY, PH = 10, 48
+    PAD    = 12
 
-    # ── Player name container (icon + name, left-aligned) ─────────────────
     pl_r = pygame.Rect(18, PY, 220, PH)
     pygame.draw.rect(screen, COL_PL_BG, pl_r, border_radius=8)
     pygame.draw.rect(screen, COL_PL_BD, pl_r, 2, border_radius=8)
     ns = font_lg.render(f"{IC_USER}  PLAYER_001", True, COL_PL_NAME)
     screen.blit(ns, (pl_r.x + PAD, pl_r.centery - ns.get_height() // 2))
 
-    # ── Level container  [⚡ Lv.  ···  1] ────────────────────────────────
     lv_r = pygame.Rect(pl_r.right + 8, PY, 148, PH)
     pygame.draw.rect(screen, COL_PL_BG, lv_r, border_radius=8)
     pygame.draw.rect(screen, COL_PL_BD, lv_r, 2, border_radius=8)
-    # Left: bolt icon + label
     lv_lbl = font_sm.render(f"{IC_BOLT}  Lv.", True, COL_LEVEL)
-    screen.blit(lv_lbl, (lv_r.x + PAD,
-                          lv_r.centery - lv_lbl.get_height() // 2))
-    # Right: level value
+    screen.blit(lv_lbl, (lv_r.x + PAD, lv_r.centery - lv_lbl.get_height() // 2))
     lv_val = font_lg.render("1", True, COL_LEVEL)
     screen.blit(lv_val, (lv_r.right - PAD - lv_val.get_width(),
                           lv_r.centery - lv_val.get_height() // 2))
 
-    # ── Gold container  [[ingot] GOLD  ···  0] ────────────────────────────
     gd_r = pygame.Rect(lv_r.right + 8, PY, 190, PH)
     pygame.draw.rect(screen, COL_PL_BG, gd_r, border_radius=8)
     pygame.draw.rect(screen, (75, 62, 22), gd_r, 2, border_radius=8)
-    # Left: ingot icon
     ix, iy = gd_r.x + PAD, gd_r.centery - 6
     pygame.draw.rect(screen, (175, 128, 25), (ix,     iy,     22, 12), border_radius=3)
     pygame.draw.rect(screen, (235, 190, 55), (ix + 3, iy + 2, 16,  5), border_radius=2)
-    # Left: "GOLD" label
     gl_s = font_sm.render("GOLD", True, (152, 118, 45))
     screen.blit(gl_s, (ix + 28, gd_r.centery - gl_s.get_height() // 2))
-    # Right: value
     gv_s = font_lg.render(str(gold), True, (225, 182, 65))
     screen.blit(gv_s, (gd_r.right - PAD - gv_s.get_width(),
                         gd_r.centery - gv_s.get_height() // 2))
 
-    # ── Gem container  [[diamond] GEMS  ···  0] ───────────────────────────
     gm_r = pygame.Rect(gd_r.right + 8, PY, 190, PH)
     pygame.draw.rect(screen, COL_PL_BG, gm_r, border_radius=8)
     pygame.draw.rect(screen, (22, 72, 48), gm_r, 2, border_radius=8)
-    # Left: gem diamond icon
     gx2, gy2 = gm_r.x + PAD + 7, gm_r.centery
     gem_pts = [(gx2, gy2 - 8), (gx2 + 7, gy2), (gx2, gy2 + 8), (gx2 - 7, gy2)]
     pygame.draw.polygon(screen, (42, 165, 100), gem_pts)
     pygame.draw.polygon(screen, (95, 230, 158), gem_pts, 1)
-    # Left: "GEMS" label
     gml_s = font_sm.render("GEMS", True, (42, 138, 82))
     screen.blit(gml_s, (gm_r.x + PAD + 20, gm_r.centery - gml_s.get_height() // 2))
-    # Right: value
     gmv_s = font_lg.render(str(gems), True, (85, 215, 140))
     screen.blit(gmv_s, (gm_r.right - PAD - gmv_s.get_width(),
                          gm_r.centery - gmv_s.get_height() // 2))
 
-    # ── SFX / Settings buttons ─────────────────────────────────────────────
     for r, icon in ((sfx_r, IC_VOLUME), (set_r, IC_COG)):
         bg = COL_BTN_HOV if r.collidepoint(mx, my) else COL_BTN
         btn(screen, r, bg, COL_BTN_BD, font_lg, icon, COL_BTN_TXT, radius=8)
@@ -141,10 +127,60 @@ def _draw_sidebar(screen, font_lg, font_sm, page, mx, my):
 
         ic_s = font_sm.render(icon, True, tc)
         nm_s = font_sm.render(lbl,  True, tc)
-        bx   = r.x + 14   # left-aligned with padding
+        bx   = r.x + 14
         screen.blit(ic_s, (bx, r.centery - ic_s.get_height() // 2))
         screen.blit(nm_s, (bx + ic_s.get_width() + 8,
                             r.centery - nm_s.get_height() // 2))
+
+
+# ── JOIN sub-screen ───────────────────────────────────────────────────────────
+
+def _draw_join(screen: pygame.Surface,
+               font_lg: pygame.font.Font,
+               font_sm: pygame.font.Font,
+               ip_str: str,
+               mx: int, my: int,
+               connect_r: pygame.Rect,
+               back_r:    pygame.Rect) -> None:
+    CX, CY = LOGICAL_W // 2, LOGICAL_H // 2
+
+    title = font_lg.render(f"{IC_SIGNIN}  JOIN GAME", True, COL_JOIN_TXT)
+    screen.blit(title, (CX - title.get_width() // 2, CY - 110))
+
+    hint = font_sm.render("Enter the HOST player's IP address:", True, COL_HINT)
+    screen.blit(hint, (CX - hint.get_width() // 2, CY - 68))
+
+    # IP input field
+    input_r = pygame.Rect(CX - 200, CY - 40, 400, 52)
+    pygame.draw.rect(screen, COL_INPUT_BG, input_r, border_radius=8)
+    pygame.draw.rect(screen, COL_INPUT_BD, input_r, 2, border_radius=8)
+
+    if ip_str:
+        ip_s = font_lg.render(ip_str, True, COL_IP_VAL)
+        screen.blit(ip_s, (input_r.x + 14,
+                            input_r.centery - ip_s.get_height() // 2))
+        cursor_x = input_r.x + 14 + ip_s.get_width() + 3
+        if (pygame.time.get_ticks() // 500) % 2 == 0:
+            pygame.draw.rect(screen, COL_IP_VAL,
+                             (cursor_x, input_r.y + 13, 2, 26))
+    else:
+        ph = font_lg.render("e.g.  192.168.1.100", True, COL_IP_DIM)
+        screen.blit(ph, (input_r.x + 14, input_r.centery - ph.get_height() // 2))
+        if (pygame.time.get_ticks() // 500) % 2 == 0:
+            pygame.draw.rect(screen, COL_IP_DIM,
+                             (input_r.x + 14, input_r.y + 13, 2, 26))
+
+    # CONNECT button (dimmed when no IP entered)
+    if ip_str:
+        btn(screen, connect_r,
+            COL_JOIN_HOV if connect_r.collidepoint(mx, my) else COL_JOIN,
+            COL_JOIN_BD, font_lg, f"{IC_SIGNIN}  CONNECT", COL_JOIN_TXT, radius=9)
+    else:
+        btn(screen, connect_r,
+            (28, 34, 50), COL_BTN_BD,
+            font_lg, f"{IC_SIGNIN}  CONNECT", (55, 65, 85), radius=9)
+
+    draw_back_btn(screen, font_sm, back_r, mx, my)
 
 
 # ── Quit confirm dialog ───────────────────────────────────────────────────────
@@ -155,28 +191,22 @@ def _draw_quit_dialog(screen: pygame.Surface,
                       confirm_r: pygame.Rect,
                       cancel_r:  pygame.Rect,
                       mx: int, my: int) -> None:
-    """半透明遮罩 + 確認離開對話框。"""
-    # 半透明暗色遮罩
     overlay = pygame.Surface((LOGICAL_W, LOGICAL_H), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 155))
     screen.blit(overlay, (0, 0))
 
-    # 對話框面板
     CX  = LOGICAL_W // 2
     PW, PH = 400, 190
     panel = pygame.Rect(CX - PW // 2, LOGICAL_H // 2 - PH // 2, PW, PH)
     pygame.draw.rect(screen, (18, 22, 34), panel, border_radius=14)
     pygame.draw.rect(screen, (58, 72, 108), panel, 2, border_radius=14)
 
-    # 標題
     title = font_lg.render("Exit Game?", True, (220, 225, 242))
     screen.blit(title, (CX - title.get_width() // 2, panel.y + 26))
 
-    # 提示文字
     sub = font_sm.render("Are you sure you want to quit?", True, (88, 105, 145))
     screen.blit(sub, (CX - sub.get_width() // 2, panel.y + 62))
 
-    # CANCEL 按鈕
     hov_c = cancel_r.collidepoint(mx, my)
     pygame.draw.rect(screen, COL_BTN_HOV if hov_c else COL_BTN,
                      cancel_r, border_radius=9)
@@ -186,7 +216,6 @@ def _draw_quit_dialog(screen: pygame.Surface,
     screen.blit(cs, (cancel_r.centerx - cs.get_width()  // 2,
                      cancel_r.centery - cs.get_height() // 2))
 
-    # YES, QUIT 按鈕
     hov_q = confirm_r.collidepoint(mx, my)
     pygame.draw.rect(screen, (185, 45, 45) if hov_q else (130, 30, 30),
                      confirm_r, border_radius=9)
@@ -204,24 +233,28 @@ def lobby_screen(screen: pygame.Surface,
                  font_sm: pygame.font.Font,
                  clock: pygame.time.Clock) -> tuple:
 
-    FPS          = 60
-    page         = "game"
-    sel_mode     = 0
+    FPS           = 60
+    page          = "game"
+    sel_mode      = 0
     char_page_idx = 0
     map_page_idx  = 0
-    gold         = 200
-    gems         = 10
-    confirm_quit = False
+    gold          = 200
+    gems          = 10
+    confirm_quit  = False
+    join_mode     = False
+    ip_str        = ""
 
-    # Top-right icon buttons
     SFX_R  = pygame.Rect(LOGICAL_W - 26 - 46 - 10 - 46, 11, 46, 46)
     SET_R  = pygame.Rect(LOGICAL_W - 26 - 46,            11, 46, 46)
 
-    # Quit confirm dialog buttons
     _DCX       = LOGICAL_W // 2
     _DY        = LOGICAL_H // 2 - 190 // 2
     DCANCEL_R  = pygame.Rect(_DCX - 186, _DY + 120, 170, 44)
     DCONFIRM_R = pygame.Rect(_DCX + 16,  _DY + 120, 170, 44)
+
+    CX, CY     = LOGICAL_W // 2, LOGICAL_H // 2
+    CONNECT_R  = pygame.Rect(CX - 110, CY + 30,  220, 50)
+    JBACK_R    = pygame.Rect(CX - 80,  CY + 108, 160, 44)
 
     while True:
         clock.tick(FPS)
@@ -232,14 +265,35 @@ def lobby_screen(screen: pygame.Surface,
             if event.type == pygame.QUIT:
                 return None, None
 
+            # ── Keyboard ──────────────────────────────────────────────────
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    if confirm_quit:
-                        confirm_quit = False
+                if join_mode:
+                    if event.key == pygame.K_ESCAPE:
+                        join_mode = False
+                        ip_str    = ""
+                    elif event.key == pygame.K_RETURN and ip_str:
+                        return "join", ip_str
+                    elif event.key == pygame.K_BACKSPACE:
+                        ip_str = ip_str[:-1]
                     else:
-                        confirm_quit = True
+                        c = event.unicode
+                        if c in "0123456789." and len(ip_str) < 15:
+                            ip_str += c
+                else:
+                    if event.key == pygame.K_ESCAPE:
+                        confirm_quit = not confirm_quit
 
+            # ── Mouse ─────────────────────────────────────────────────────
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+
+                if join_mode:
+                    if CONNECT_R.collidepoint(mx, my) and ip_str:
+                        return "join", ip_str
+                    elif JBACK_R.collidepoint(mx, my):
+                        join_mode = False
+                        ip_str    = ""
+                    continue
+
                 if confirm_quit:
                     if DCONFIRM_R.collidepoint(mx, my):
                         return None, None
@@ -256,8 +310,11 @@ def lobby_screen(screen: pygame.Surface,
                     for i, r in enumerate(game_page.MODE_RS):
                         if r.collidepoint(mx, my):
                             sel_mode = i
-                    if game_page.ONLINE_R.collidepoint(mx, my):
-                        return "online", None
+                    if game_page.HOST_R.collidepoint(mx, my):
+                        return "host", None
+                    elif game_page.JOIN_R.collidepoint(mx, my):
+                        join_mode = True
+                        ip_str    = ""
 
                 elif page == "characters":
                     for i, r in enumerate(characters_page.CHAR_THUMB_RS):
@@ -277,19 +334,23 @@ def lobby_screen(screen: pygame.Surface,
         _draw_topbar(screen, font_lg, font_sm, SFX_R, SET_R, mx, my, gold, gems)
         _draw_sidebar(screen, font_lg, font_sm, page, mx, my)
 
-        if page == "game":
-            game_page.draw(screen, font_lg, font_sm, mx, my, sel_mode)
-        elif page == "characters":
-            characters_page.draw(screen, font_lg, font_sm, char_page_idx)
-        elif page == "map":
-            map_page.draw(screen, font_lg, font_sm, map_page_idx)
-        elif page == "shop":
-            shop_page.draw(screen, font_lg, font_sm)
-        elif page == "missions":
-            missions_page.draw(screen, font_lg, font_sm, mx, my)
+        if join_mode:
+            _draw_join(screen, font_lg, font_sm, ip_str, mx, my,
+                       CONNECT_R, JBACK_R)
+        else:
+            if page == "game":
+                game_page.draw(screen, font_lg, font_sm, mx, my, sel_mode)
+            elif page == "characters":
+                characters_page.draw(screen, font_lg, font_sm, char_page_idx)
+            elif page == "map":
+                map_page.draw(screen, font_lg, font_sm, map_page_idx)
+            elif page == "shop":
+                shop_page.draw(screen, font_lg, font_sm)
+            elif page == "missions":
+                missions_page.draw(screen, font_lg, font_sm, mx, my)
 
-        if confirm_quit:
-            _draw_quit_dialog(screen, font_lg, font_sm,
-                              DCONFIRM_R, DCANCEL_R, mx, my)
+            if confirm_quit:
+                _draw_quit_dialog(screen, font_lg, font_sm,
+                                  DCONFIRM_R, DCANCEL_R, mx, my)
 
         pygame.display.flip()
