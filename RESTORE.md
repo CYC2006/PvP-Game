@@ -1,82 +1,111 @@
-# 還原 Host / Join 模式說明
+# RESTORE.md — 連線模式切換說明
 
-這份文件記錄了從「雙人雲端版」還原回「Host / Join 模式」所需的所有步驟。
-Host / Join 的邏輯程式碼完整保留在原本的檔案裡，只是沒有被 UI 呼叫到。
+本文件記錄各種連線模式的切換方法，以及目前各模式相關程式碼的保留狀態。
 
 ---
 
-## 目前狀態（雲端版）
-
-主畫面只有一個 **ONLINE** 按鈕，玩家按下後自動連到 `cloud_config.py` 裡的雲端 IP。
-
-## 還原目標（Host / Join 版）
+## 目前狀態（Host / Join 模式）
 
 主畫面顯示 **HOST** 和 **JOIN** 兩個按鈕：
-- HOST：在本機啟動 server，自己當房主
-- JOIN：輸入對方 IP 加入
+- **HOST**：在本機啟動 server，等待對方加入
+- **JOIN**：輸入對方 IP 連線
+
+適用情境：同一網路（LAN）的兩台電腦對打。
 
 ---
 
-## 需要修改的檔案
+## 模式 A：還原 Oracle 雲端自動撮合
 
-### 1. `game/pages/game_page.py`
+這個模式下，主畫面只有 ONLINE 按鈕，client 自動探測 Oracle VM 是否在線：
+- Oracle VM 有回應 → 連 Oracle VM（異地對打）
+- Oracle VM 無回應 → 自動 fallback 到本機 server（同電腦開發測試）
 
-**現況**：`draw()` 函式渲染 ONLINE 按鈕，HOST_R / JOIN_R 定義保留但未渲染。  
-**還原**：把 `draw()` 函式底部改回渲染 HOST 和 JOIN 按鈕。
+### 目前哪些程式碼還保留
 
-把這段（ONLINE 按鈕）：
+| 檔案 | 內容 | 狀態 |
+|------|------|------|
+| `network/cloud_config.py` | Oracle IP `161.33.6.210` | ✅ 保留 |
+| `network/protocol.py` | `PKT_PING = 0x0A`, `PKT_PONG = 0x0B`, `pack_ping()` | ✅ 保留 |
+| `server.py` | PKT_PING handler（收到後直接回 PKT_PONG） | ✅ 保留 |
+| `deploy.sh` | rsync + SSH 部署腳本 | ✅ 保留 |
+| `client.py` | Oracle probe 邏輯 | ❌ 已移除（見 git history） |
+| `game/pages/game_page.py` | ONLINE_R rect 定義 + COL_ONLINE 顏色 | ✅ 保留 |
+
+### 需要修改的檔案
+
+#### 1. `client.py` — 加回 Oracle probe 邏輯
+
+**完整實作在 git commit `872d3df`**（2026-06-09）。
+
+概略步驟：
+
+a. 加回 import：
 ```python
-    # ONLINE
-    btn(screen, ONLINE_R,
-        COL_ONLINE_HOV if ONLINE_R.collidepoint(mx, my) else COL_ONLINE,
-        COL_ONLINE_BD, font_lg, f"{IC_SERVER}  ONLINE", COL_ONLINE_TXT, radius=10)
+from network.protocol import (
+    ..., PKT_PING, PKT_PONG,
+    ..., pack_ping,
+)
 ```
 
-換回這段（HOST / JOIN 按鈕）：
+b. `matchmaking_screen` 改為接受 `oracle_addr`，加回 Phase 1 probe：
 ```python
-    # HOST / JOIN
-    btn(screen, HOST_R,
-        COL_HOST_HOV if HOST_R.collidepoint(mx, my) else COL_HOST,
-        COL_HOST_BD, font_lg, f"{IC_SERVER}  HOST", COL_HOST_TXT, radius=10)
+_PROBE_TIMEOUT  = 2.0   # 秒：等待 Oracle VM 回應的上限
+_PROBE_INTERVAL = 0.5   # 秒：每次重送 PKT_PING 的間隔
 
-    btn(screen, JOIN_R,
-        COL_JOIN_HOV if JOIN_R.collidepoint(mx, my) else COL_JOIN,
-        COL_JOIN_BD, font_lg, f"{IC_SIGNIN}  JOIN", COL_JOIN_TXT, radius=10)
+def matchmaking_screen(sock, oracle_addr, screen, font_lg, font_sm, clock):
+    # Phase 1: 探測 Oracle VM（送 PKT_PING，等 PKT_PONG）
+    #   - 有回應 → server_addr = oracle_addr
+    #   - 超時   → server_addr = ("127.0.0.1", port)（本機 fallback）
+    # Phase 2: 送 PKT_JOIN，等 PKT_JOINED + PKT_ALL_JOINED
+    # Returns (player_id, server_addr) or (None, None)
+```
+
+c. `run()` 改為：
+```python
+oracle_addr = (CLOUD_SERVER_IP, CLOUD_SERVER_PORT)
+# 在 matchmaking_screen 裡預先啟動本機 server（fallback 用）
+player_id, server_addr = matchmaking_screen(sock, oracle_addr, ...)
+```
+
+#### 2. `game/pages/game_page.py` — 換回 ONLINE 按鈕
+
+把 HOST / JOIN 按鈕換回單一 ONLINE 按鈕（`draw()` 底部）：
+```python
+btn(screen, ONLINE_R,
+    COL_ONLINE_HOV if ONLINE_R.collidepoint(mx, my) else COL_ONLINE,
+    COL_ONLINE_BD, font_lg, f"{IC_SERVER}  ONLINE", COL_ONLINE_TXT, radius=10)
+```
+
+#### 3. `game/lobby.py` — event handler 改回回傳 `"online"`
+
+```python
+if game_page.ONLINE_R.collidepoint(mx, my):
+    return "online", None
+```
+
+移除 `_draw_join()` 子畫面和 `join_mode` 狀態機。
+
+#### 4. 部署 Oracle VM
+
+```bash
+# 確認 Oracle VM 上 iptables 已開放 UDP 5000
+ssh -i network/pvp-game-server.key opc@161.33.6.210 \
+  "sudo iptables -I INPUT -p udp --dport 5000 -j ACCEPT"
+
+# 部署 server.py
+bash deploy.sh
 ```
 
 ---
 
-### 2. `game/lobby.py`
+## 模式 B：目前使用中的 Host / Join 模式
 
-**現況**：event handler 裡，`page == "game"` 時點擊 ONLINE_R → `return ("online", None)`。  
-**還原**：改回點擊 HOST_R → `state = "host"`，點擊 JOIN_R → `state = "join"`。
-
-把這段（ONLINE）：
-```python
-                    if game_page.ONLINE_R.collidepoint(mx, my):
-                        return "online", None
-```
-
-換回這段（HOST / JOIN）：
-```python
-                        if game_page.HOST_R.collidepoint(mx, my):
-                            state = "host"
-                        elif game_page.JOIN_R.collidepoint(mx, my):
-                            state = "join"
-```
-
----
-
-### 3. `client.py`
-
-**現況**：`mode == "online"` 的分支讀取 `cloud_config.CLOUD_SERVER_IP`。  
-**還原**：這段不需要刪除，host / join 分支本來就在，三個模式可以並存。  
-只需要確保 lobby 不會再回傳 `"online"`，client.py 不需要改動。
+不需要任何修改，目前 codebase 就是這個模式。
 
 ---
 
 ## 注意事項
 
-- `_draw_host()` 和 `_draw_join()` 函式在 `lobby.py` 裡完整保留，隨時可用。
-- `network/cloud_config.py` 可以保留，不影響 Host / Join 模式運作。
-- `RESTORE.md`（本文件）可以保留，不影響任何功能。
+- `network/*.key` 和 `network/*.pub` 已加入 `.gitignore`，不會被 commit。
+- `network/cloud_config.py` 在 `deploy.sh` 的 rsync exclude list 裡，不會被傳到 Oracle VM。
+- 完整的 Oracle 自動撮合實作可以在 git log 裡找到：`git show 872d3df`
