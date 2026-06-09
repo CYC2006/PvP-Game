@@ -44,10 +44,10 @@ _SKILLS: dict = {
         ("FLASH GRENADE", "E",     8,
          "Lobs a stun grenade that detonates on landing. "
          "Any enemy inside the blast radius is briefly blinded and disoriented."),
-        ("MERCURY BARRAGE","R",    15,
+        ("MERCURY BARRAGE","F",    15,
          "Lock your aim and unleash 7 volleys of 5 bullets in a spread fan "
-         "(-6° / -3° / 0° / +3° / +6°), one volley every 12 ticks. "
-         "35 bullets total over 1.2 seconds. "
+         "(-6° / -3° / 0° / +3° / +6°), one volley every 6 ticks. "
+         "35 bullets total over 0.6 seconds. "
          "No spread, same damage and range as normal shots. "
          "Aim is fixed for the full duration; LMB, RMB, SPACE, and E are locked. "
          "Q (rune) and movement remain available."),
@@ -63,7 +63,7 @@ _SKILLS: dict = {
         ("FRAG GRENADE",  "E",     8,
          "Hurls a fragmentation grenade that explodes on impact, "
          "dealing heavy damage to all enemies within the blast radius."),
-        ("GIANT FORM",    "R",     20,
+        ("GIANT FORM",    "F",     20,
          "Transforms into a massive giant for a limited time. "
          "Greatly increases body size, armor thickness, and raw damage output."),
     ],
@@ -80,21 +80,24 @@ _SKILLS: dict = {
          "It fires automatically at any enemy within 250 px, matching your gun's damage and fire rate. "
          "The turret has 180 HP — loses 1 HP per shot and 1 HP every 0.5 s passively. "
          "Enemy bullets also damage it. Only you can see the detection radius."),
-        ("ROLLING BARRAGE","R",    10,
+        ("ROLLING BARRAGE","F",    10,
          "Calls in 18 airstrikes toward the cursor in rapid succession (~3 s). "
          "Strikes land from 60 px to 230 px ahead, randomly spread ±100 px left/right. "
          "Each strike shows a shrinking targeting circle before detonating in an 80 px radius."),
     ],
     'Hunter': [
-        ("—",             "RMB",   0,
-         "Skill under development."),
+        ("AIR CANNON",    "RMB",   5,
+         "Fires a high-speed invisible air blast (800 px/s) in the aimed direction. "
+         "Deals no damage, but launches the enemy on contact. "
+         "On hit, the RMB cooldown is immediately reset — "
+         "land the shot and you can fire again right away."),
         ("MINI GRENADES", "SPACE", 4,
          "Scatters a cluster of small grenades in an arc. "
          "Each grenade lands independently and detonates with its own small explosion."),
         ("LOG BARRIER",   "E",     10,
          "Erects wooden barriers in the aimed direction. "
          "Blocks movement and line of sight, forcing enemies to reposition."),
-        ("PHANTOM CLOAK",  "R",    15,
+        ("PHANTOM CLOAK",  "F",    15,
          "Vanishes for 3 seconds with 2× movement speed. "
          "You can still shoot and use all skills while invisible. "
          "Every 0.5 s you briefly flicker into view — and you still take damage."),
@@ -111,7 +114,7 @@ _SKILLS: dict = {
          "A glowing marker is also placed at a random cardinal point on the ring and orbits clockwise — "
          "press E again within 4 seconds to instantly blink to the marker's current position. "
          "If your Space mark is active, the ring still fires and stuns, but no orbiting marker is created."),
-        ("PUSH ZONE", "R", 5,
+        ("PUSH ZONE", "F", 5,
          "Projects a 160×100 px force field toward the cursor. "
          "Enemies caught inside are launched away and stunned for 1 second. "
          "Only you see the targeting rectangle before it fires."),
@@ -129,7 +132,7 @@ _SKILLS: dict = {
          "Damage never overflows to your HP — the excess is fully blocked. "
          "When the shield breaks or expires, it releases a shockwave ring (60→350 px in 0.5 s): "
          "the first enemy caught by the expanding ring is knocked back and stunned for 0.5 s (no damage)."),
-        ("CLONE CORPS", "R", 20,
+        ("CLONE CORPS", "F", 20,
          "Summons two semi-transparent clones flanking your position. "
          "For 8 seconds, every basic attack fires three parallel shots — "
          "one from each clone — without extra ammo cost."),
@@ -144,7 +147,7 @@ _SKILLS: dict = {
         ("SMOKE SCREEN",  "E",     8,
          "Deploys a smoke grenade creating a persistent cloud. "
          "Both sides lose visibility in the area, ideal for breaking line of sight."),
-        ("SHADOW RUSH",   "R",     7,
+        ("SHADOW RUSH",   "F",     7,
          "Dashes swiftly toward the cursor, releasing a spinning blade arc "
          "upon arrival that strikes any enemy caught in the sweep."),
     ],
@@ -161,13 +164,13 @@ _SKILLS: dict = {
          "For 3 s, every 30 ticks a green shockwave (r 60→60→400, 0.6 s) erupts from your position. "
          "No pool required. When the ring hits the enemy: deals 3 dmg, adds 1 poison stack, "
          "and heals you for 3 \xd7 (enemy's current poison stacks). Up to 6 shockwaves per activation."),
-        ("—", "R",     0, "Skill under development."),
+        ("—", "F",     0, "Skill under development."),
     ],
     'Zombie': [
         ("—", "RMB",   0, "Skill under development."),
         ("—", "SPACE", 0, "Skill under development."),
         ("—", "E",     0, "Skill under development."),
-        ("—", "R",     0, "Skill under development."),
+        ("—", "F",     0, "Skill under development."),
     ],
 }
 
@@ -339,13 +342,13 @@ def draw(screen: pygame.Surface,
                         (sx0 + si * (star_w + star_gap), sy))
         sy += font_sm.get_height() + 5
 
-    # ── Right — 2×2 skill grid (RMB / SPACE / E / R) ─────────────────────
+    # ── Right — 2×2 skill grid (RMB / SPACE / E / F) ─────────────────────
     SK_GAP = 10
     SK_W   = (RW - SK_GAP) // 2
     SK_H   = (DET_H - SK_GAP) // 2
 
     skills = _SKILLS.get(char_name, [("—", k, 0, "Skill under development.")
-                                     for k in ("RMB", "SPACE", "E", "R")])
+                                     for k in ("RMB", "SPACE", "E", "F")])
     BADGE_W = 54
 
     for si, (sname, skey, scd, sdesc) in enumerate(skills):
