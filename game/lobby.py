@@ -160,15 +160,11 @@ def _draw_join(screen: pygame.Surface,
         screen.blit(ip_s, (input_r.x + 14,
                             input_r.centery - ip_s.get_height() // 2))
         cursor_x = input_r.x + 14 + ip_s.get_width() + 3
-        if (pygame.time.get_ticks() // 500) % 2 == 0:
-            pygame.draw.rect(screen, COL_IP_VAL,
-                             (cursor_x, input_r.y + 13, 2, 26))
     else:
-        ph = font_lg.render("e.g.  192.168.1.100", True, COL_IP_DIM)
-        screen.blit(ph, (input_r.x + 14, input_r.centery - ph.get_height() // 2))
-        if (pygame.time.get_ticks() // 500) % 2 == 0:
-            pygame.draw.rect(screen, COL_IP_DIM,
-                             (input_r.x + 14, input_r.y + 13, 2, 26))
+        cursor_x = input_r.x + 14
+    if (pygame.time.get_ticks() // 500) % 2 == 0:
+        pygame.draw.rect(screen, COL_IP_VAL,
+                         (cursor_x, input_r.y + 13, 2, 26))
 
     # CONNECT button (dimmed when no IP entered)
     if ip_str:

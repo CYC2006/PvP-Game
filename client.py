@@ -55,6 +55,19 @@ def _start_server_thread() -> None:
 
 # ── Matchmaking screen ────────────────────────────────────────────────────────
 
+def _get_lan_ip() -> str:
+    """Return the machine's LAN IP (the address other devices on the same
+    network should use to reach this machine).  Falls back to 127.0.0.1."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
 def matchmaking_screen(sock: socket.socket, server_addr: tuple,
                        screen: pygame.Surface,
                        font_lg: pygame.font.Font,
@@ -65,6 +78,11 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
     Wait for PKT_JOINED + PKT_ALL_JOINED from the server.
     Returns (player_id, server_addr) on success, (None, None) on cancel.
     """
+    # When hosting (server is on this machine), show LAN IP so the host
+    # can tell the other player what to enter in JOIN.
+    is_host    = server_addr[0] in ("127.0.0.1", "localhost")
+    display_ip = _get_lan_ip() if is_host else server_addr[0]
+
     player_id  = None
     all_joined = False
     last_join  = -999.0
@@ -128,8 +146,12 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
 
         t = font_lg.render(msg, True, COL_TEXT)
         screen.blit(t, (CX - t.get_width() // 2, CY - 30))
-        s = font_sm.render(f"{server_addr[0]}:{server_addr[1]}", True, COL_HINT)
-        screen.blit(s, (CX - s.get_width() // 2, CY + 15))
+
+        if is_host:
+            hint = font_sm.render(f"Your IP: {display_ip}:{server_addr[1]}", True, COL_HINT)
+        else:
+            hint = font_sm.render(f"{display_ip}:{server_addr[1]}", True, COL_HINT)
+        screen.blit(hint, (CX - hint.get_width() // 2, CY + 15))
 
         hov = BACK_R.collidepoint(mx, my)
         pygame.draw.rect(screen, (36, 46, 68) if hov else (24, 30, 46),
