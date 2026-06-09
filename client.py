@@ -406,6 +406,7 @@ def run() -> None:
             cmd, effective_stance, ammo, is_reloading, skill_cooldowns = read_input(
                 player_id, keys_held, logical_mouse, shift_held,
                 suppress_lmb, _is_stunned)
+            if cmd.shooting:        audio.play_lmb(my_char_name)
             if cmd.use_skill_rmb:   audio.play_skill(my_char_name, 'rmb')
             if cmd.use_skill_space: audio.play_skill(my_char_name, 'space')
             if cmd.use_skill_e:     audio.play_skill(my_char_name, 'e')
