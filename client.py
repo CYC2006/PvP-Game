@@ -141,7 +141,7 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
         # ── Draw ──────────────────────────────────────────────────────
         screen.fill(COL_BG)
         dots = "." * dot_count
-        msg  = (f"Match found! Starting{dots}" if player_id is not None
+        msg  = (f"Match found! Starting{dots}" if all_joined
                 else f"Waiting for opponent{dots}")
 
         t = font_lg.render(msg, True, COL_TEXT)

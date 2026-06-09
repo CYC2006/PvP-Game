@@ -331,6 +331,8 @@ def lobby_screen(screen: pygame.Surface,
         _draw_sidebar(screen, font_lg, font_sm, page, mx, my)
 
         if join_mode:
+            # Full-page JOIN screen — skip topbar / sidebar
+            screen.fill(COL_BG)
             _draw_join(screen, font_lg, font_sm, ip_str, mx, my,
                        CONNECT_R, JBACK_R)
         else:
