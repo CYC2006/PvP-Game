@@ -362,9 +362,11 @@ def draw(screen: pygame.Surface,
         pygame.draw.rect(screen, (38, 50, 75), sr, 2, border_radius=10)
 
         HDR_Y = sky + 12
+        HDR_H = font_lg.get_height()
 
-        # Key badge
-        badge_r = pygame.Rect(skx + 10, HDR_Y - 3, BADGE_W, 24)
+        # Key badge — vertically centred relative to font_lg row height
+        badge_top = HDR_Y + (HDR_H - 24) // 2
+        badge_r = pygame.Rect(skx + 10, badge_top, BADGE_W, 24)
         pygame.draw.rect(screen, (30, 42, 66), badge_r, border_radius=5)
         pygame.draw.rect(screen, (55, 75, 115), badge_r, 1, border_radius=5)
         bk = font_sm.render(skey, True, (110, 148, 205))
@@ -374,12 +376,13 @@ def draw(screen: pygame.Surface,
         # Skill name
         sn_c = (185, 210, 248) if sname != "—" else (55, 68, 95)
         screen.blit(font_lg.render(sname, True, sn_c),
-                    (skx + 10 + BADGE_W + 8, HDR_Y - 1))
+                    (skx + 10 + BADGE_W + 8, HDR_Y))
 
-        # Cooldown (right-aligned in header row)
+        # Cooldown (right-aligned, vertically centred with font_lg row)
         if scd > 0:
             cd_s = font_sm.render(f"{IC_CLOCK}  {scd}s", True, (95, 140, 195))
-            screen.blit(cd_s, (skx + SK_W - cd_s.get_width() - 10, HDR_Y + 4))
+            cd_top = HDR_Y + (HDR_H - cd_s.get_height()) // 2
+            screen.blit(cd_s, (skx + SK_W - cd_s.get_width() - 10, cd_top))
 
         # Separator
         SEP_Y = HDR_Y + font_lg.get_height() + 6
