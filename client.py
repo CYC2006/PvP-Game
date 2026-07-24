@@ -13,7 +13,6 @@ from game.input      import (read_input, set_giant_age, set_dash_context,
 from game.renderer   import draw, handle_settings_click, reset_game_state, settings_blocks_click, LOGICAL_W, LOGICAL_H
 from game.state      import GameState
 from game.obstacle   import load_map
-import game.audio as audio
 import game.charselect as charselect
 from game.charselect import CHARACTERS as _CHAR_LIST
 from game.chars.vince.giant_state import TOTAL_TICKS as _GIANT_TOTAL_TICKS
@@ -288,7 +287,6 @@ def _show_game_over_msg(screen: pygame.Surface,
 
 def run() -> None:
     os.environ['SDL_WINDOW_ALLOW_HIGHDPI'] = '1'
-    pygame.mixer.pre_init(44100, -16, 2, 512)
     pygame.init()
     screen = pygame.display.set_mode(
         (LOGICAL_W, LOGICAL_H), pygame.SCALED | pygame.RESIZABLE)
@@ -406,11 +404,6 @@ def run() -> None:
             cmd, effective_stance, ammo, is_reloading, skill_cooldowns = read_input(
                 player_id, keys_held, logical_mouse, shift_held,
                 suppress_lmb, _is_stunned)
-            if cmd.shooting:        audio.play_lmb(my_char_name)
-            if cmd.use_skill_rmb:   audio.play_skill(my_char_name, 'rmb')
-            if cmd.use_skill_space: audio.play_skill(my_char_name, 'space')
-            if cmd.use_skill_e:     audio.play_skill(my_char_name, 'e')
-            if cmd.use_skill_r:     audio.play_skill(my_char_name, 'r')
             aim_angle_deg = math.degrees(math.atan2(cmd.aim_x, -cmd.aim_y))
             _mercury_locked = get_mercury_aim_angle()
             if _mercury_locked is not None:
