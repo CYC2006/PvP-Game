@@ -54,8 +54,14 @@ def pack_all_joined() -> bytes:
     return bytes([PKT_ALL_JOINED])
 
 
-def pack_join() -> bytes:
-    return bytes([PKT_JOIN])
+def pack_join(room_code: int) -> bytes:
+    return bytes([PKT_JOIN]) + struct.pack('>H', room_code)
+
+
+def unpack_join(data: bytes) -> int:
+    if len(data) >= 3:
+        return struct.unpack('>H', data[1:3])[0]
+    return 0
 
 
 def pack_joined(player_id: int) -> bytes:

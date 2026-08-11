@@ -3,7 +3,7 @@ Main menu / lobby screen — primary controller.
 
 Returns:
   ("host", None)    – user clicked HOST (caller starts local server → 127.0.0.1)
-  ("join", ip_str)  – user entered IP and confirmed JOIN
+  ("join", code_str) – user entered 4-digit room code and confirmed JOIN
   (None,   None)    – user closed the window
 """
 import pygame
@@ -138,7 +138,7 @@ def _draw_sidebar(screen, font_lg, font_sm, page, mx, my):
 def _draw_join(screen: pygame.Surface,
                font_lg: pygame.font.Font,
                font_sm: pygame.font.Font,
-               ip_str: str,
+               code_str: str,
                mx: int, my: int,
                connect_r: pygame.Rect,
                back_r:    pygame.Rect) -> None:
@@ -147,27 +147,27 @@ def _draw_join(screen: pygame.Surface,
     title = font_lg.render(f"{IC_SIGNIN}  JOIN GAME", True, COL_JOIN_TXT)
     screen.blit(title, (CX - title.get_width() // 2, CY - 110))
 
-    hint = font_sm.render("Enter the HOST player's IP address:", True, COL_HINT)
+    hint = font_sm.render("Enter room code:", True, COL_HINT)
     screen.blit(hint, (CX - hint.get_width() // 2, CY - 68))
 
-    # IP input field
-    input_r = pygame.Rect(CX - 200, CY - 40, 400, 52)
+    # Code input field
+    input_r = pygame.Rect(CX - 120, CY - 40, 240, 52)
     pygame.draw.rect(screen, COL_INPUT_BG, input_r, border_radius=8)
     pygame.draw.rect(screen, COL_INPUT_BD, input_r, 2, border_radius=8)
 
-    if ip_str:
-        ip_s = font_lg.render(ip_str, True, COL_IP_VAL)
-        screen.blit(ip_s, (input_r.x + 14,
-                            input_r.centery - ip_s.get_height() // 2))
-        cursor_x = input_r.x + 14 + ip_s.get_width() + 3
+    if code_str:
+        cs = font_lg.render(code_str, True, COL_IP_VAL)
+        screen.blit(cs, (input_r.x + 14,
+                         input_r.centery - cs.get_height() // 2))
+        cursor_x = input_r.x + 14 + cs.get_width() + 3
     else:
         cursor_x = input_r.x + 14
     if (pygame.time.get_ticks() // 500) % 2 == 0:
         pygame.draw.rect(screen, COL_IP_VAL,
                          (cursor_x, input_r.y + 13, 2, 26))
 
-    # CONNECT button (dimmed when no IP entered)
-    if ip_str:
+    # CONNECT button — enabled only when exactly 4 digits
+    if len(code_str) == 4:
         btn(screen, connect_r,
             COL_JOIN_HOV if connect_r.collidepoint(mx, my) else COL_JOIN,
             COL_JOIN_BD, font_lg, f"{IC_SIGNIN}  CONNECT", COL_JOIN_TXT, radius=9)
@@ -238,7 +238,7 @@ def lobby_screen(screen: pygame.Surface,
     gems          = 10
     confirm_quit  = False
     join_mode     = False
-    ip_str        = ""
+    code_str      = ""
 
     SFX_R  = pygame.Rect(LOGICAL_W - 26 - 46 - 10 - 46, 11, 46, 46)
     SET_R  = pygame.Rect(LOGICAL_W - 26 - 46,            11, 46, 46)
@@ -266,15 +266,15 @@ def lobby_screen(screen: pygame.Surface,
                 if join_mode:
                     if event.key == pygame.K_ESCAPE:
                         join_mode = False
-                        ip_str    = ""
-                    elif event.key == pygame.K_RETURN and ip_str:
-                        return "join", ip_str
+                        code_str  = ""
+                    elif event.key == pygame.K_RETURN and len(code_str) == 4:
+                        return "join", code_str
                     elif event.key == pygame.K_BACKSPACE:
-                        ip_str = ip_str[:-1]
+                        code_str = code_str[:-1]
                     else:
                         c = event.unicode
-                        if c in "0123456789." and len(ip_str) < 15:
-                            ip_str += c
+                        if c in "0123456789" and len(code_str) < 4:
+                            code_str += c
                 else:
                     if event.key == pygame.K_ESCAPE:
                         confirm_quit = not confirm_quit
@@ -283,11 +283,11 @@ def lobby_screen(screen: pygame.Surface,
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
 
                 if join_mode:
-                    if CONNECT_R.collidepoint(mx, my) and ip_str:
-                        return "join", ip_str
+                    if CONNECT_R.collidepoint(mx, my) and len(code_str) == 4:
+                        return "join", code_str
                     elif JBACK_R.collidepoint(mx, my):
                         join_mode = False
-                        ip_str    = ""
+                        code_str  = ""
                     continue
 
                 if confirm_quit:
@@ -310,7 +310,7 @@ def lobby_screen(screen: pygame.Surface,
                         return "host", None
                     elif game_page.JOIN_R.collidepoint(mx, my):
                         join_mode = True
-                        ip_str    = ""
+                        code_str  = ""
 
                 elif page == "characters":
                     for i, r in enumerate(characters_page.CHAR_THUMB_RS):
@@ -333,7 +333,7 @@ def lobby_screen(screen: pygame.Surface,
         if join_mode:
             # Full-page JOIN screen — skip topbar / sidebar
             screen.fill(COL_BG)
-            _draw_join(screen, font_lg, font_sm, ip_str, mx, my,
+            _draw_join(screen, font_lg, font_sm, code_str, mx, my,
                        CONNECT_R, JBACK_R)
         else:
             if page == "game":

@@ -1,5 +1,6 @@
 import math
 import os
+import random
 import socket
 import sys
 import time
@@ -17,6 +18,7 @@ import game.charselect as charselect
 from game.charselect import CHARACTERS as _CHAR_LIST
 from game.chars.vince.giant_state import TOTAL_TICKS as _GIANT_TOTAL_TICKS
 from game.lobby      import lobby_screen
+from network.cloud_config import CLOUD_SERVER_IP, CLOUD_SERVER_PORT
 from network.protocol import (
     PKT_JOINED, PKT_STATE, PKT_GAME_START, PKT_ALL_JOINED,
     PKT_QUIT, PKT_GAME_OVER,
@@ -35,13 +37,12 @@ COL_TEXT = (220, 220, 220)
 COL_HINT = (110, 130, 160)
 
 
-# ── Local server thread (used when CLOUD_SERVER_IP = "127.0.0.1") ────────────
+# ── Local server thread (used only when CLOUD_SERVER_IP = "127.0.0.1") ───────
 
 _local_server_started = False
 
 def _start_server_thread() -> None:
-    """Start server.py as a daemon thread for local / same-machine testing.
-    Silently ignores bind errors (another terminal may already own the port)."""
+    """Start server.py as a daemon thread for local / same-machine testing."""
     def _run_safe():
         try:
             from server import run as server_run
@@ -50,39 +51,22 @@ def _start_server_thread() -> None:
             print(f"[Server] Could not bind port (already in use?): {e}")
     t = threading.Thread(target=_run_safe, daemon=True)
     t.start()
-    time.sleep(0.4)   # give the server time to bind
+    time.sleep(0.4)
 
 
 # ── Matchmaking screen ────────────────────────────────────────────────────────
 
-def _get_lan_ip() -> str:
-    """Return the machine's LAN IP (the address other devices on the same
-    network should use to reach this machine).  Falls back to 127.0.0.1."""
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "127.0.0.1"
-
-
 def matchmaking_screen(sock: socket.socket, server_addr: tuple,
+                       room_code: int, is_host: bool,
                        screen: pygame.Surface,
                        font_lg: pygame.font.Font,
                        font_sm: pygame.font.Font,
                        clock: pygame.time.Clock):
     """
-    Send PKT_JOIN every second to server_addr.
+    Send PKT_JOIN(room_code) every second to server_addr.
     Wait for PKT_JOINED + PKT_ALL_JOINED from the server.
     Returns (player_id, server_addr) on success, (None, None) on cancel.
     """
-    # When hosting (server is on this machine), show LAN IP so the host
-    # can tell the other player what to enter in JOIN.
-    is_host    = server_addr[0] in ("127.0.0.1", "localhost")
-    display_ip = _get_lan_ip() if is_host else server_addr[0]
-
     player_id  = None
     all_joined = False
     last_join  = -999.0
@@ -90,7 +74,7 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
     dot_count = 0
     dot_timer = 0.0
     CX, CY    = LOGICAL_W // 2, LOGICAL_H // 2
-    BACK_R    = pygame.Rect(CX - 80, CY + 110, 160, 44)
+    BACK_R    = pygame.Rect(CX - 80, CY + 130, 160, 44)
 
     while True:
         dt    = clock.tick(FPS) / 1000.0
@@ -117,7 +101,7 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
         # Send PKT_JOIN every second
         if now - last_join >= 1.0:
             try:
-                sock.sendto(pack_join(), server_addr)
+                sock.sendto(pack_join(room_code), server_addr)
             except Exception:
                 pass
             last_join = now
@@ -145,13 +129,16 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
                 else f"Waiting for opponent{dots}")
 
         t = font_lg.render(msg, True, COL_TEXT)
-        screen.blit(t, (CX - t.get_width() // 2, CY - 30))
+        screen.blit(t, (CX - t.get_width() // 2, CY - 55))
 
         if is_host:
-            hint = font_sm.render(f"Your IP: {display_ip}:{server_addr[1]}", True, COL_HINT)
+            code_surf = font_lg.render(str(room_code), True, (235, 195, 70))
+            lbl_surf  = font_sm.render("Room Code  (share with friend)", True, COL_HINT)
+            screen.blit(lbl_surf,  (CX - lbl_surf.get_width()  // 2, CY - 12))
+            screen.blit(code_surf, (CX - code_surf.get_width() // 2, CY + 14))
         else:
-            hint = font_sm.render(f"{display_ip}:{server_addr[1]}", True, COL_HINT)
-        screen.blit(hint, (CX - hint.get_width() // 2, CY + 15))
+            hint = font_sm.render(f"Joining room {room_code}…", True, COL_HINT)
+            screen.blit(hint, (CX - hint.get_width() // 2, CY - 12))
 
         hov = BACK_R.collidepoint(mx, my)
         pygame.draw.rect(screen, (36, 46, 68) if hov else (24, 30, 46),
@@ -176,7 +163,7 @@ def _cancel_matchmaking(sock, server_addr, player_id):
 
 # ── 選角畫面 ──────────────────────────────────────────────────────────────────
 
-def char_select_loop(sock, server_addr, player_id, screen,
+def char_select_loop(sock, server_addr, player_id, room_code, screen,
                      font_lg, font_sm, clock) -> tuple:
     charselect.reset()
     my_ready        = False
@@ -217,7 +204,7 @@ def char_select_loop(sock, server_addr, player_id, screen,
         if heartbeat_timer >= HEARTBEAT_INTERVAL:
             heartbeat_timer = 0.0
             try:
-                sock.sendto(pack_join(), server_addr)
+                sock.sendto(pack_join(room_code), server_addr)
             except Exception:
                 pass
 
@@ -305,24 +292,28 @@ def run() -> None:
     while app_running:
 
         # ── Lobby ────────────────────────────────────────────────────
-        mode, join_ip = lobby_screen(screen, font_lg, font_sm, clock)
+        mode, join_code = lobby_screen(screen, font_lg, font_sm, clock)
         if mode is None:
             break   # user closed window
 
-        # ── Resolve server address ────────────────────────────────────
-        if mode == "host":
-            if not _local_server_started:
-                _start_server_thread()
-                _local_server_started = True
-            server_addr = ("127.0.0.1", PORT)
-        else:   # "join"
-            server_addr = (join_ip, PORT)
+        # ── Resolve server address + room code ────────────────────────
+        is_host = (mode == "host")
+        if is_host:
+            room_code = random.randint(1000, 9999)
+            if CLOUD_SERVER_IP == "127.0.0.1":
+                if not _local_server_started:
+                    _start_server_thread()
+                    _local_server_started = True
+        else:
+            room_code = int(join_code)
+        server_addr = (CLOUD_SERVER_IP, CLOUD_SERVER_PORT)
 
         # ── Matchmaking ──────────────────────────────────────────────
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setblocking(False)
 
         player_id, server_addr = matchmaking_screen(sock, server_addr,
+                                                    room_code, is_host,
                                                     screen, font_lg, font_sm, clock)
         if player_id is None:
             sock.close()
@@ -335,7 +326,7 @@ def run() -> None:
 
         # ── Char select ──────────────────────────────────────────────
         player_chars, my_char_name, my_rune_id = char_select_loop(
-            sock, server_addr, player_id, screen, font_lg, font_sm, clock)
+            sock, server_addr, player_id, room_code, screen, font_lg, font_sm, clock)
         if player_chars is None:
             sock.close()
             pygame.display.set_caption("PvP Game")
