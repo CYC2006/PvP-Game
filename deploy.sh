@@ -4,7 +4,7 @@
 # 只傳 server 需要的檔案，跳過 client 專用的部分（renderer、assets 等）
 
 KEY="$(dirname "$0")/network/pvp-game-server.key"
-REMOTE="opc@161.33.6.210"
+REMOTE="opc@129.225.195.211"
 LOCAL="$(dirname "$0")/"
 
 echo "[Deploy] Syncing files..."
