@@ -580,6 +580,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     flash_fx.draw_screen_flash(screen, state, my_id)
 
     # Portal teleport flash — additive RGB tint, no extra Surface needed
+    global _portal_flash_frames
     if _portal_flash_frames > 0:
         t = _portal_flash_frames / _PORTAL_FLASH_TOTAL
         screen.fill((int(70 * t), int(10 * t), int(110 * t)),
