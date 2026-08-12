@@ -479,24 +479,29 @@ def pack_char_select(char_id: int, rune_id: int = 0) -> bytes:
 def pack_game_start(chars: dict = None, map_id: int = 0) -> bytes:
     """
     chars: {pid: char_id}（最多 2 對）
-    格式: PKT_GAME_START map_id [pid char_id] ...
-    map_id byte prepended so clients load the correct map.
+    格式: PKT_GAME_START [pid char_id] ... map_id
+    map_id appended at the end so old servers (without map_id) remain compatible:
+    old clients/servers simply never read the trailing byte.
     """
-    data = [PKT_GAME_START, int(map_id) & 0xFF]
+    data = [PKT_GAME_START]
     if chars:
         for pid, char_id in sorted(chars.items()):
             data += [int(pid) & 0xFF, int(char_id) & 0xFF]
+    data += [int(map_id) & 0xFF]
     return bytes(data)
 
 
-def unpack_game_start(data: bytes) -> tuple[dict, int]:
-    """回傳 ({pid: char_id}, map_id)。"""
-    map_id = data[1] if len(data) >= 2 else 0
-    chars  = {}
-    i = 2
+def unpack_game_start(data: bytes) -> tuple:
+    """回傳 ({pid: char_id}, map_id)。
+    向下相容：若封包長度與舊格式相同（無 map_id 尾端 byte），map_id 預設為 0。
+    """
+    chars = {}
+    i = 1
     while i + 1 < len(data):
         chars[data[i]] = data[i + 1]
         i += 2
+    # i now points past the last pair; if one byte remains it's map_id
+    map_id = data[i] if i < len(data) else 0
     return chars, map_id
 
 
