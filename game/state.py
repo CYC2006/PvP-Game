@@ -678,6 +678,12 @@ class GameState:
                 self._spawn_item(obs.x, obs.y, "gem")
             elif r < 0.20:
                 self._spawn_item(obs.x, obs.y, "health")
+            elif r < 0.25:
+                self._spawn_item(obs.x, obs.y, "gem")
+                self._spawn_item(obs.x, obs.y, "gem")
+            elif r < 0.30:
+                self._spawn_item(obs.x, obs.y, "health")
+                self._spawn_item(obs.x, obs.y, "health")
 
     # ── step_bullets 輔助方法 ────────────────────────────────────────────────
 
@@ -887,19 +893,14 @@ class GameState:
         )
 
     def _spawn_gold(self, x: float, y: float) -> None:
-        """在 box_special 破壞位置周圍散落 2~5 顆冷縮寶石。"""
-        for _ in range(random.randint(2, 5)):
-            angle = random.uniform(0, math.tau)
-            dist  = random.uniform(40, 140)
-            while self._next_gold_id in self.gold_ingots:
-                self._next_gold_id = (self._next_gold_id + 1) % 256
-            gid   = self._next_gold_id
-            self._next_gold_id = (self._next_gold_id + 1) % 256
-            self.gold_ingots[gid] = GoldIngot(
-                id=gid,
-                x=x + math.cos(angle) * dist,
-                y=y + math.sin(angle) * dist,
-            )
+        """在 box_special 破壞位置周圍散落同種寶石（冷縮或回血各 50%）。
+        數量：40% 2個、30% 3個、20% 4個、10% 5個。
+        """
+        r = random.random()
+        count = 2 if r < 0.40 else 3 if r < 0.70 else 4 if r < 0.90 else 5
+        kind  = random.choice(("gem", "health"))
+        for _ in range(count):
+            self._spawn_item(x, y, kind)
 
     # ── 技能相關（實作移至 game/chars/*/）────────────────────────────────────────
 
@@ -1227,7 +1228,7 @@ class GameState:
             for pid, player in self.players.items():
                 if math.hypot(player.x - ingot.x, player.y - ingot.y) < PLAYER_RADIUS + GOLD_RADIUS:
                     if ingot.kind == "health":
-                        heal = int(player.max_hp * 0.30)
+                        heal = int(player.max_hp * 0.10)
                         player.hp = min(player.max_hp, player.hp + heal)
                     else:  # "gem"
                         self.gold_counts[pid] = self.gold_counts.get(pid, 0) + 1

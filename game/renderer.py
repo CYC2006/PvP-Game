@@ -734,7 +734,7 @@ def _draw_gold_ingots(screen, state, cx, cy) -> None:
         if -20 <= sx <= SCREEN_W + 20 and -20 <= sy <= SCREEN_H + 20:
             spin = now * 120 + ingot.id * 47
             a    = math.radians(spin % 360)
-            r    = 20 if ingot.kind == "health" else 10
+            r    = 10
             pts  = [(sx + r * math.cos(a + i * math.pi / 2),
                      sy + r * math.sin(a + i * math.pi / 2)) for i in range(4)]
 
@@ -1054,9 +1054,6 @@ def _draw_hud(screen, state, my_id, font, my_stance="stand",
         stance_col = COL_STANCE.get(my_stance, COL_TEXT)
         screen.blit(font.render(f"[E] {my_stance.upper()}", True, stance_col), (8, 44))
         _draw_ammo_hud(screen, font_hud, ammo, is_reloading)
-        gems = state.gold_counts.get(my_id, 0)
-        gem_surf = font.render(f"◆ {gems}", True, (80, 200, 255))
-        screen.blit(gem_surf, (8, 62))
     if skill_cooldowns:
         _draw_skill_hud(screen, font, skill_cooldowns)
     _draw_hp_bar(screen, state, my_id, font_hud)
