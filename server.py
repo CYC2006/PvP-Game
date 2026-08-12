@@ -319,41 +319,52 @@ def run(map_id: int = 0):
                 room = rooms.get(code)
                 if not room or addr not in room.addr_to_id or not room.game_started:
                     continue
-                cmd      = unpack_command(data)
-                p        = room.state.players.get(cmd.player_id)
-                r_active = p and p.r_skill_phase > 0
-                _mercury = p and p.mercury_start_tick >= 0
-                _stunned = p and room.state.tick < p.stun_until
-                if p and not r_active and not _stunned:
-                    pid, ax, ay = cmd.player_id, cmd.aim_x, cmd.aim_y
-                    if not _mercury:
-                        if cmd.use_skill_e:
-                            fn = _SKILL_E.get(p.char_name)
-                            if fn:
-                                fn(room.state, pid, ax, ay)
-                        _bursting = p.burst_next_tick >= 0
-                        if cmd.use_skill_rmb:
-                            fn = _SKILL_RMB.get(p.char_name)
-                            if fn:
-                                fn(room.state, pid, ax, ay)
-                        if not _bursting:
-                            if cmd.use_skill_space:
-                                fn = _SKILL_SPACE.get(p.char_name)
+                try:
+                    cmd      = unpack_command(data)
+                    p        = room.state.players.get(cmd.player_id)
+                    r_active = p and p.r_skill_phase > 0
+                    _mercury = p and p.mercury_start_tick >= 0
+                    _stunned = p and room.state.tick < p.stun_until
+                    if p and not r_active and not _stunned:
+                        pid, ax, ay = cmd.player_id, cmd.aim_x, cmd.aim_y
+                        if not _mercury:
+                            if cmd.use_skill_e:
+                                fn = _SKILL_E.get(p.char_name)
                                 if fn:
                                     fn(room.state, pid, ax, ay)
-                            if cmd.use_skill_r:
-                                fn = _SKILL_R.get(p.char_name)
+                            _bursting = p.burst_next_tick >= 0
+                            if cmd.use_skill_rmb:
+                                fn = _SKILL_RMB.get(p.char_name)
                                 if fn:
                                     fn(room.state, pid, ax, ay)
-                    if cmd.use_rune:
-                        room.state._activate_rune(pid)
-                room.state.apply_command(
-                    cmd.player_id,
-                    cmd.move_x, cmd.move_y,
-                    cmd.shooting, cmd.aim_x, cmd.aim_y,
-                    cmd.running, cmd.stance,
-                    cmd.speed_mult,
-                )
+                            if not _bursting:
+                                if cmd.use_skill_space:
+                                    fn = _SKILL_SPACE.get(p.char_name)
+                                    if fn:
+                                        fn(room.state, pid, ax, ay)
+                                if cmd.use_skill_r:
+                                    fn = _SKILL_R.get(p.char_name)
+                                    if fn:
+                                        fn(room.state, pid, ax, ay)
+                        if cmd.use_rune:
+                            room.state._activate_rune(pid)
+                    room.state.apply_command(
+                        cmd.player_id,
+                        cmd.move_x, cmd.move_y,
+                        cmd.shooting, cmd.aim_x, cmd.aim_y,
+                        cmd.running, cmd.stance,
+                        cmd.speed_mult,
+                    )
+                except Exception as cmd_err:
+                    import traceback
+                    print(f"[Server] CMD ERROR room {code}: {cmd_err}")
+                    traceback.print_exc()
+                    _broadcast_game_over(room)
+                    _reset_room(room)
+                    _try_match(room)
+                    if not room.clients and not room.waiting:
+                        rooms.pop(code, None)
+                    break   # restart outer loop（room 已重置，addr_room 對應已清除）
 
         # ── Per-room disconnect detection + game tick ──────────────────────
         now = time.perf_counter()
