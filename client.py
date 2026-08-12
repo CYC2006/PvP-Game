@@ -10,7 +10,8 @@ import pygame
 from game.input      import (read_input, set_giant_age, set_dash_context,
                              set_burst_shots_left, set_cloak_ticks,
                              get_mercury_aim_angle, notify_air_cannon_hit,
-                             cancel_mercury_barrage, init_char, init_rune)
+                             cancel_mercury_barrage, init_char, init_rune,
+                             apply_gem_cd_reduction)
 from game.renderer   import draw, handle_settings_click, reset_game_state, set_map_portals, trigger_portal_flash, settings_blocks_click, LOGICAL_W, LOGICAL_H
 from game.state      import GameState, configure_map
 from game.obstacle   import load_map
@@ -111,6 +112,23 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
     CX        = LOGICAL_W // 2
     BACK_R    = pygame.Rect(CX - 80, 580, 160, 44)
 
+    # ── Map selection (host only) ──────────────────────────────────────
+    _maps       = _get_maps_meta()
+    _RANDOM_IDX = len(_maps)          # last button = Random
+    _N_BTNS     = _RANDOM_IDX + 1
+    _BTN_W      = 200
+    _BTN_H      = 46
+    _BTN_GAP    = 16
+    _btn_total  = _N_BTNS * _BTN_W + (_N_BTNS - 1) * _BTN_GAP
+    _BTN_Y      = 430
+    _MAP_BTN_RS = [
+        pygame.Rect(CX - _btn_total // 2 + i * (_BTN_W + _BTN_GAP),
+                    _BTN_Y, _BTN_W, _BTN_H)
+        for i in range(_N_BTNS)
+    ]
+    sel_map_idx   = map_id if map_id < _RANDOM_IDX else 0
+    actual_map_id = sel_map_idx
+
     while True:
         dt    = clock.tick(FPS) / 1000.0
         now   = time.perf_counter()
@@ -132,11 +150,17 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
                 if BACK_R.collidepoint(mx, my):
                     _cancel_matchmaking(sock, server_addr, player_id)
                     return None, None
+                if is_host:
+                    for _i, _r in enumerate(_MAP_BTN_RS):
+                        if _r.collidepoint(mx, my):
+                            sel_map_idx   = _i
+                            actual_map_id = (random.randint(0, _RANDOM_IDX - 1)
+                                             if _i == _RANDOM_IDX else _i)
 
-        # Send PKT_JOIN every second (map_id carried so server knows which map HOST wants)
+        # Send PKT_JOIN every second with current map selection
         if now - last_join >= 1.0:
             try:
-                sock.sendto(pack_join(room_code, map_id), server_addr)
+                sock.sendto(pack_join(room_code, actual_map_id), server_addr)
             except Exception:
                 pass
             last_join = now
@@ -171,6 +195,33 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
             screen.blit(lbl_surf, (CX - lbl_surf.get_width() // 2, 210))
             _draw_spaced_digits(screen, _get_giant_font(), str(room_code),
                                 (235, 195, 70), CX, 245)
+
+            # ── Map selection row ──────────────────────────────────────
+            sel_hint = font_sm.render("SELECT MAP", True, COL_HINT)
+            screen.blit(sel_hint, (CX - sel_hint.get_width() // 2, _BTN_Y - 26))
+
+            for _i, _r in enumerate(_MAP_BTN_RS):
+                _sel = (_i == sel_map_idx)
+                _hov = _r.collidepoint(mx, my)
+                _rnd = (_i == _RANDOM_IDX)
+                _lbl = (chr(0xf074) + "  RANDOM") if _rnd else _maps[_i]["name"]
+
+                if _sel:
+                    _bg = (32, 20, 60) if _rnd else (28, 52, 88)
+                    _bd = (120, 60, 210) if _rnd else (68, 148, 235)
+                    _tc = (200, 150, 255) if _rnd else (185, 218, 255)
+                elif _hov:
+                    _bg = (22, 16, 42) if _rnd else (22, 36, 60)
+                    _bd = (80, 40, 140) if _rnd else (48, 82, 138)
+                    _tc = (160, 110, 230) if _rnd else (140, 175, 225)
+                else:
+                    _bg, _bd, _tc = (16, 22, 36), (36, 48, 74), (82, 105, 148)
+
+                pygame.draw.rect(screen, _bg, _r, border_radius=8)
+                pygame.draw.rect(screen, _bd, _r, 2, border_radius=8)
+                _ns = font_sm.render(_lbl, True, _tc)
+                screen.blit(_ns, (_r.centerx - _ns.get_width()  // 2,
+                                  _r.centery - _ns.get_height() // 2))
         else:
             hint = font_sm.render(f"Joining room {room_code}…", True, COL_HINT)
             screen.blit(hint, (CX - hint.get_width() // 2, 300))
@@ -377,11 +428,12 @@ def run() -> None:
         # ── Game loop ────────────────────────────────────────────────
         set_map_portals(map_entry.get("portals", []))
         reset_game_state()
-        state         = GameState()
-        keys_held     = set()
-        fullscreen    = False
-        game_running  = True
-        opponent_quit = False
+        state              = GameState()
+        keys_held          = set()
+        fullscreen         = False
+        game_running       = True
+        opponent_quit      = False
+        _prev_gem_count    = 0
 
         while game_running:
             for event in pygame.event.get():
@@ -464,6 +516,10 @@ def run() -> None:
                 if (_prev_lp and _next_lp and
                         abs(_next_lp.x - _prev_lp.x) > 300):
                     trigger_portal_flash()
+                new_gem_count = state.gold_counts.get(player_id, 0)
+                for _ in range(new_gem_count - _prev_gem_count):
+                    apply_gem_cd_reduction()
+                _prev_gem_count = new_gem_count
 
             local_player = state.players.get(player_id)
             if local_player:

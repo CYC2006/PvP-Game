@@ -112,6 +112,21 @@ def notify_air_cannon_hit(seq: int) -> None:
         _state.skill_last_ms['rmb'] = 0
 
 
+def apply_gem_cd_reduction() -> None:
+    """撿到冷縮寶石時呼叫：所有在冷卻中的技能減少 1 秒冷卻時間。"""
+    now = pygame.time.get_ticks()
+    for slot, max_cd in _state.skill_cds_ms.items():
+        if max_cd <= 0:
+            continue
+        remaining = max_cd - (now - _state.skill_last_ms[slot])
+        if remaining > 0:
+            # 提早 1000ms 計為已使用，等效縮短 1 秒冷卻
+            _state.skill_last_ms[slot] = max(
+                _state.skill_last_ms[slot] - 1000,
+                now - max_cd,
+            )
+
+
 def get_mercury_aim_angle():
     """Return locked aim_angle_deg while Agent's Mercury Barrage is active, else None."""
     now = pygame.time.get_ticks()

@@ -189,7 +189,7 @@ class GoldIngot:
     id: int
     x: float
     y: float
-    kind: str = "gold"   # "gold" | "health"
+    kind: str = "gem"   # "gem" | "health"
 
 
 @dataclass
@@ -675,7 +675,7 @@ class GameState:
         elif obs.kind == "box_normal":
             r = random.random()
             if r < 0.10:
-                self._spawn_item(obs.x, obs.y, "gold")
+                self._spawn_item(obs.x, obs.y, "gem")
             elif r < 0.20:
                 self._spawn_item(obs.x, obs.y, "health")
 
@@ -872,9 +872,9 @@ class GameState:
                 self._dot_cooldown.pop(k, None)
 
     def _spawn_item(self, x: float, y: float, kind: str) -> None:
-        """掉落 1 個道具（金錠或血包），位置稍微隨機偏移。"""
+        """掉落 1 個道具（寶石或血包），位置稍微隨機偏移。"""
         angle = random.uniform(0, math.tau)
-        dist  = random.uniform(10, 30)
+        dist  = random.uniform(20, 60)
         while self._next_gold_id in self.gold_ingots:
             self._next_gold_id = (self._next_gold_id + 1) % 256
         gid   = self._next_gold_id
@@ -887,10 +887,10 @@ class GameState:
         )
 
     def _spawn_gold(self, x: float, y: float) -> None:
-        """在 box_special 破壞位置周圍散落 2~5 顆金錠。"""
+        """在 box_special 破壞位置周圍散落 2~5 顆冷縮寶石。"""
         for _ in range(random.randint(2, 5)):
             angle = random.uniform(0, math.tau)
-            dist  = random.uniform(20, 70)
+            dist  = random.uniform(40, 140)
             while self._next_gold_id in self.gold_ingots:
                 self._next_gold_id = (self._next_gold_id + 1) % 256
             gid   = self._next_gold_id
@@ -1221,7 +1221,7 @@ class GameState:
                 player.speed_boost_ticks -= 1
 
     def step_gold_collection(self) -> None:
-        """任一玩家碰到金錠/血包就撿起。金錠累計計數；血包回復最大血量 30%（不超過滿血）。"""
+        """任一玩家碰到寶石/血包就撿起。寶石累計計數（client 偵測後縮短冷卻）；血包回復最大血量 30%（不超過滿血）。"""
         collected = []
         for gid, ingot in self.gold_ingots.items():
             for pid, player in self.players.items():
@@ -1229,7 +1229,7 @@ class GameState:
                     if ingot.kind == "health":
                         heal = int(player.max_hp * 0.30)
                         player.hp = min(player.max_hp, player.hp + heal)
-                    else:
+                    else:  # "gem"
                         self.gold_counts[pid] = self.gold_counts.get(pid, 0) + 1
                     collected.append(gid)
                     break

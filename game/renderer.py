@@ -742,10 +742,10 @@ def _draw_gold_ingots(screen, state, cx, cy) -> None:
                 col_main = (220,  80, 100)   # 紅偏粉
                 col_ring = (240, 130, 145)
                 col_glow = (255, 180, 190)
-            else:
-                col_main = (255, 215,   0)   # 金色
-                col_ring = (255, 230,  80)
-                col_glow = (255, 255, 180)
+            else:  # "gem" 冷縮寶石：淺藍色
+                col_main = ( 80, 200, 255)
+                col_ring = (140, 220, 255)
+                col_glow = (210, 245, 255)
 
             pygame.draw.polygon(screen, col_main, pts)
             pygame.draw.circle(screen, col_ring, (sx, sy), r + 3, 1)
@@ -1054,9 +1054,9 @@ def _draw_hud(screen, state, my_id, font, my_stance="stand",
         stance_col = COL_STANCE.get(my_stance, COL_TEXT)
         screen.blit(font.render(f"[E] {my_stance.upper()}", True, stance_col), (8, 44))
         _draw_ammo_hud(screen, font_hud, ammo, is_reloading)
-        gold = state.gold_counts.get(my_id, 0)
-        gold_surf = font.render(f"◆ {gold}", True, (255, 215, 0))
-        screen.blit(gold_surf, (8, 62))
+        gems = state.gold_counts.get(my_id, 0)
+        gem_surf = font.render(f"◆ {gems}", True, (80, 200, 255))
+        screen.blit(gem_surf, (8, 62))
     if skill_cooldowns:
         _draw_skill_hud(screen, font, skill_cooldowns)
     _draw_hp_bar(screen, state, my_id, font_hud)
