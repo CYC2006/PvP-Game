@@ -37,6 +37,30 @@ COL_TEXT = (220, 220, 220)
 COL_HINT = (110, 130, 160)
 
 
+# ── Giant font (room code — the single most important glyph on the page) ─────
+
+_giant_font_cache: list = []
+
+def _get_giant_font() -> pygame.font.Font:
+    if not _giant_font_cache:
+        path = os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf")
+        _giant_font_cache.append(pygame.font.Font(path, 100))
+    return _giant_font_cache[0]
+
+
+def _draw_spaced_digits(screen: pygame.Surface, font: pygame.font.Font,
+                        text: str, color, center_x: int, y: int,
+                        gap: int = 18) -> None:
+    """Render `text` one glyph at a time with a fixed gap between glyphs,
+    centred horizontally on center_x."""
+    surfs   = [font.render(ch, True, color) for ch in text]
+    total_w = sum(s.get_width() for s in surfs) + gap * (len(surfs) - 1)
+    x = center_x - total_w // 2
+    for s in surfs:
+        screen.blit(s, (x, y))
+        x += s.get_width() + gap
+
+
 # ── Local server thread (used only when CLOUD_SERVER_IP = "127.0.0.1") ───────
 
 _local_server_started = False
@@ -73,8 +97,8 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
 
     dot_count = 0
     dot_timer = 0.0
-    CX, CY    = LOGICAL_W // 2, LOGICAL_H // 2
-    BACK_R    = pygame.Rect(CX - 80, CY + 130, 160, 44)
+    CX        = LOGICAL_W // 2
+    BACK_R    = pygame.Rect(CX - 80, 580, 160, 44)
 
     while True:
         dt    = clock.tick(FPS) / 1000.0
@@ -126,19 +150,19 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
         screen.fill(COL_BG)
         dots = "." * dot_count
         msg  = (f"Match found! Starting{dots}" if all_joined
-                else f"Waiting for opponent{dots}")
+                else "Waiting for Opponent")
 
         t = font_lg.render(msg, True, COL_TEXT)
-        screen.blit(t, (CX - t.get_width() // 2, CY - 55))
+        screen.blit(t, (CX - t.get_width() // 2, 130))
 
         if is_host:
-            code_surf = font_lg.render(str(room_code), True, (235, 195, 70))
-            lbl_surf  = font_sm.render("Room Code  (share with friend)", True, COL_HINT)
-            screen.blit(lbl_surf,  (CX - lbl_surf.get_width()  // 2, CY - 12))
-            screen.blit(code_surf, (CX - code_surf.get_width() // 2, CY + 14))
+            lbl_surf = font_sm.render("ROOM CODE  —  SHARE WITH YOUR FRIEND", True, COL_HINT)
+            screen.blit(lbl_surf, (CX - lbl_surf.get_width() // 2, 210))
+            _draw_spaced_digits(screen, _get_giant_font(), str(room_code),
+                                (235, 195, 70), CX, 245)
         else:
             hint = font_sm.render(f"Joining room {room_code}…", True, COL_HINT)
-            screen.blit(hint, (CX - hint.get_width() // 2, CY - 12))
+            screen.blit(hint, (CX - hint.get_width() // 2, 300))
 
         hov = BACK_R.collidepoint(mx, my)
         pygame.draw.rect(screen, (36, 46, 68) if hov else (24, 30, 46),

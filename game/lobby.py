@@ -6,6 +6,7 @@ Returns:
   ("join", code_str) – user entered 4-digit room code and confirmed JOIN
   (None,   None)    – user closed the window
 """
+import os
 import pygame
 
 from game.pages.layout import (
@@ -44,6 +45,17 @@ TAB_RS = [
     pygame.Rect(_TAB_X, _TAB_Y0 + i * _TAB_STEP, _TAB_W, _TAB_H)
     for i in range(len(SIDEBAR_TABS))
 ]
+
+
+# ── Giant font (room-code digits — sized to match the HOST connection screen) ─
+
+_giant_font_cache: list = []
+
+def _get_giant_font() -> pygame.font.Font:
+    if not _giant_font_cache:
+        path = os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf")
+        _giant_font_cache.append(pygame.font.Font(path, 100))
+    return _giant_font_cache[0]
 
 
 # ── Persistent chrome ─────────────────────────────────────────────────────────
@@ -142,29 +154,41 @@ def _draw_join(screen: pygame.Surface,
                mx: int, my: int,
                connect_r: pygame.Rect,
                back_r:    pygame.Rect) -> None:
-    CX, CY = LOGICAL_W // 2, LOGICAL_H // 2
+    CX = LOGICAL_W // 2
 
     title = font_lg.render(f"{IC_SIGNIN}  JOIN GAME", True, COL_JOIN_TXT)
-    screen.blit(title, (CX - title.get_width() // 2, CY - 110))
+    screen.blit(title, (CX - title.get_width() // 2, 130))
 
-    hint = font_sm.render("Enter room code:", True, COL_HINT)
-    screen.blit(hint, (CX - hint.get_width() // 2, CY - 68))
+    hint = font_sm.render("ENTER ROOM CODE", True, COL_HINT)
+    screen.blit(hint, (CX - hint.get_width() // 2, 210))
 
-    # Code input field
-    input_r = pygame.Rect(CX - 120, CY - 40, 240, 52)
-    pygame.draw.rect(screen, COL_INPUT_BG, input_r, border_radius=8)
-    pygame.draw.rect(screen, COL_INPUT_BD, input_r, 2, border_radius=8)
+    # 4-digit code grid — box size matches the HOST screen's giant room code
+    giant = _get_giant_font()
+    BOX_W, BOX_H, GAP = 100, 140, 20
+    total_w = BOX_W * 4 + GAP * 3
+    start_x = CX - total_w // 2
+    box_y   = 245
 
-    if code_str:
-        cs = font_lg.render(code_str, True, COL_IP_VAL)
-        screen.blit(cs, (input_r.x + 14,
-                         input_r.centery - cs.get_height() // 2))
-        cursor_x = input_r.x + 14 + cs.get_width() + 3
-    else:
-        cursor_x = input_r.x + 14
-    if (pygame.time.get_ticks() // 500) % 2 == 0:
-        pygame.draw.rect(screen, COL_IP_VAL,
-                         (cursor_x, input_r.y + 13, 2, 26))
+    caret_on = (pygame.time.get_ticks() // 500) % 2 == 0
+
+    for i in range(4):
+        box_r = pygame.Rect(start_x + i * (BOX_W + GAP), box_y, BOX_W, BOX_H)
+        filled = i < len(code_str)
+        active = i == len(code_str)
+
+        bd = COL_IP_VAL if filled else (COL_JOIN_BD if active else COL_INPUT_BD)
+        pygame.draw.rect(screen, COL_INPUT_BG, box_r, border_radius=12)
+        pygame.draw.rect(screen, bd, box_r, 3, border_radius=12)
+
+        if filled:
+            ds = giant.render(code_str[i], True, COL_IP_VAL)
+            screen.blit(ds, (box_r.centerx - ds.get_width() // 2,
+                             box_r.centery - ds.get_height() // 2))
+        elif active and caret_on:
+            cw = 40
+            pygame.draw.rect(screen, COL_JOIN_BD,
+                             (box_r.centerx - cw // 2, box_r.bottom - 26, cw, 4),
+                             border_radius=2)
 
     # CONNECT button — enabled only when exactly 4 digits
     if len(code_str) == 4:
@@ -248,9 +272,9 @@ def lobby_screen(screen: pygame.Surface,
     DCANCEL_R  = pygame.Rect(_DCX - 186, _DY + 120, 170, 44)
     DCONFIRM_R = pygame.Rect(_DCX + 16,  _DY + 120, 170, 44)
 
-    CX, CY     = LOGICAL_W // 2, LOGICAL_H // 2
-    CONNECT_R  = pygame.Rect(CX - 110, CY + 30,  220, 50)
-    JBACK_R    = pygame.Rect(CX - 80,  CY + 108, 160, 44)
+    CX         = LOGICAL_W // 2
+    CONNECT_R  = pygame.Rect(CX - 110, 410, 220, 50)
+    JBACK_R    = pygame.Rect(CX - 80,  580, 160, 44)
 
     while True:
         clock.tick(FPS)
