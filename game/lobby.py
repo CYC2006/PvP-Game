@@ -332,7 +332,7 @@ def lobby_screen(screen: pygame.Surface,
                         if r.collidepoint(mx, my):
                             sel_mode = i
                     if game_page.HOST_R.collidepoint(mx, my):
-                        return "host", None, map_page_idx
+                        return "host", None, 0  # map selection happens in the host screen
                     elif game_page.JOIN_R.collidepoint(mx, my):
                         join_mode = True
                         code_str  = ""
