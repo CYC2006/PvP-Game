@@ -95,7 +95,8 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
                        screen: pygame.Surface,
                        font_lg: pygame.font.Font,
                        font_sm: pygame.font.Font,
-                       clock: pygame.time.Clock):
+                       clock: pygame.time.Clock,
+                       map_id: int = 0):
     """
     Send PKT_JOIN(room_code) every second to server_addr.
     Wait for PKT_JOINED + PKT_ALL_JOINED from the server.
@@ -132,10 +133,10 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
                     _cancel_matchmaking(sock, server_addr, player_id)
                     return None, None
 
-        # Send PKT_JOIN every second
+        # Send PKT_JOIN every second (map_id carried so server knows which map HOST wants)
         if now - last_join >= 1.0:
             try:
-                sock.sendto(pack_join(room_code), server_addr)
+                sock.sendto(pack_join(room_code, map_id), server_addr)
             except Exception:
                 pass
             last_join = now
@@ -348,7 +349,8 @@ def run() -> None:
 
         player_id, server_addr = matchmaking_screen(sock, server_addr,
                                                     room_code, is_host,
-                                                    screen, font_lg, font_sm, clock)
+                                                    screen, font_lg, font_sm, clock,
+                                                    map_id=lobby_map_id)
         if player_id is None:
             sock.close()
             continue

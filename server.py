@@ -82,37 +82,47 @@ class RoomState:
         'state', 'clients', 'addr_to_id', 'player_chars', 'player_runes',
         'last_seen', 'obstacle_hp', 'game_started', 'paused', 'paused_since',
         'next_tick', 'waiting', 'portal_cooldowns',
+        'map_id', 'obstacles', 'obstacle_hp_template', 'portals', 'map_w', 'map_h',
     )
 
-    def __init__(self, obstacle_hp_template: dict):
+    def __init__(self, map_id: int, map_data: dict):
+        self.map_id                = map_id
+        self.obstacles             = map_data["obstacles"]
+        self.obstacle_hp_template  = map_data["obstacle_hp_template"]
+        self.portals               = map_data["portals"]
+        self.map_w                 = map_data["width"]
+        self.map_h                 = map_data["height"]
         self.state             = GameState()
-        self.clients           = {}          # pid → addr
-        self.addr_to_id        = {}          # addr → pid
-        self.player_chars      = {}          # pid → char_id
-        self.player_runes      = {}          # pid → rune_id
-        self.last_seen         = {}          # pid → perf_counter time
-        self.obstacle_hp       = dict(obstacle_hp_template)
+        self.clients           = {}
+        self.addr_to_id        = {}
+        self.player_chars      = {}
+        self.player_runes      = {}
+        self.last_seen         = {}
+        self.obstacle_hp       = dict(self.obstacle_hp_template)
         self.game_started      = False
         self.paused            = False
         self.paused_since      = 0.0
         self.next_tick         = time.perf_counter()
-        self.waiting           = {}          # addr → timestamp of last PKT_JOIN
-        self.portal_cooldowns  = {}          # pid → ticks remaining before next teleport
+        self.waiting           = {}
+        self.portal_cooldowns  = {}
 
 
 def run(map_id: int = 0):
-    meta      = _get_maps_meta()
-    map_entry = meta[map_id] if map_id < len(meta) else meta[0]
-    map_path  = map_entry["file"]
-    map_w     = map_entry.get("width",  1920)
-    map_h     = map_entry.get("height", 1080)
-    portals   = map_entry.get("portals", [])
+    meta = _get_maps_meta()
 
-    configure_map(map_w, map_h)
-
-    obstacles            = load_map(map_path)
-    obstacle_hp_template = {oid: obs.hp for oid, obs in obstacles.items()}
-    print(f"[Server] Loaded map '{map_entry['id']}' ({map_w}x{map_h}): {len(obstacles)} obstacles")
+    def _load_map_data(mid: int) -> dict:
+        entry = meta[mid] if mid < len(meta) else meta[0]
+        obs   = load_map(entry["file"])
+        w     = entry.get("width",  1920)
+        h     = entry.get("height", 1080)
+        print(f"[Server] Loaded map '{entry['id']}' ({w}x{h}): {len(obs)} obstacles")
+        return {
+            "obstacles":            obs,
+            "obstacle_hp_template": {oid: o.hp for oid, o in obs.items()},
+            "portals":              entry.get("portals", []),
+            "width":                w,
+            "height":               h,
+        }
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((HOST, PORT))
@@ -162,7 +172,8 @@ def run(map_id: int = 0):
         room.paused        = False
         room.state         = GameState()
         room.obstacle_hp.clear()
-        room.obstacle_hp.update(obstacle_hp_template)
+        room.obstacle_hp.update(room.obstacle_hp_template)
+        configure_map(room.map_w, room.map_h)
         room.next_tick     = time.perf_counter()
         room.portal_cooldowns.clear()
         print("[Server] Room reset — waiting for players")
@@ -217,7 +228,7 @@ def run(map_id: int = 0):
 
             # ── PKT_JOIN ──────────────────────────────────────────────────
             if ptype == PKT_JOIN:
-                join_code = unpack_join(data)
+                join_code, join_map_id = unpack_join(data)
                 room = rooms.get(join_code)
 
                 if room and addr in room.addr_to_id:
@@ -227,10 +238,12 @@ def run(map_id: int = 0):
                     if len(room.clients) == MAX_PLAYERS and not room.game_started:
                         sock.sendto(pack_all_joined(), addr)
                     elif room.game_started and room.player_chars:
-                        sock.sendto(pack_game_start(room.player_chars, map_id), addr)
+                        sock.sendto(pack_game_start(room.player_chars, room.map_id), addr)
                 else:
                     if room is None:
-                        room = RoomState(obstacle_hp_template)
+                        # First player to join a room is treated as host — their map_id wins
+                        room = RoomState(join_map_id, _load_map_data(join_map_id))
+                        configure_map(room.map_w, room.map_h)
                         rooms[join_code] = room
                     room.waiting[addr] = time.perf_counter()
                     addr_room[addr]    = join_code
@@ -247,7 +260,7 @@ def run(map_id: int = 0):
                     continue
                 if room.game_started:
                     if room.player_chars:
-                        sock.sendto(pack_game_start(room.player_chars, map_id), addr)
+                        sock.sendto(pack_game_start(room.player_chars, room.map_id), addr)
                 else:
                     pid     = room.addr_to_id[addr]
                     char_id = data[1]
@@ -266,7 +279,7 @@ def run(map_id: int = 0):
                             r_id      = room.player_runes.get(p_id, 0)
                             room.state.apply_char_stats(p_id, char_name, r_id)
                             print(f"[Server] Player {p_id} → {char_name}, rune {r_id}")
-                        payload = pack_game_start(room.player_chars, map_id)
+                        payload = pack_game_start(room.player_chars, room.map_id)
                         for a in room.clients.values():
                             try:
                                 sock.sendto(payload, a)
@@ -398,13 +411,13 @@ def run(map_id: int = 0):
                     try:
                         s = room.state
                         s.tick += 1
-                        s.step_bullets(obstacles, room.obstacle_hp)
+                        s.step_bullets(room.obstacles, room.obstacle_hp)
                         s.step_pending_pellets()
                         s.step_jumps()
                         s.step_zombie_jumps()
                         s.step_vince_taunt()
-                        s.step_vince_dash(obstacles)
-                        s.resolve_player_collisions(obstacles)
+                        s.step_vince_dash(room.obstacles)
+                        s.resolve_player_collisions(room.obstacles)
                         s.step_gold_collection()
                         s.step_status_effects()
                         s.step_smoke_patches()
@@ -415,7 +428,7 @@ def run(map_id: int = 0):
                         s.step_burst()
                         s.step_mercury_barrage()
                         s.step_mines()
-                        s.step_turrets(obstacles, room.obstacle_hp)
+                        s.step_turrets(room.obstacles, room.obstacle_hp)
                         s.step_barrage()
                         s.step_poison_pools()
                         s.step_poisoner_space()
@@ -432,8 +445,8 @@ def run(map_id: int = 0):
                         s.step_rune_recovery()
 
                         # Portal teleportation (Portal map only)
-                        if portals:
-                            _step_portals(s, room, portals)
+                        if room.portals:
+                            _step_portals(s, room, room.portals)
 
                         payload = pack_state(s)
                         for a in room.clients.values():

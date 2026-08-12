@@ -54,14 +54,16 @@ def pack_all_joined() -> bytes:
     return bytes([PKT_ALL_JOINED])
 
 
-def pack_join(room_code: int) -> bytes:
-    return bytes([PKT_JOIN]) + struct.pack('>H', room_code)
+def pack_join(room_code: int, map_id: int = 0) -> bytes:
+    """map_id appended as optional trailing byte — old servers ignore it."""
+    return bytes([PKT_JOIN]) + struct.pack('>H', room_code) + bytes([map_id & 0xFF])
 
 
-def unpack_join(data: bytes) -> int:
-    if len(data) >= 3:
-        return struct.unpack('>H', data[1:3])[0]
-    return 0
+def unpack_join(data: bytes) -> tuple:
+    """Returns (room_code, map_id). map_id defaults to 0 if not present."""
+    room_code = struct.unpack('>H', data[1:3])[0] if len(data) >= 3 else 0
+    map_id    = data[3] if len(data) >= 4 else 0
+    return room_code, map_id
 
 
 def pack_joined(player_id: int) -> bytes:
