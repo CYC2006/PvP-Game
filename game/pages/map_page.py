@@ -244,13 +244,23 @@ def draw(screen: pygame.Surface,
             dot_y += font_sm.get_height() + 4
 
     # ── Right: minimap preview ────────────────────────────────────────────
-    prev_surf = _get_minimap(map_def, _PREV_W, _PREV_H)
+    # Fit the map inside the envelope while preserving its true aspect ratio.
+    map_w  = map_def["width"]
+    map_h  = map_def["height"]
+    scale  = min(_PREV_W / map_w, _PREV_H / map_h)
+    disp_w = int(map_w * scale)
+    disp_h = int(map_h * scale)
+    off_x  = (_PREV_W - disp_w) // 2
+    off_y  = (_PREV_H - disp_h) // 2
 
-    prev_rect = pygame.Rect(_RX, _DET_Y, _PREV_W, _PREV_H)
-    screen.blit(prev_surf, prev_rect.topleft)
-
-    # Border around preview
-    pygame.draw.rect(screen, (55, 75, 110), prev_rect, 2, border_radius=4)
+    frame_rect = pygame.Rect(_RX, _DET_Y, _PREV_W, _PREV_H)
+    # Dark letterbox background (clearly distinct from any map floor colour)
+    pygame.draw.rect(screen, (10, 10, 16), frame_rect, border_radius=4)
+    # Map surface at true aspect ratio, centred inside the frame
+    prev_surf = _get_minimap(map_def, disp_w, disp_h)
+    screen.blit(prev_surf, (_RX + off_x, _DET_Y + off_y))
+    # Thick border around the whole frame
+    pygame.draw.rect(screen, (68, 92, 138), frame_rect, 3, border_radius=4)
 
     # ── Right: map info below preview ─────────────────────────────────────
     INFO_Y = _DET_Y + _PREV_H + 10
