@@ -90,10 +90,9 @@ _player_cache: dict = {}
 _map_surface: "pygame.Surface | None" = None
 # Portal definitions for current map: list of {"x", "y_min", "y_max"}
 _map_portals: list = []
-# Portal teleport flash effect (purple overlay fading over several frames)
+# Portal teleport flash effect (additive tint fading over several frames)
 _portal_flash_frames: int = 0
-_PORTAL_FLASH_TOTAL:  int = 14
-_portal_flash_surf:   "pygame.Surface | None" = None
+_PORTAL_FLASH_TOTAL:  int = 18
 # skill HUD 圓形背景 Surface（固定大小，建立一次重複使用）
 _skill_bg_surf: "pygame.Surface | None" = None
 # skill HUD 冷卻扇形 Surface（固定大小，每幀 fill 清空後重繪，省掉 allocation）
@@ -232,7 +231,7 @@ def trigger_portal_flash() -> None:
 
 def reset_game_state() -> None:
     """每局遊戲開始前呼叫，清除跨局殘留的視覺狀態。"""
-    global _map_surface, _skill_bg_surf, _skill_pie_surf, _portal_flash_frames
+    global _map_surface, _skill_bg_surf, _skill_pie_surf
     _shake_timers.clear()
     _prev_bullet_pos.clear()
     _particles.clear()
@@ -580,14 +579,11 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
 
-    # Portal teleport flash — purple overlay that fades out after teleportation
-    global _portal_flash_frames, _portal_flash_surf
+    # Portal teleport flash — additive RGB tint, no extra Surface needed
     if _portal_flash_frames > 0:
-        if _portal_flash_surf is None:
-            _portal_flash_surf = pygame.Surface((SCREEN_W, SCREEN_H))
-            _portal_flash_surf.fill((190, 80, 255))
-        _portal_flash_surf.set_alpha(int(220 * _portal_flash_frames / _PORTAL_FLASH_TOTAL))
-        screen.blit(_portal_flash_surf, (0, 0))
+        t = _portal_flash_frames / _PORTAL_FLASH_TOTAL
+        screen.fill((int(70 * t), int(10 * t), int(110 * t)),
+                    special_flags=pygame.BLEND_RGB_ADD)
         _portal_flash_frames -= 1
 
     # ── 邊框脈動：中毒綠框（非殘血時）或殘血紅框（優先級高）
