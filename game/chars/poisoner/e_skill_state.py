@@ -4,14 +4,14 @@
 - 每 30 tick 釋放一次綠色衝擊波（不再需要站在毒液池上）
 - 衝擊波：半徑 60→400，歷時 0.6 秒（36 tick），命中對手 3 點傷害 + 毒素層數 +1
 - 衝擊波命中對手時：自己回復 3 × 對手當前毒素層數 HP
-- 最多 6 次，冷卻 10 秒（由 chars.csv cd_e=10）
+- 最多 5 次，冷卻 10 秒（由 chars.csv cd_e=10）
 """
 from game.chars.pioneer.shield_state import _start_shockwave
 from game.chars.poisoner.poison_stack_state import add_poison_stack
 
 E_TICKS          = 180   # 3s × 60 fps
 CHECK_INTERVAL   = 30    # ticks between pool-standing checks
-MAX_CHECKS       = 6
+MAX_CHECKS       = 5
 
 SW_START_R       = 60
 SW_END_R         = 400

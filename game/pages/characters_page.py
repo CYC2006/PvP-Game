@@ -45,9 +45,9 @@ _SKILLS: dict = {
          "Lobs a stun grenade that detonates on landing. "
          "Any enemy inside the blast radius is briefly blinded and disoriented."),
         ("MERCURY BARRAGE","F",    15,
-         "Lock your aim and unleash 7 volleys of 5 bullets in a spread fan "
-         "(-6° / -3° / 0° / +3° / +6°), one volley every 6 ticks. "
-         "35 bullets total over 0.6 seconds. "
+         "Lock your aim and unleash 5 volleys of 5 bullets in a spread fan "
+         "(-10° / -5° / 0° / +5° / +10°), one volley every 6 ticks. "
+         "25 bullets total over 0.4 seconds. "
          "No spread, same damage and range as normal shots. "
          "Aim is fixed for the full duration; LMB, RMB, SPACE, and E are locked. "
          "Q (rune) and movement remain available."),
@@ -163,7 +163,7 @@ _SKILLS: dict = {
         ("TOXIC RESONANCE", "E", 10,
          "For 3 s, every 30 ticks a green shockwave (r 60→60→400, 0.6 s) erupts from your position. "
          "No pool required. When the ring hits the enemy: deals 3 dmg, adds 1 poison stack, "
-         "and heals you for 3 \xd7 (enemy's current poison stacks). Up to 6 shockwaves per activation."),
+         "and heals you for 3 \xd7 (enemy's current poison stacks). Up to 5 shockwaves per activation."),
         ("—", "F",     0, "Skill under development."),
     ],
     'Zombie': [

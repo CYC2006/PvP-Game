@@ -3,6 +3,7 @@ import pygame
 from dataclasses import dataclass, field
 from game.command import PlayerCommand
 from game.chars.vince.giant_state import GROW_TICKS, ACTIVE_TICKS, SHRINK_TICKS, TOTAL_TICKS
+from game.chars.agent.mercury_state import ULT_DURATION as _MERCURY_ULT_TICKS
 
 # ── 模組級常數（renderer 以 from game.input import 取得；init_char 後同步更新）──
 SHOOT_COOLDOWN_MS = 333
@@ -529,7 +530,7 @@ def read_input(player_id: int, keys_held: set,
                 _state.r_skill_start_ms    = now
                 _state.r_skill_start_angle = math.degrees(math.atan2(aim_x, -aim_y))
             if _state.char_name == 'Agent':
-                _state.mercury_end_ms   = now + 1250  # 72 ticks × ~17ms + safety margin
+                _state.mercury_end_ms   = now + int(_MERCURY_ULT_TICKS * 1000 / 60) + 150  # duration + safety margin
                 _state.mercury_aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
 
     # ── R 鍵：手動換彈 ────────────────────────────────────────────────────

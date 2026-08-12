@@ -1,9 +1,9 @@
 import math
 
-VOLLEY_COUNT    = 7
+VOLLEY_COUNT    = 5
 VOLLEY_INTERVAL = 6                                # ticks between volleys
-ULT_DURATION    = VOLLEY_INTERVAL * (VOLLEY_COUNT - 1)   # 72 ticks
-_ANGLES_DEG     = (-6.0, -3.0, 0.0, 3.0, 6.0)
+ULT_DURATION    = VOLLEY_INTERVAL * (VOLLEY_COUNT - 1)   # 24 ticks
+_ANGLES_DEG     = (-10.0, -5.0, 0.0, 5.0, 10.0)
 
 
 def activate_mercury(state, owner_id: int, aim_x: float, aim_y: float) -> None:
