@@ -90,6 +90,10 @@ _player_cache: dict = {}
 _map_surface: "pygame.Surface | None" = None
 # Portal definitions for current map: list of {"x", "y_min", "y_max"}
 _map_portals: list = []
+# Portal teleport flash effect (purple overlay fading over several frames)
+_portal_flash_frames: int = 0
+_PORTAL_FLASH_TOTAL:  int = 14
+_portal_flash_surf:   "pygame.Surface | None" = None
 # skill HUD 圓形背景 Surface（固定大小，建立一次重複使用）
 _skill_bg_surf: "pygame.Surface | None" = None
 # skill HUD 冷卻扇形 Surface（固定大小，每幀 fill 清空後重繪，省掉 allocation）
@@ -221,18 +225,24 @@ def set_map_portals(portals: list) -> None:
     _map_portals = portals or []
 
 
+def trigger_portal_flash() -> None:
+    global _portal_flash_frames
+    _portal_flash_frames = _PORTAL_FLASH_TOTAL
+
+
 def reset_game_state() -> None:
     """每局遊戲開始前呼叫，清除跨局殘留的視覺狀態。"""
-    global _map_surface, _skill_bg_surf, _skill_pie_surf
+    global _map_surface, _skill_bg_surf, _skill_pie_surf, _portal_flash_frames
     _shake_timers.clear()
     _prev_bullet_pos.clear()
     _particles.clear()
     _prev_destroyed.clear()
     _debris.clear()
     # 強制重建地圖底層（下一幀重新繪製）
-    _map_surface    = None
-    _skill_bg_surf  = None
-    _skill_pie_surf = None
+    _map_surface         = None
+    _skill_bg_surf       = None
+    _skill_pie_surf      = None
+    _portal_flash_frames = 0
 
 
 # 各障礙物種類的粒子顏色（同色系深淺變化）
@@ -569,6 +579,16 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     airstrike_fx.update(state)
     airstrike_fx.draw(screen, state, cx, cy)
     flash_fx.draw_screen_flash(screen, state, my_id)
+
+    # Portal teleport flash — purple overlay that fades out after teleportation
+    global _portal_flash_frames, _portal_flash_surf
+    if _portal_flash_frames > 0:
+        if _portal_flash_surf is None:
+            _portal_flash_surf = pygame.Surface((SCREEN_W, SCREEN_H))
+            _portal_flash_surf.fill((190, 80, 255))
+        _portal_flash_surf.set_alpha(int(220 * _portal_flash_frames / _PORTAL_FLASH_TOTAL))
+        screen.blit(_portal_flash_surf, (0, 0))
+        _portal_flash_frames -= 1
 
     # ── 邊框脈動：中毒綠框（非殘血時）或殘血紅框（優先級高）
     low_hp = me.max_hp > 0 and (me.hp / me.max_hp) <= 0.30

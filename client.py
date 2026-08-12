@@ -11,7 +11,7 @@ from game.input      import (read_input, set_giant_age, set_dash_context,
                              set_burst_shots_left, set_cloak_ticks,
                              get_mercury_aim_angle, notify_air_cannon_hit,
                              cancel_mercury_barrage, init_char, init_rune)
-from game.renderer   import draw, handle_settings_click, reset_game_state, set_map_portals, settings_blocks_click, LOGICAL_W, LOGICAL_H
+from game.renderer   import draw, handle_settings_click, reset_game_state, set_map_portals, trigger_portal_flash, settings_blocks_click, LOGICAL_W, LOGICAL_H
 from game.state      import GameState, configure_map
 from game.obstacle   import load_map
 import game.charselect as charselect
@@ -458,7 +458,12 @@ def run() -> None:
                 except (BlockingIOError, ConnectionResetError, OSError):
                     break
             if latest:
-                state = unpack_state(latest)
+                _prev_lp = state.players.get(player_id)
+                state    = unpack_state(latest)
+                _next_lp = state.players.get(player_id)
+                if (_prev_lp and _next_lp and
+                        abs(_next_lp.x - _prev_lp.x) > 300):
+                    trigger_portal_flash()
 
             local_player = state.players.get(player_id)
             if local_player:

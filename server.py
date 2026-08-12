@@ -143,7 +143,7 @@ def run(map_id: int = 0):
 
     def _step_portals(state: GameState, room: RoomState, map_portals: list) -> None:
         """Teleport players that walk into a portal edge."""
-        from game.state import MAP_WIDTH
+        map_w = room.map_w
         for pid, player in state.players.items():
             cd = room.portal_cooldowns.get(pid, 0)
             if cd > 0:
@@ -153,9 +153,9 @@ def run(map_id: int = 0):
                 continue
             if player.x <= PLAYER_RADIUS * 2:
                 # Entered left portal → emerge at right
-                player.x = MAP_WIDTH - PLAYER_RADIUS * 2 - 4
+                player.x = map_w - PLAYER_RADIUS * 2 - 4
                 room.portal_cooldowns[pid] = PORTAL_COOLDOWN_TICKS
-            elif player.x >= MAP_WIDTH - PLAYER_RADIUS * 2:
+            elif player.x >= map_w - PLAYER_RADIUS * 2:
                 # Entered right portal → emerge at left
                 player.x = PLAYER_RADIUS * 2 + 4
                 room.portal_cooldowns[pid] = PORTAL_COOLDOWN_TICKS
