@@ -1355,8 +1355,6 @@ class GameState:
 
             opponent_id = 3 - cannon.owner_id
             opp = self.players.get(opponent_id)
-            if opp and not (opp.giant_tick >= 0):  # giant 時不受空氣炮影響（可選設計）
-                pass
             if opp:
                 hit_r = PLAYER_RADIUS + self._AIR_CANNON_RADIUS
                 if math.hypot(opp.x - cannon.x, opp.y - cannon.y) < hit_r:

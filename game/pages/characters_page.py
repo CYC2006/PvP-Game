@@ -168,7 +168,10 @@ _SKILLS: dict = {
     ],
     'Zombie': [
         ("—", "RMB",   0, "Skill under development."),
-        ("—", "SPACE", 0, "Skill under development."),
+        ("GROUND POUND",  "SPACE", 8,
+         "Leap 200 px toward your aim, then slam down. "
+         "Enemies caught in the landing shockwave are knocked back and stunned. "
+         "Instantly refills your magazine and cancels any reload in progress."),
         ("—", "E",     0, "Skill under development."),
         ("—", "F",     0, "Skill under development."),
     ],
