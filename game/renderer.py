@@ -3,8 +3,7 @@ import math
 import time
 import random
 import pygame
-from game.state import (GameState, MAP_WIDTH, MAP_HEIGHT,
-                        PLAYER_RADIUS, BULLET_RADIUS)
+from game.state import (GameState, PLAYER_RADIUS, BULLET_RADIUS)
 import game.input as _inp
 from game.input import MAGAZINE_SIZE
 from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _ws, COL_BULLET as _COL_BULLET_UTILS
@@ -89,6 +88,8 @@ _rotated_cache: dict = {}
 _player_cache: dict = {}
 # 靜態地圖底層（背景 + 網格），在 pygame 初始化後第一次 draw() 時建立
 _map_surface: "pygame.Surface | None" = None
+# Portal definitions for current map: list of {"x", "y_min", "y_max"}
+_map_portals: list = []
 # skill HUD 圓形背景 Surface（固定大小，建立一次重複使用）
 _skill_bg_surf: "pygame.Surface | None" = None
 # skill HUD 冷卻扇形 Surface（固定大小，每幀 fill 清空後重繪，省掉 allocation）
@@ -212,6 +213,12 @@ _prev_destroyed: set = set()
 # ── 地面殘骸（純視覺，永久留存）────────────────────────────────────────────
 # 每筆：{'x','y','polys':[[(dx,dy),...],...],'color':(r,g,b),'outline':(r,g,b)}
 _debris: list = []
+
+
+def set_map_portals(portals: list) -> None:
+    """Set portal definitions for the current map (called before each game)."""
+    global _map_portals
+    _map_portals = portals or []
 
 
 def reset_game_state() -> None:
@@ -580,13 +587,51 @@ def _build_map_surface() -> "pygame.Surface":
     """預渲染整張地圖底層（背景色 + 網格線 + 邊框）到 MAP_WIDTH×MAP_HEIGHT Surface。
     建立一次，每幀只做一次 blit。
     """
-    surf = pygame.Surface((MAP_WIDTH, MAP_HEIGHT))
+    from game.state import MAP_WIDTH as MW, MAP_HEIGHT as MH
+    surf = pygame.Surface((MW, MH))
     surf.fill(COL_MAP_BG)
-    for x in range(0, MAP_WIDTH + 1, GRID_SIZE):
-        pygame.draw.line(surf, COL_GRID, (x, 0), (x, MAP_HEIGHT))
-    for y in range(0, MAP_HEIGHT + 1, GRID_SIZE):
-        pygame.draw.line(surf, COL_GRID, (0, y), (MAP_WIDTH, y))
+    for x in range(0, MW + 1, GRID_SIZE):
+        pygame.draw.line(surf, COL_GRID, (x, 0), (x, MH))
+    for y in range(0, MH + 1, GRID_SIZE):
+        pygame.draw.line(surf, COL_GRID, (0, y), (MW, y))
     pygame.draw.rect(surf, COL_MAP_BORDER, surf.get_rect(), 2)
+
+    # Draw portals if this map has them
+    for portal in _map_portals:
+        px     = portal["x"]
+        py_min = portal["y_min"]
+        py_max = portal["y_max"]
+        ph     = py_max - py_min
+        pw     = 28   # portal visual width into the map
+
+        # Determine rect: left portal anchors at x=0, right portal at map edge
+        rect_x = 0 if px == 0 else MW - pw
+
+        # Outer glow layers (darkest → brightest), each inset from the open (inner) side.
+        # Left portal: anchored at x=0, shrinks rightward.
+        # Right portal: anchored at x=MW, shrinks leftward.
+        LAYERS = [
+            ((60,  18,  90), 0),
+            ((100,  30, 150), 3),
+            ((150,  60, 220), 7),
+            ((190, 100, 255), 12),
+        ]
+        for col, inset in LAYERS:
+            if px == 0:
+                r = pygame.Rect(0, py_min + inset, pw - inset, ph - inset * 2)
+            else:
+                r = pygame.Rect(MW - pw + inset, py_min + inset, pw - inset, ph - inset * 2)
+            if r.width > 0 and r.height > 0:
+                pygame.draw.rect(surf, col, r)
+
+        # Lavender shimmer stripe down the centre of the portal slab
+        cx_line = rect_x + pw // 2
+        pygame.draw.line(surf, (230, 190, 255),
+                         (cx_line, py_min + 6), (cx_line, py_max - 6), 2)
+        # Small bright centre dot
+        pygame.draw.circle(surf, (255, 230, 255),
+                           (cx_line, (py_min + py_max) // 2), 4)
+
     return surf
 
 

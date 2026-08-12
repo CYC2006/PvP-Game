@@ -1,0 +1,350 @@
+{
+  "width": 1920,
+  "height": 720,
+  "obstacles": [
+    {
+      "id": 0,
+      "kind": "tree_1",
+      "x": 150,
+      "y": 108,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 1,
+      "kind": "tree_1",
+      "x": 250,
+      "y": 605,
+      "angle_deg": 0,
+      "scale": 0.85
+    },
+    {
+      "id": 2,
+      "kind": "tree_1",
+      "x": 1026,
+      "y": 258,
+      "angle_deg": 0,
+      "scale": 1.19
+    },
+    {
+      "id": 3,
+      "kind": "box_normal",
+      "x": 344,
+      "y": 261,
+      "angle_deg": -23,
+      "scale": 0.72
+    },
+    {
+      "id": 4,
+      "kind": "box_normal",
+      "x": 214,
+      "y": 420,
+      "angle_deg": -17,
+      "scale": 0.66
+    },
+    {
+      "id": 5,
+      "kind": "box_normal",
+      "x": 866,
+      "y": 607,
+      "angle_deg": -32,
+      "scale": 0.67
+    },
+    {
+      "id": 6,
+      "kind": "box_normal",
+      "x": 1485,
+      "y": 68,
+      "angle_deg": 7,
+      "scale": 0.83
+    },
+    {
+      "id": 7,
+      "kind": "box_normal",
+      "x": 535,
+      "y": 566,
+      "angle_deg": -14,
+      "scale": 0.8
+    },
+    {
+      "id": 8,
+      "kind": "box_normal",
+      "x": 1506,
+      "y": 181,
+      "angle_deg": 2,
+      "scale": 0.77
+    },
+    {
+      "id": 9,
+      "kind": "box_normal",
+      "x": 776,
+      "y": 524,
+      "angle_deg": 17,
+      "scale": 0.75
+    },
+    {
+      "id": 10,
+      "kind": "box_normal",
+      "x": 1210,
+      "y": 462,
+      "angle_deg": -1,
+      "scale": 0.83
+    },
+    {
+      "id": 11,
+      "kind": "box_normal",
+      "x": 1265,
+      "y": 283,
+      "angle_deg": 23,
+      "scale": 0.66
+    },
+    {
+      "id": 12,
+      "kind": "box_normal",
+      "x": 383,
+      "y": 555,
+      "angle_deg": 14,
+      "scale": 0.83
+    },
+    {
+      "id": 13,
+      "kind": "box_normal",
+      "x": 763,
+      "y": 100,
+      "angle_deg": 7,
+      "scale": 0.74
+    },
+    {
+      "id": 14,
+      "kind": "box_normal",
+      "x": 663,
+      "y": 170,
+      "angle_deg": 12,
+      "scale": 0.67
+    },
+    {
+      "id": 15,
+      "kind": "box_normal",
+      "x": 1365,
+      "y": 610,
+      "angle_deg": 44,
+      "scale": 0.78
+    },
+    {
+      "id": 16,
+      "kind": "box_normal",
+      "x": 376,
+      "y": 660,
+      "angle_deg": 23,
+      "scale": 0.74
+    },
+    {
+      "id": 17,
+      "kind": "box_normal",
+      "x": 841,
+      "y": 311,
+      "angle_deg": -39,
+      "scale": 0.67
+    },
+    {
+      "id": 18,
+      "kind": "box_normal",
+      "x": 1025,
+      "y": 100,
+      "angle_deg": -9,
+      "scale": 0.79
+    },
+    {
+      "id": 19,
+      "kind": "box_normal",
+      "x": 910,
+      "y": 513,
+      "angle_deg": -14,
+      "scale": 0.72
+    },
+    {
+      "id": 20,
+      "kind": "box_normal",
+      "x": 1212,
+      "y": 647,
+      "angle_deg": -7,
+      "scale": 0.83
+    },
+    {
+      "id": 21,
+      "kind": "box_normal",
+      "x": 1354,
+      "y": 469,
+      "angle_deg": -24,
+      "scale": 0.72
+    },
+    {
+      "id": 22,
+      "kind": "box_normal",
+      "x": 991,
+      "y": 439,
+      "angle_deg": -10,
+      "scale": 0.81
+    },
+    {
+      "id": 23,
+      "kind": "rock_1",
+      "x": 1632,
+      "y": 507,
+      "angle_deg": 15,
+      "scale": 1.19
+    },
+    {
+      "id": 24,
+      "kind": "rock_1",
+      "x": 1632,
+      "y": 369,
+      "angle_deg": 0,
+      "scale": 0.68
+    },
+    {
+      "id": 25,
+      "kind": "rock_1",
+      "x": 1672,
+      "y": 262,
+      "angle_deg": 1,
+      "scale": 0.76
+    },
+    {
+      "id": 26,
+      "kind": "rock_1",
+      "x": 776,
+      "y": 627,
+      "angle_deg": -27,
+      "scale": 0.65
+    },
+    {
+      "id": 27,
+      "kind": "rock_1",
+      "x": 1667,
+      "y": 173,
+      "angle_deg": -37,
+      "scale": 0.94
+    },
+    {
+      "id": 28,
+      "kind": "rock_1",
+      "x": 629,
+      "y": 263,
+      "angle_deg": 39,
+      "scale": 0.92
+    },
+    {
+      "id": 29,
+      "kind": "rock_1",
+      "x": 1101,
+      "y": 352,
+      "angle_deg": -25,
+      "scale": 0.84
+    },
+    {
+      "id": 30,
+      "kind": "rock_1",
+      "x": 276,
+      "y": 87,
+      "angle_deg": -12,
+      "scale": 1.12
+    },
+    {
+      "id": 31,
+      "kind": "rock_1",
+      "x": 676,
+      "y": 515,
+      "angle_deg": -29,
+      "scale": 1.09
+    },
+    {
+      "id": 32,
+      "kind": "rock_1",
+      "x": 1824,
+      "y": 93,
+      "angle_deg": 0,
+      "scale": 0.85
+    },
+    {
+      "id": 33,
+      "kind": "rock_1",
+      "x": 638,
+      "y": 631,
+      "angle_deg": -10,
+      "scale": 0.63
+    },
+    {
+      "id": 34,
+      "kind": "rock_1",
+      "x": 850,
+      "y": 404,
+      "angle_deg": 17,
+      "scale": 0.75
+    },
+    {
+      "id": 35,
+      "kind": "box_special",
+      "x": 962,
+      "y": 607,
+      "angle_deg": 41,
+      "scale": 0.71
+    },
+    {
+      "id": 36,
+      "kind": "box_special",
+      "x": 385,
+      "y": 67,
+      "angle_deg": 21,
+      "scale": 0.78
+    },
+    {
+      "id": 37,
+      "kind": "box_special",
+      "x": 919,
+      "y": 81,
+      "angle_deg": -32,
+      "scale": 0.85
+    },
+    {
+      "id": 38,
+      "kind": "box_special",
+      "x": 1631,
+      "y": 599,
+      "angle_deg": 33,
+      "scale": 0.69
+    },
+    {
+      "id": 39,
+      "kind": "box_special",
+      "x": 1575,
+      "y": 240,
+      "angle_deg": -3,
+      "scale": 0.82
+    },
+    {
+      "id": 40,
+      "kind": "rock_2",
+      "x": 566,
+      "y": 111,
+      "angle_deg": 4,
+      "scale": 0.78
+    },
+    {
+      "id": 41,
+      "kind": "rock_2",
+      "x": 1087,
+      "y": 520,
+      "angle_deg": -13,
+      "scale": 0.77
+    },
+    {
+      "id": 42,
+      "kind": "rock_2",
+      "x": 948,
+      "y": 174,
+      "angle_deg": -23,
+      "scale": 0.68
+    }
+  ]
+}

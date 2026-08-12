@@ -476,26 +476,28 @@ def pack_char_select(char_id: int, rune_id: int = 0) -> bytes:
     return bytes([PKT_CHAR_SELECT, char_id & 0xFF, rune_id & 0xFF])
 
 
-def pack_game_start(chars: dict = None) -> bytes:
+def pack_game_start(chars: dict = None, map_id: int = 0) -> bytes:
     """
     chars: {pid: char_id}（最多 2 對）
-    格式: PKT_GAME_START [pid char_id] ...
+    格式: PKT_GAME_START map_id [pid char_id] ...
+    map_id byte prepended so clients load the correct map.
     """
-    data = [PKT_GAME_START]
+    data = [PKT_GAME_START, int(map_id) & 0xFF]
     if chars:
         for pid, char_id in sorted(chars.items()):
             data += [int(pid) & 0xFF, int(char_id) & 0xFF]
     return bytes(data)
 
 
-def unpack_game_start(data: bytes) -> dict:
-    """回傳 {pid: char_id}。"""
-    chars = {}
-    i = 1
+def unpack_game_start(data: bytes) -> tuple[dict, int]:
+    """回傳 ({pid: char_id}, map_id)。"""
+    map_id = data[1] if len(data) >= 2 else 0
+    chars  = {}
+    i = 2
     while i + 1 < len(data):
         chars[data[i]] = data[i + 1]
         i += 2
-    return chars
+    return chars, map_id
 
 
 def pack_quit(player_id: int) -> bytes:

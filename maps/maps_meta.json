@@ -1,0 +1,34 @@
+[
+  {
+    "id": "grassland",
+    "file": "maps/map_01.json",
+    "name": "GRASSLAND",
+    "desc": "An open field scattered with wooden crates, rocky outcrops, and clusters of tall trees. Cover is sparse but varied — positioning and map awareness are essential to winning.",
+    "tags": [
+      {"label": "Wooden Crates", "destructible": true,  "color": [165, 115,  60]},
+      {"label": "Rocks",         "destructible": false, "color": [115, 125, 138]},
+      {"label": "Trees",         "destructible": false, "color": [ 55, 148,  70]}
+    ],
+    "minimap_bg": [18, 32, 18],
+    "width": 1920,
+    "height": 1080
+  },
+  {
+    "id": "portal",
+    "file": "maps/map_02.json",
+    "name": "PORTAL",
+    "desc": "A wide corridor where mystical portals on each side connect opposite ends of the arena. Enter left to emerge right — master portal timing to gain the upper hand.",
+    "tags": [
+      {"label": "Wooden Crates", "destructible": true,  "color": [165, 115,  60]},
+      {"label": "Rocks",         "destructible": false, "color": [115, 125, 138]},
+      {"label": "Trees",         "destructible": false, "color": [ 55, 148,  70]}
+    ],
+    "minimap_bg": [16, 12, 28],
+    "width": 1920,
+    "height": 720,
+    "portals": [
+      {"x": 0,    "y_min": 240, "y_max": 480},
+      {"x": 1920, "y_min": 240, "y_max": 480}
+    ]
+  }
+]

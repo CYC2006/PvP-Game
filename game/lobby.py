@@ -251,13 +251,14 @@ def _draw_quit_dialog(screen: pygame.Surface,
 def lobby_screen(screen: pygame.Surface,
                  font_lg: pygame.font.Font,
                  font_sm: pygame.font.Font,
-                 clock: pygame.time.Clock) -> tuple:
+                 clock: pygame.time.Clock,
+                 initial_map: int = 0) -> tuple:
 
     FPS           = 60
     page          = "game"
     sel_mode      = 0
     char_page_idx = 0
-    map_page_idx  = 0
+    map_page_idx  = initial_map
     gold          = 200
     gems          = 10
     confirm_quit  = False
@@ -283,7 +284,7 @@ def lobby_screen(screen: pygame.Surface,
         # ── Events ────────────────────────────────────────────────────────
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return None, None
+                return None, None, 0
 
             # ── Keyboard ──────────────────────────────────────────────────
             if event.type == pygame.KEYDOWN:
@@ -292,7 +293,7 @@ def lobby_screen(screen: pygame.Surface,
                         join_mode = False
                         code_str  = ""
                     elif event.key == pygame.K_RETURN and len(code_str) == 4:
-                        return "join", code_str
+                        return "join", code_str, map_page_idx
                     elif event.key == pygame.K_BACKSPACE:
                         code_str = code_str[:-1]
                     else:
@@ -308,7 +309,7 @@ def lobby_screen(screen: pygame.Surface,
 
                 if join_mode:
                     if CONNECT_R.collidepoint(mx, my) and len(code_str) == 4:
-                        return "join", code_str
+                        return "join", code_str, map_page_idx
                     elif JBACK_R.collidepoint(mx, my):
                         join_mode = False
                         code_str  = ""
@@ -316,7 +317,7 @@ def lobby_screen(screen: pygame.Surface,
 
                 if confirm_quit:
                     if DCONFIRM_R.collidepoint(mx, my):
-                        return None, None
+                        return None, None, 0
                     elif DCANCEL_R.collidepoint(mx, my):
                         confirm_quit = False
                     continue
@@ -331,7 +332,7 @@ def lobby_screen(screen: pygame.Surface,
                         if r.collidepoint(mx, my):
                             sel_mode = i
                     if game_page.HOST_R.collidepoint(mx, my):
-                        return "host", None
+                        return "host", None, map_page_idx
                     elif game_page.JOIN_R.collidepoint(mx, my):
                         join_mode = True
                         code_str  = ""

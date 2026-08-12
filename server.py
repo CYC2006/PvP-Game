@@ -1,8 +1,9 @@
+import json
 import socket
 import time
 import sys
 
-from game.state    import GameState
+from game.state    import GameState, configure_map, PORTAL_Y_MIN, PORTAL_Y_MAX, PORTAL_COOLDOWN_TICKS, PLAYER_RADIUS
 from game.obstacle import load_map
 from network.protocol import (
     PKT_JOIN, PKT_CMD, PKT_CHAR_SELECT, PKT_QUIT, PKT_PING, PKT_PONG,
@@ -61,38 +62,57 @@ TICK_RATE           = 60
 TICK_DT             = 1.0 / TICK_RATE
 MAX_PLAYERS         = 2
 BUF_SIZE            = 8192
-MAP_PATH            = "maps/map_01.json"
 TIMEOUT             = 5.0    # secs without packet during game → pause
 PAUSE_RESET_TIMEOUT = 5.0    # secs paused before force-reset
 QUEUE_TIMEOUT       = 12.0   # secs without JOIN heartbeat → remove from queue
+
+_MAPS_META_PATH = "maps/maps_meta.json"
+_maps_meta: list[dict] = []
+
+def _get_maps_meta() -> list[dict]:
+    global _maps_meta
+    if not _maps_meta:
+        with open(_MAPS_META_PATH, encoding="utf-8") as f:
+            _maps_meta = json.load(f)
+    return _maps_meta
 
 
 class RoomState:
     __slots__ = (
         'state', 'clients', 'addr_to_id', 'player_chars', 'player_runes',
         'last_seen', 'obstacle_hp', 'game_started', 'paused', 'paused_since',
-        'next_tick', 'waiting',
+        'next_tick', 'waiting', 'portal_cooldowns',
     )
 
     def __init__(self, obstacle_hp_template: dict):
-        self.state         = GameState()
-        self.clients       = {}          # pid → addr
-        self.addr_to_id    = {}          # addr → pid
-        self.player_chars  = {}          # pid → char_id
-        self.player_runes  = {}          # pid → rune_id
-        self.last_seen     = {}          # pid → perf_counter time
-        self.obstacle_hp   = dict(obstacle_hp_template)
-        self.game_started  = False
-        self.paused        = False
-        self.paused_since  = 0.0
-        self.next_tick     = time.perf_counter()
-        self.waiting       = {}          # addr → timestamp of last PKT_JOIN
+        self.state             = GameState()
+        self.clients           = {}          # pid → addr
+        self.addr_to_id        = {}          # addr → pid
+        self.player_chars      = {}          # pid → char_id
+        self.player_runes      = {}          # pid → rune_id
+        self.last_seen         = {}          # pid → perf_counter time
+        self.obstacle_hp       = dict(obstacle_hp_template)
+        self.game_started      = False
+        self.paused            = False
+        self.paused_since      = 0.0
+        self.next_tick         = time.perf_counter()
+        self.waiting           = {}          # addr → timestamp of last PKT_JOIN
+        self.portal_cooldowns  = {}          # pid → ticks remaining before next teleport
 
 
-def run():
-    obstacles            = load_map(MAP_PATH)
+def run(map_id: int = 0):
+    meta      = _get_maps_meta()
+    map_entry = meta[map_id] if map_id < len(meta) else meta[0]
+    map_path  = map_entry["file"]
+    map_w     = map_entry.get("width",  1920)
+    map_h     = map_entry.get("height", 1080)
+    portals   = map_entry.get("portals", [])
+
+    configure_map(map_w, map_h)
+
+    obstacles            = load_map(map_path)
     obstacle_hp_template = {oid: obs.hp for oid, obs in obstacles.items()}
-    print(f"[Server] Loaded map: {len(obstacles)} obstacles")
+    print(f"[Server] Loaded map '{map_entry['id']}' ({map_w}x{map_h}): {len(obstacles)} obstacles")
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((HOST, PORT))
@@ -111,6 +131,25 @@ def run():
             except Exception:
                 pass
 
+    def _step_portals(state: GameState, room: RoomState, map_portals: list) -> None:
+        """Teleport players that walk into a portal edge."""
+        from game.state import MAP_WIDTH
+        for pid, player in state.players.items():
+            cd = room.portal_cooldowns.get(pid, 0)
+            if cd > 0:
+                room.portal_cooldowns[pid] = cd - 1
+                continue
+            if not (PORTAL_Y_MIN <= player.y <= PORTAL_Y_MAX):
+                continue
+            if player.x <= PLAYER_RADIUS * 2:
+                # Entered left portal → emerge at right
+                player.x = MAP_WIDTH - PLAYER_RADIUS * 2 - 4
+                room.portal_cooldowns[pid] = PORTAL_COOLDOWN_TICKS
+            elif player.x >= MAP_WIDTH - PLAYER_RADIUS * 2:
+                # Entered right portal → emerge at left
+                player.x = PLAYER_RADIUS * 2 + 4
+                room.portal_cooldowns[pid] = PORTAL_COOLDOWN_TICKS
+
     def _reset_room(room: RoomState) -> None:
         for addr in list(room.addr_to_id.keys()):
             addr_room.pop(addr, None)
@@ -125,6 +164,7 @@ def run():
         room.obstacle_hp.clear()
         room.obstacle_hp.update(obstacle_hp_template)
         room.next_tick     = time.perf_counter()
+        room.portal_cooldowns.clear()
         print("[Server] Room reset — waiting for players")
 
     def _try_match(room: RoomState) -> None:
@@ -187,7 +227,7 @@ def run():
                     if len(room.clients) == MAX_PLAYERS and not room.game_started:
                         sock.sendto(pack_all_joined(), addr)
                     elif room.game_started and room.player_chars:
-                        sock.sendto(pack_game_start(room.player_chars), addr)
+                        sock.sendto(pack_game_start(room.player_chars, map_id), addr)
                 else:
                     if room is None:
                         room = RoomState(obstacle_hp_template)
@@ -207,7 +247,7 @@ def run():
                     continue
                 if room.game_started:
                     if room.player_chars:
-                        sock.sendto(pack_game_start(room.player_chars), addr)
+                        sock.sendto(pack_game_start(room.player_chars, map_id), addr)
                 else:
                     pid     = room.addr_to_id[addr]
                     char_id = data[1]
@@ -226,7 +266,7 @@ def run():
                             r_id      = room.player_runes.get(p_id, 0)
                             room.state.apply_char_stats(p_id, char_name, r_id)
                             print(f"[Server] Player {p_id} → {char_name}, rune {r_id}")
-                        payload = pack_game_start(room.player_chars)
+                        payload = pack_game_start(room.player_chars, map_id)
                         for a in room.clients.values():
                             try:
                                 sock.sendto(payload, a)
@@ -390,6 +430,10 @@ def run():
                         s.step_robot_e()
                         s.step_air_cannons()
                         s.step_rune_recovery()
+
+                        # Portal teleportation (Portal map only)
+                        if portals:
+                            _step_portals(s, room, portals)
 
                         payload = pack_state(s)
                         for a in room.clients.values():

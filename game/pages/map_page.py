@@ -5,30 +5,36 @@ Layout
 ------
   Left column  — scrollable list of map cards (click to select)
   Right section — minimap preview (scaled render) + map details & legend
+
+Map metadata is loaded from maps/maps_meta.json so all map info lives
+in the maps/ directory alongside the obstacle JSONs.
 """
+import json
 import pygame
 from game.pages.layout import LOGICAL_W, LOGICAL_H, _TB, _SW
 
-# ── Map definitions ───────────────────────────────────────────────────────────
-# tags: (label, destructible, dot_colour)
-MAPS: list[dict] = [
-    {
-        "id":   "grassland",
-        "file": "maps/map_01.json",
-        "name": "GRASSLAND",
-        "desc": (
-            "An open field scattered with wooden crates, rocky outcrops, "
-            "and clusters of tall trees.  Cover is sparse but varied — "
-            "positioning and map awareness are essential to winning."
-        ),
-        "tags": [
-            ("Wooden Crates", True,  (165, 115,  60)),
-            ("Rocks",         False, (115, 125, 138)),
-            ("Trees",         False, ( 55, 148,  70)),
-        ],
-        "minimap_bg": (18, 32, 18),   # dark grass tint
-    },
-]
+# ── Load map metadata from maps/ ─────────────────────────────────────────────
+
+def _load_maps_meta() -> list[dict]:
+    with open("maps/maps_meta.json", encoding="utf-8") as f:
+        raw = json.load(f)
+    result = []
+    for m in raw:
+        result.append({
+            "id":         m["id"],
+            "file":       m["file"],
+            "name":       m["name"],
+            "desc":       m["desc"],
+            "tags":       [(t["label"], t["destructible"], tuple(t["color"])) for t in m["tags"]],
+            "minimap_bg": tuple(m["minimap_bg"]),
+            "width":      m.get("width", 1920),
+            "height":     m.get("height", 1080),
+            "portals":    m.get("portals", []),
+        })
+    return result
+
+
+MAPS: list[dict] = _load_maps_meta()
 
 # Colour mapping used when rendering the minimap
 _KIND_COLOUR: dict = {
@@ -56,9 +62,10 @@ _DET_H = _DET_B - _DET_Y             # 630
 _PREV_W = _RW - 0
 _PREV_H = int(_PREV_W * 9 / 16)
 
-# Map card rects (left list)
-_CARD_H   = 96
+# Map card: tall enough for name + 3 tag rows + padding
+_CARD_H   = 126
 _CARD_GAP = 10
+
 MAP_RS: list[pygame.Rect] = [
     pygame.Rect(_IX, _DET_Y + i * (_CARD_H + _CARD_GAP), _LW, _CARD_H)
     for i in range(len(MAPS))
@@ -71,26 +78,29 @@ _minimap_cache: dict[tuple, pygame.Surface] = {}
 def _build_minimap(map_def: dict, w: int, h: int) -> pygame.Surface:
     from game.obstacle import load_map
 
+    map_w = map_def["width"]
+    map_h = map_def["height"]
+
     surf = pygame.Surface((w, h))
     surf.fill(map_def["minimap_bg"])
 
     # Subtle grid
     grid_col = tuple(max(0, c + 6) for c in map_def["minimap_bg"])
     GRID = 80
-    sx = w / LOGICAL_W
-    sy = h / LOGICAL_H
-    for gx in range(0, LOGICAL_W, GRID):
+    sx = w / map_w
+    sy = h / map_h
+    for gx in range(0, map_w, GRID):
         pygame.draw.line(surf, grid_col, (int(gx * sx), 0), (int(gx * sx), h))
-    for gy in range(0, LOGICAL_H, GRID):
+    for gy in range(0, map_h, GRID):
         pygame.draw.line(surf, grid_col, (0, int(gy * sy)), (w, int(gy * sy)))
 
     obstacles = load_map(map_def["file"])
 
-    # Draw trees first (large, semi-transparent feel via colour)
+    # Draw trees first
     for obs in obstacles.values():
         if obs.kind != "tree_1":
             continue
-        col = _KIND_COLOUR.get(obs.kind, (120, 120, 120))
+        col  = _KIND_COLOUR.get(obs.kind, (120, 120, 120))
         dark = tuple(max(0, c - 30) for c in col)
         ox, oy = int(obs.x * sx), int(obs.y * sy)
         r = max(4, int(obs.width * sx * obs.radius_ratio / 2))
@@ -107,7 +117,7 @@ def _build_minimap(map_def: dict, w: int, h: int) -> pygame.Surface:
         pygame.draw.circle(surf, (80, 88, 100), (ox, oy), r + 2)
         pygame.draw.circle(surf, col,           (ox, oy), r)
 
-    # Draw boxes (rotated OBBs — approximate as rects for minimap)
+    # Draw boxes
     for obs in obstacles.values():
         if obs.kind not in ("box_normal", "box_special"):
             continue
@@ -117,6 +127,40 @@ def _build_minimap(map_def: dict, w: int, h: int) -> pygame.Surface:
         ox, oy = int(obs.x * sx) - ow // 2, int(obs.y * sy) - oh // 2
         pygame.draw.rect(surf, (100, 68, 35), (ox - 1, oy - 1, ow + 2, oh + 2))
         pygame.draw.rect(surf, col,           (ox, oy, ow, oh))
+
+    # Draw portals (Portal map)
+    for portal in map_def.get("portals", []):
+        px     = portal["x"]
+        py_min = portal["y_min"]
+        py_max = portal["y_max"]
+
+        screen_x   = int(px * sx)
+        screen_y1  = int(py_min * sy)
+        screen_y2  = int(py_max * sy)
+        portal_h   = screen_y2 - screen_y1
+        portal_w   = max(8, int(20 * sx))
+
+        # Left portal: draw on the left edge; right portal: on the right edge
+        if px == 0:
+            rect_x = 0
+        else:
+            rect_x = w - portal_w
+
+        # Layered glow: outer (dim) → mid → inner (bright)
+        for layer, (col, inset) in enumerate([
+            ((80,  30, 120), 0),
+            ((140,  60, 200), 2),
+            ((190, 120, 255), 4),
+        ]):
+            r = pygame.Rect(rect_x + inset, screen_y1 + inset,
+                            portal_w - inset * 2, portal_h - inset * 2)
+            if r.width > 0 and r.height > 0:
+                pygame.draw.rect(surf, col, r)
+
+        # Bright centre line
+        cx_line = rect_x + portal_w // 2
+        pygame.draw.line(surf, (230, 180, 255),
+                         (cx_line, screen_y1 + 4), (cx_line, screen_y2 - 4), 1)
 
     return surf
 
@@ -178,16 +222,26 @@ def draw(screen: pygame.Surface,
         # Map name
         nc = (185, 218, 255) if sel else (90, 110, 145)
         ns = font_lg.render(m["name"], True, nc)
-        screen.blit(ns, (r.x + 14, r.y + 14))
+        screen.blit(ns, (r.x + 14, r.y + 12))
 
-        # Obstacle colour dots
-        dot_y = r.y + r.h - 18
+        # Portal map: show small portal indicator badge
+        if m.get("portals"):
+            badge_col = (130, 60, 200) if sel else (80, 40, 130)
+            pygame.draw.rect(screen, badge_col,
+                             (r.x + r.w - 36, r.y + 10, 28, 14), border_radius=4)
+            bt = font_sm.render("TP", True, (220, 170, 255))
+            screen.blit(bt, (r.x + r.w - 36 + (28 - bt.get_width()) // 2,
+                             r.y + 10 + (14 - bt.get_height()) // 2))
+
+        # Obstacle colour dots — stacked vertically from bottom of name
+        dot_y = r.y + 12 + ns.get_height() + 8
         dot_x = r.x + 14
         for lbl, _destr, dcol in m["tags"]:
-            pygame.draw.circle(screen, dcol, (dot_x + 5, dot_y + 6), 5)
-            ls = font_sm.render(lbl, True, (75, 92, 118) if not sel else (115, 142, 178))
+            pygame.draw.circle(screen, dcol, (dot_x + 5, dot_y + 7), 5)
+            ls = font_sm.render(lbl, True,
+                                (115, 142, 178) if sel else (75, 92, 118))
             screen.blit(ls, (dot_x + 14, dot_y))
-            dot_y += font_sm.get_height() + 3
+            dot_y += font_sm.get_height() + 4
 
     # ── Right: minimap preview ────────────────────────────────────────────
     prev_surf = _get_minimap(map_def, _PREV_W, _PREV_H)
@@ -216,7 +270,6 @@ def draw(screen: pygame.Surface,
     # Obstacle legend
     LEGEND_X = INFO_X
     for lbl, destr, dcol in map_def["tags"]:
-        # Coloured square swatch
         sw_r = pygame.Rect(LEGEND_X, INFO_Y + 3, 12, 12)
         pygame.draw.rect(screen, dcol, sw_r, border_radius=3)
 
@@ -225,4 +278,4 @@ def draw(screen: pygame.Surface,
         ls = font_sm.render(full_lbl, True, (105, 128, 165))
         screen.blit(ls, (LEGEND_X + 18, INFO_Y))
 
-        LEGEND_X += 18 + ls.get_width() + 22   # horizontal layout
+        LEGEND_X += 18 + ls.get_width() + 22

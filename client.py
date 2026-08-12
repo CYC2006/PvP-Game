@@ -11,8 +11,8 @@ from game.input      import (read_input, set_giant_age, set_dash_context,
                              set_burst_shots_left, set_cloak_ticks,
                              get_mercury_aim_angle, notify_air_cannon_hit,
                              cancel_mercury_barrage, init_char, init_rune)
-from game.renderer   import draw, handle_settings_click, reset_game_state, settings_blocks_click, LOGICAL_W, LOGICAL_H
-from game.state      import GameState
+from game.renderer   import draw, handle_settings_click, reset_game_state, set_map_portals, settings_blocks_click, LOGICAL_W, LOGICAL_H
+from game.state      import GameState, configure_map
 from game.obstacle   import load_map
 import game.charselect as charselect
 from game.charselect import CHARACTERS as _CHAR_LIST
@@ -30,7 +30,17 @@ from network.protocol import (
 PORT     = 5000
 BUF_SIZE = 8192
 FPS      = 60
-MAP_PATH = "maps/map_01.json"
+
+_MAPS_META_PATH = "maps/maps_meta.json"
+_maps_meta: list[dict] = []
+
+def _get_maps_meta() -> list[dict]:
+    global _maps_meta
+    if not _maps_meta:
+        import json
+        with open(_MAPS_META_PATH, encoding="utf-8") as f:
+            _maps_meta = json.load(f)
+    return _maps_meta
 
 COL_BG   = (20, 24, 32)
 COL_TEXT = (220, 220, 220)
@@ -65,12 +75,12 @@ def _draw_spaced_digits(screen: pygame.Surface, font: pygame.font.Font,
 
 _local_server_started = False
 
-def _start_server_thread() -> None:
+def _start_server_thread(map_id: int = 0) -> None:
     """Start server.py as a daemon thread for local / same-machine testing."""
     def _run_safe():
         try:
             from server import run as server_run
-            server_run()
+            server_run(map_id=map_id)
         except OSError as e:
             print(f"[Server] Could not bind port (already in use?): {e}")
     t = threading.Thread(target=_run_safe, daemon=True)
@@ -208,13 +218,13 @@ def char_select_loop(sock, server_addr, player_id, room_code, screen,
                     sock.sendto(pack_quit(player_id), server_addr)
                 except Exception:
                     pass
-                return None, None, 0
+                return None, None, 0, 0
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 try:
                     sock.sendto(pack_quit(player_id), server_addr)
                 except Exception:
                     pass
-                return None, None, 0
+                return None, None, 0, 0
             just_confirmed = charselect.handle_event(event)
             if just_confirmed:
                 idx     = charselect.selected_idx()
@@ -251,14 +261,14 @@ def char_select_loop(sock, server_addr, player_id, room_code, screen,
                 data, _ = sock.recvfrom(BUF_SIZE)
                 pkt = packet_type(data)
                 if pkt == PKT_GAME_START:
-                    raw_chars    = unpack_game_start(data)
+                    raw_chars, map_id = unpack_game_start(data)
                     player_chars = {pid: _CHAR_LIST[cid]["name"]
                                     for pid, cid in raw_chars.items()
                                     if 0 <= cid < len(_CHAR_LIST)}
-                    return player_chars, charselect.selected_char()["name"], charselect.selected_rune()
+                    return player_chars, charselect.selected_char()["name"], charselect.selected_rune(), map_id
                 elif pkt == PKT_GAME_OVER:
                     # Opponent left (PKT_QUIT) or server force-reset — go back to lobby
-                    return None, None, 0
+                    return None, None, 0, 0
             except (BlockingIOError, ConnectionResetError, OSError):
                 break
 
@@ -316,7 +326,7 @@ def run() -> None:
     while app_running:
 
         # ── Lobby ────────────────────────────────────────────────────
-        mode, join_code = lobby_screen(screen, font_lg, font_sm, clock)
+        mode, join_code, lobby_map_id = lobby_screen(screen, font_lg, font_sm, clock)
         if mode is None:
             break   # user closed window
 
@@ -326,7 +336,7 @@ def run() -> None:
             room_code = random.randint(1000, 9999)
             if CLOUD_SERVER_IP == "127.0.0.1":
                 if not _local_server_started:
-                    _start_server_thread()
+                    _start_server_thread(map_id=lobby_map_id)
                     _local_server_started = True
         else:
             room_code = int(join_code)
@@ -345,21 +355,25 @@ def run() -> None:
 
         pygame.display.set_caption(f"PvP Game — Player {player_id}")
 
-        # ── Load map ─────────────────────────────────────────────────
-        obstacles = load_map(MAP_PATH)
-
         # ── Char select ──────────────────────────────────────────────
-        player_chars, my_char_name, my_rune_id = char_select_loop(
+        player_chars, my_char_name, my_rune_id, map_id = char_select_loop(
             sock, server_addr, player_id, room_code, screen, font_lg, font_sm, clock)
         if player_chars is None:
             sock.close()
             pygame.display.set_caption("PvP Game")
             continue
 
+        # ── Load map (using map_id from server) ───────────────────────
+        meta      = _get_maps_meta()
+        map_entry = meta[map_id] if map_id < len(meta) else meta[0]
+        configure_map(map_entry.get("width", 1920), map_entry.get("height", 1080))
+        obstacles = load_map(map_entry["file"])
+
         init_char(my_char_name)
         init_rune(my_rune_id)
 
         # ── Game loop ────────────────────────────────────────────────
+        set_map_portals(map_entry.get("portals", []))
         reset_game_state()
         state         = GameState()
         keys_held     = set()

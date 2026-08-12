@@ -7,6 +7,18 @@ import random
 MAP_WIDTH  = 1920
 MAP_HEIGHT = 1080
 
+# Portal teleport constants (used only on Portal map)
+PORTAL_Y_MIN = 240
+PORTAL_Y_MAX = 480
+PORTAL_COOLDOWN_TICKS = 90   # 1.5 s at 60 Hz — prevents instant re-entry
+
+
+def configure_map(width: int, height: int) -> None:
+    """Update global map dimensions when loading a different map."""
+    global MAP_WIDTH, MAP_HEIGHT
+    MAP_WIDTH  = width
+    MAP_HEIGHT = height
+
 KB_FORCE   = 10.0   # standard knockback initial speed (px/tick); ~45 px total displacement
 KB_DECAY   = 0.78   # per-tick multiplier (shared with step_knockback)
 KB_STOP    = 0.3    # stop threshold
