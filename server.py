@@ -355,47 +355,54 @@ def run():
                     if now - room.next_tick > TICK_DT:
                         room.next_tick = now - TICK_DT
                     room.next_tick += TICK_DT
-                    s = room.state
-                    s.tick += 1
-                    s.step_bullets(obstacles, room.obstacle_hp)
-                    s.step_pending_pellets()
-                    s.step_jumps()
-                    s.step_zombie_jumps()
-                    s.step_vince_taunt()
-                    s.step_vince_dash(obstacles)
-                    s.resolve_player_collisions(obstacles)
-                    s.step_gold_collection()
-                    s.step_status_effects()
-                    s.step_smoke_patches()
-                    s.step_blade_arcs()
-                    s.step_r_skill()
-                    s.step_air_strikes()
-                    s.step_giant()
-                    s.step_burst()
-                    s.step_mercury_barrage()
-                    s.step_mines()
-                    s.step_turrets(obstacles, room.obstacle_hp)
-                    s.step_barrage()
-                    s.step_poison_pools()
-                    s.step_poisoner_space()
-                    s.step_poisoner_e()
-                    s.step_poison_stacks()
-                    s.step_shields()
-                    s.step_shockwaves()
-                    s.step_pull()
-                    s.step_knockback()
-                    s.step_push_zones()
-                    s.step_robot_marks()
-                    s.step_robot_e()
-                    s.step_air_cannons()
-                    s.step_rune_recovery()
+                    try:
+                        s = room.state
+                        s.tick += 1
+                        s.step_bullets(obstacles, room.obstacle_hp)
+                        s.step_pending_pellets()
+                        s.step_jumps()
+                        s.step_zombie_jumps()
+                        s.step_vince_taunt()
+                        s.step_vince_dash(obstacles)
+                        s.resolve_player_collisions(obstacles)
+                        s.step_gold_collection()
+                        s.step_status_effects()
+                        s.step_smoke_patches()
+                        s.step_blade_arcs()
+                        s.step_r_skill()
+                        s.step_air_strikes()
+                        s.step_giant()
+                        s.step_burst()
+                        s.step_mercury_barrage()
+                        s.step_mines()
+                        s.step_turrets(obstacles, room.obstacle_hp)
+                        s.step_barrage()
+                        s.step_poison_pools()
+                        s.step_poisoner_space()
+                        s.step_poisoner_e()
+                        s.step_poison_stacks()
+                        s.step_shields()
+                        s.step_shockwaves()
+                        s.step_pull()
+                        s.step_knockback()
+                        s.step_push_zones()
+                        s.step_robot_marks()
+                        s.step_robot_e()
+                        s.step_air_cannons()
+                        s.step_rune_recovery()
 
-                    payload = pack_state(s)
-                    for a in room.clients.values():
-                        try:
-                            sock.sendto(payload, a)
-                        except Exception:
-                            pass
+                        payload = pack_state(s)
+                        for a in room.clients.values():
+                            try:
+                                sock.sendto(payload, a)
+                            except Exception:
+                                pass
+                    except Exception as tick_err:
+                        import traceback
+                        print(f"[Server] TICK ERROR room {code} tick {room.state.tick}: {tick_err}")
+                        traceback.print_exc()
+                        _broadcast_game_over(room)
+                        _reset_room(room)
 
             if not room.clients and not room.waiting:
                 empty_codes.append(code)
@@ -407,8 +414,15 @@ def run():
 
 
 if __name__ == "__main__":
-    try:
-        run()
-    except KeyboardInterrupt:
-        print("\n[Server] Stopped.")
-        sys.exit(0)
+    while True:
+        try:
+            run()
+        except KeyboardInterrupt:
+            print("\n[Server] Stopped.")
+            sys.exit(0)
+        except Exception as e:
+            import traceback
+            print(f"[Server] FATAL: {e}")
+            traceback.print_exc()
+            print("[Server] Restarting in 2s...")
+            time.sleep(2)
