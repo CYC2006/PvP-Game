@@ -45,9 +45,9 @@ _SKILLS: dict = {
          "Lobs a stun grenade that detonates on landing. "
          "Any enemy inside the blast radius is briefly blinded and disoriented."),
         ("MERCURY BARRAGE","F",    15,
-         "Lock your aim and unleash 5 volleys of 5 bullets in a spread fan "
-         "(-10° / -5° / 0° / +5° / +10°), one volley every 6 ticks. "
-         "25 bullets total over 0.4 seconds. "
+         "Lock your aim and unleash 7 volleys of 5 bullets in a spread fan "
+         "(-12° / -6° / 0° / +6° / +12°), one volley every 6 ticks. "
+         "35 bullets total over 0.6 seconds. "
          "No spread, same damage and range as normal shots. "
          "Aim is fixed for the full duration; LMB, RMB, SPACE, and E are locked. "
          "Q (rune) and movement remain available."),
