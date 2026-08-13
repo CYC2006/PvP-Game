@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from game.command import PlayerCommand
 from game.chars.vince.giant_state import GROW_TICKS, ACTIVE_TICKS, SHRINK_TICKS, TOTAL_TICKS
 from game.chars.agent.mercury_state import ULT_DURATION as _MERCURY_ULT_TICKS
+from game.chars.zombie.spit_state import TOTAL_TICKS as _ZOMBIE_SPIT_TICKS
 
 # ── 模組級常數（renderer 以 from game.input import 取得；init_char 後同步更新）──
 SHOOT_COOLDOWN_MS = 333
@@ -56,6 +57,7 @@ class InputState:
     robot_e_mark_until_ms: int   = 0
     mercury_end_ms:      int   = 0   # ms when Agent barrage ends (0=inactive)
     mercury_aim_angle:   float = 0.0  # aim_angle_deg locked at barrage activation
+    zombie_spit_end_ms:  int   = 0   # ms when Zombie spit channel ends (0=inactive)
     rune_id:             int   = 0
     # ── 每幀由 client.py 推入（伺服器狀態鏡像）─────────────────────────────
     giant_age:              int   = -1
@@ -99,6 +101,11 @@ def set_cloak_ticks(n: int) -> None:
 def cancel_mercury_barrage() -> None:
     """由 client.py 呼叫：server 廣播大招已結束（被暈眩中斷）時清除本地鎖定狀態。"""
     _state.mercury_end_ms = 0
+
+
+def cancel_zombie_spit() -> None:
+    """由 client.py 呼叫：本地玩家被暈眩打斷施放中的吐息時清除本地僵直預測。"""
+    _state.zombie_spit_end_ms = 0
 
 
 def notify_air_cannon_hit(seq: int) -> None:
@@ -350,7 +357,11 @@ def read_input(player_id: int, keys_held: set,
         _state.reloading = False
         _state.ammo      = _state.magazine_size
 
-    effective_stance = "reload" if _state.reloading else "machine"
+    from game.char_data import CHAR_STATS as _cs
+    _cdata           = _cs.get(_state.char_name, {})
+    _default_sprite  = _cdata.get('sprite', 'machine')
+    _has_reload      = _cdata.get('has_reload_sprite', False)
+    effective_stance = ("reload" if _has_reload else _default_sprite) if _state.reloading else _default_sprite
 
     lx, ly            = logical_mouse
     aim_x             = float(lx - LOGICAL_W // 2)
@@ -390,6 +401,7 @@ def read_input(player_id: int, keys_held: set,
     giant_frozen        = (_state.giant_age >= 0
                            and not (GROW_TICKS <= _state.giant_age < GROW_TICKS + ACTIVE_TICKS))
     _mercury_ult_active = _state.char_name == 'Agent' and now < _state.mercury_end_ms
+    _zombie_spit_active = _state.char_name == 'Zombie' and now < _state.zombie_spit_end_ms
 
     # ── 位移 / speed_mult 初始化 ──────────────────────────────────────────
     dx, dy          = 0.0, 0.0
@@ -432,8 +444,9 @@ def read_input(player_id: int, keys_held: set,
             dx, dy             = _state.dash_dx, _state.dash_dy
             _state.dash_speed -= _DASH_DECEL
 
-    # ── WASD 移動 + Space 技能（不在衝刺 / 巨人凍結 / 連射中 / 暈眩中）──
-    if not _state.dash_active and not giant_frozen and not _state.burst_shots_left:
+    # ── WASD 移動 + Space 技能（不在衝刺 / 巨人凍結 / 連射中 / 暈眩中 / Zombie 吐息僵直中）──
+    if (not _state.dash_active and not giant_frozen and not _state.burst_shots_left
+            and not _zombie_spit_active):
         if pygame.K_w in keys_held or pygame.K_UP    in keys_held: dy -= 1.0
         if pygame.K_s in keys_held or pygame.K_DOWN  in keys_held: dy += 1.0
         if pygame.K_a in keys_held or pygame.K_LEFT  in keys_held: dx -= 1.0
@@ -472,7 +485,7 @@ def read_input(player_id: int, keys_held: set,
     if (not robot_e_recall
             and not is_stunned
             and not r_skill_active and not giant_frozen and not _state.burst_shots_left
-            and not _mercury_ult_active
+            and not _mercury_ult_active and not _zombie_spit_active
             and e_just_pressed
             and _state.skill_cds_ms.get('e', -1) >= 0):
         cd_remaining = _state.skill_cds_ms['e'] - (now - _state.skill_last_ms['e'])
@@ -486,7 +499,7 @@ def read_input(player_id: int, keys_held: set,
     use_skill_rmb = False
     if (not is_stunned
             and not r_skill_active and not giant_frozen and not _state.burst_shots_left
-            and not _mercury_ult_active
+            and not _mercury_ult_active and not _zombie_spit_active
             and _state.skill_cds_ms.get('rmb', -1) >= 0):
         rmb_cd_ms = _state.skill_cds_ms['rmb']
         if _state.char_name == 'Vince':
@@ -502,6 +515,8 @@ def read_input(player_id: int, keys_held: set,
             if rmb_just_pressed and (rmb_cd_ms - (now - _state.skill_last_ms['rmb'])) <= 0:
                 use_skill_rmb = True
                 _state.skill_last_ms['rmb'] = now
+                if _state.char_name == 'Zombie':
+                    _state.zombie_spit_end_ms = now + int(_ZOMBIE_SPIT_TICKS * 1000 / 60) + 150
     elif is_stunned and rmb_just_released:
         # 暈眩中放開 RMB：清除 Vince 蓄力狀態，但不觸發技能
         _state.r_holding = False
@@ -521,7 +536,7 @@ def read_input(player_id: int, keys_held: set,
     use_skill_r = False
     if (not is_stunned
             and not r_skill_active and not giant_frozen and not _state.burst_shots_left
-            and not _mercury_ult_active
+            and not _mercury_ult_active and not _zombie_spit_active
             and _state.skill_cds_ms.get('r', -1) >= 0):
         if f_just_pressed and (_state.skill_cds_ms['r'] - (now - _state.skill_last_ms['r'])) <= 0:
             use_skill_r = True
@@ -551,7 +566,8 @@ def read_input(player_id: int, keys_held: set,
     # ── Q 鍵：啟動魔紋（血量上限為被動，cd=-1 不觸發）───────────────────
     use_rune = False
     if (q_just_pressed and _state.skill_cds_ms.get('q', -1) >= 0
-            and not giant_frozen and not _state.burst_shots_left):
+            and not giant_frozen and not _state.burst_shots_left
+            and not _zombie_spit_active):
         cd_remaining = _state.skill_cds_ms['q'] - (now - _state.skill_last_ms['q'])
         if cd_remaining <= 0:
             use_rune = True
@@ -561,6 +577,7 @@ def read_input(player_id: int, keys_held: set,
     shooting = False
     if (not suppress_lmb
             and not _mercury_ult_active
+            and not _zombie_spit_active
             and not _state.reloading
             and not r_skill_active
             and not _state.burst_shots_left

@@ -18,6 +18,7 @@ from game.chars.hunter   import mini_grenade_fx
 from game.chars.hunter   import air_cannon_fx
 from game.chars.zombie   import blade_fx
 from game.chars.zombie   import jump_fx as zombie_jump_fx
+from game.chars.zombie   import spit_fx as zombie_spit_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
 from game.chars.poisoner   import bubble_fx
 from game.chars.poisoner   import poison_pool_fx
@@ -560,6 +561,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     pioneer_shield_fx.draw_shockwaves(screen, cx, cy)
     zombie_jump_fx.update(state)
     zombie_jump_fx.draw_landing_shockwaves(screen, cx, cy)
+    zombie_spit_fx.draw(screen, state, cx, cy)
     vince_taunt_fx.update(state)
     vince_taunt_fx.draw_taunt_shockwaves(screen, cx, cy)
     marksman_mine_fx.update(state, my_id)

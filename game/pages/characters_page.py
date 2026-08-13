@@ -81,9 +81,11 @@ _SKILLS: dict = {
          "The turret has 180 HP — loses 1 HP per shot and 1 HP every 0.5 s passively. "
          "Enemy bullets also damage it. Only you can see the detection radius."),
         ("ROLLING BARRAGE","F",    10,
-         "Calls in 18 airstrikes toward the cursor in rapid succession (~3 s). "
-         "Strikes land from 60 px to 230 px ahead, randomly spread ±100 px left/right. "
-         "Each strike shows a shrinking targeting circle before detonating in an 80 px radius."),
+         "Calls in 18 waves of 3 strikes (54 total) toward the cursor in rapid "
+         "succession (~3.3 s). Each wave lands 60 px farther than the last, from "
+         "60 px up to 1080 px ahead, and every strike in a wave is independently "
+         "spread ±100 px left/right. Each strike shows a fixed crosshair marker "
+         "before detonating in an 80 px radius."),
     ],
     'Hunter': [
         ("AIR CANNON",    "RMB",   5,
@@ -167,7 +169,13 @@ _SKILLS: dict = {
         ("—", "F",     0, "Skill under development."),
     ],
     'Zombie': [
-        ("—", "RMB",   0, "Skill under development."),
+        ("CORROSIVE SPEW", "RMB",   8,
+         "Lock your aim and enter a 1 s full-body freeze — no moving, shooting, "
+         "or other skills. Spews 10 waves of 3 orbs (30 total) along the locked "
+         "direction, one wave every 6 ticks. Each wave lands farther out and "
+         "spreads wider (wave N: 10N px forward, ±N px lateral spread). "
+         "Orbs are light gray, semi-transparent spheres, radius 20-30 px, that linger "
+         "on the ground for 1-1.2 s. Touching one stuns the enemy for 1 s — no damage."),
         ("GROUND POUND",  "SPACE", 8,
          "Leap 200 px toward your aim, then slam down. "
          "Enemies caught in the landing shockwave are knocked back and stunned. "

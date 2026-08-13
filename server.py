@@ -32,6 +32,7 @@ _SKILL_RMB: dict = {
     'Marksman': lambda s, pid, ax, ay: s._spawn_explosion_bullet(pid, ax, ay),
     'Poisoner': lambda s, pid, ax, ay: s._spawn_pool_bullet(pid, ax, ay),
     'Hunter':   lambda s, pid, ax, ay: s._spawn_air_cannon(pid, ax, ay),
+    'Zombie':   lambda s, pid, ax, ay: s._activate_zombie_spit(pid, ax, ay),
 }
 
 _SKILL_SPACE: dict = {
@@ -324,10 +325,11 @@ def run(map_id: int = 0):
                     p        = room.state.players.get(cmd.player_id)
                     r_active = p and p.r_skill_phase > 0
                     _mercury = p and p.mercury_start_tick >= 0
+                    _zombie_spit = p and p.zombie_spit_tick >= 0
                     _stunned = p and room.state.tick < p.stun_until
                     if p and not r_active and not _stunned:
                         pid, ax, ay = cmd.player_id, cmd.aim_x, cmd.aim_y
-                        if not _mercury:
+                        if not _mercury and not _zombie_spit:
                             if cmd.use_skill_e:
                                 fn = _SKILL_E.get(p.char_name)
                                 if fn:
@@ -426,6 +428,7 @@ def run(map_id: int = 0):
                         s.step_pending_pellets()
                         s.step_jumps()
                         s.step_zombie_jumps()
+                        s.step_zombie_spit()
                         s.step_vince_taunt()
                         s.step_vince_dash(room.obstacles)
                         s.resolve_player_collisions(room.obstacles)

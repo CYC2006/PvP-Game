@@ -1,6 +1,6 @@
 import struct
 from game.command import PlayerCommand
-from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool, PushZone, RobotMark, RobotEMark, RobotERing, Turret, BarrageStrike, Shield
+from game.state import GameState, Player, Bullet, GoldIngot, SmokePatch, BladeArc, AirStrike, LogBarrier, Mine, PoisonPool, PushZone, RobotMark, RobotEMark, RobotERing, Turret, BarrageStrike, Shield, ZombieOrb
 
 # --- Packet types ---
 PKT_JOIN        = 0x01
@@ -44,6 +44,7 @@ _BARRAGE_ENTRY     = struct.Struct("!BhhBB")  # id x_i16 y_i16 age_u8 owner_id
 _SHIELD_ENTRY      = struct.Struct("!BHHB")   # owner_id hp_u16 max_hp_u16 status_u8(0=active,1=broken)
 _E_RING_ENTRY      = struct.Struct("!BhhH")  # owner_id cx_i16 cy_i16 age_u16
 _E_MARK_ENTRY      = struct.Struct("!BhhHB") # owner_id cx_i16 cy_i16 age_u16 start_angle_u8(idx: 0=0°,1=90°,2=180°,3=270°)
+_ZOMBIE_ORB_ENTRY  = struct.Struct("!BhhBBB") # id x_i16 y_i16 radius_u8 age_u8 owner_id
 
 # stance 編碼表
 _STANCE_TO_INT = {"stand": 0, "machine": 1, "hold": 2}
@@ -262,7 +263,16 @@ def pack_state(state: GameState) -> bytes:
         for m in e_mark_list
     )
 
-    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data + mark_data + turret_data + barrage_data + shield_data + cannon_data + e_ring_data + e_mark_data
+    orb_list = list(state.zombie_orbs.values())
+    orb_data = bytes([len(orb_list)]) + b"".join(
+        _ZOMBIE_ORB_ENTRY.pack(o.id, int(o.x), int(o.y),
+                               min(255, int(o.radius)),
+                               min(255, state.tick - o.spawn_tick),
+                               o.owner_id)
+        for o in orb_list
+    )
+
+    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data + mark_data + turret_data + barrage_data + shield_data + cannon_data + e_ring_data + e_mark_data + orb_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -470,6 +480,16 @@ def unpack_state(data: bytes) -> GameState:
                 start_angle=_E_IDX_ANGLE.get(em_aidx, 0),
                 spawn_tick=state.tick - em_age)
             offset += _E_MARK_ENTRY.size
+
+    if offset < len(data):
+        orb_count = data[offset]; offset += 1
+        for _ in range(orb_count):
+            oid, ox, oy, oradius, oage, oowner = _ZOMBIE_ORB_ENTRY.unpack(
+                data[offset: offset + _ZOMBIE_ORB_ENTRY.size])
+            state.zombie_orbs[oid] = ZombieOrb(
+                id=oid, owner_id=oowner, x=float(ox), y=float(oy),
+                radius=float(oradius), spawn_tick=state.tick - oage)
+            offset += _ZOMBIE_ORB_ENTRY.size
 
     return state
 

@@ -60,18 +60,20 @@ def _load() -> tuple[dict, list]:
             return row.get(col, '').strip()
 
         d: dict = {
-            'name':         key,
-            'folder':       s('folder'),
-            'hp':           i('hp'),
-            'speed':        f('speed_pxs') / _TICK_RATE,        # px/s → px/tick
-            'gun':           s('gun'),
-            'damage_min':    i('dmg_min'),
-            'damage_max':    i('dmg_max'),
-            'mag':           s('mag'),
-            'fire_interval': f('fire_interval'),    # 每次射擊間隔（秒）
-            'reload_time':   f('reload_time'),
-            'bullet_speed':  f('bspeed_pxs') / _BSPEED_DENOM,   # px/s → 乘數
-            'spread':        f('spread'),
+            'name':              key,
+            'folder':            s('folder'),
+            'hp':                i('hp'),
+            'speed':             f('speed_pxs') / _TICK_RATE,   # px/s → px/tick
+            'gun':               s('gun'),
+            'damage_min':        i('dmg_min'),
+            'damage_max':        i('dmg_max'),
+            'mag':               s('mag'),
+            'fire_interval':     f('fire_interval'),
+            'reload_time':       f('reload_time'),
+            'bullet_speed':      f('bspeed_pxs') / _BSPEED_DENOM,
+            'spread':            f('spread'),
+            'sprite':            s('sprite') or 'machine',       # 預設造型後綴
+            'has_reload_sprite': bool(i('has_reload_sprite')),   # 是否有換彈造型
         }
 
         # 特殊武器欄位（空白 → 略過；apply_char_stats 會用預設值）

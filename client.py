@@ -10,7 +10,8 @@ import pygame
 from game.input      import (read_input, set_giant_age, set_dash_context,
                              set_burst_shots_left, set_cloak_ticks,
                              get_mercury_aim_angle, notify_air_cannon_hit,
-                             cancel_mercury_barrage, init_char, init_rune,
+                             cancel_mercury_barrage, cancel_zombie_spit,
+                             init_char, init_rune,
                              apply_gem_cd_reduction)
 from game.renderer   import draw, handle_settings_click, reset_game_state, set_map_portals, trigger_portal_flash, settings_blocks_click, LOGICAL_W, LOGICAL_H
 from game.state      import GameState, configure_map
@@ -543,6 +544,8 @@ def run() -> None:
                 notify_air_cannon_hit(local_player.air_cannon_hit_seq)
                 if local_player.mercury_start_tick < 0 and _is_stunned:
                     cancel_mercury_barrage()
+                if _is_stunned:
+                    cancel_zombie_spit()
             draw(screen, state, player_id, font_sm, obstacles,
                  effective_stance, aim_angle_deg, ammo, is_reloading,
                  player_chars, skill_cooldowns,

@@ -125,6 +125,11 @@ class Player:
     zombie_jump_tick: int   = -1   # tick when zombie jump started (-1 = inactive)
     zombie_jump_dx: float   = 0.0  # normalized jump direction x
     zombie_jump_dy: float   = 0.0  # normalized jump direction y
+    # ── Zombie RMB 技能狀態（腐蝕吐息，完全僵直）─────────────────────
+    zombie_spit_tick: int       = -1   # tick when spit started (-1 = inactive)
+    zombie_spit_aim_x: float    = 0.0  # locked aim direction x（施放當下鎖定）
+    zombie_spit_aim_y: float    = 0.0
+    zombie_spit_wave_fired: int = 0    # waves fired so far (0~WAVE_COUNT)
     # ── Assassin R 技能狀態 ───────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -311,6 +316,17 @@ class BarrageStrike:
 
 
 @dataclass
+class ZombieOrb:
+    id:          int
+    owner_id:    int
+    x:           float
+    y:           float
+    radius:      float
+    spawn_tick:  int
+    expire_tick: int = -1   # tick when the orb disappears (server-only; unknown on client)
+
+
+@dataclass
 class LogBarrier:
     id:       int
     owner_id: int
@@ -434,6 +450,8 @@ class GameState:
     robot_e_rings: dict      = field(default_factory=dict)   # owner_id → RobotERing
     air_cannons: dict        = field(default_factory=dict)   # cid → AirCannon
     _next_air_cannon_id: int = 0
+    zombie_orbs: dict        = field(default_factory=dict)   # oid → ZombieOrb
+    _next_zombie_orb_id: int = 0
 
     def add_player(self, player_id: int) -> "Player":
         spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
@@ -508,6 +526,11 @@ class GameState:
                 return
         # R 技能進行中：禁止所有輸入，由 step_r_skill 驅動
         if player.r_skill_phase > 0:
+            if player._shoot_slow_timer > 0:
+                player._shoot_slow_timer -= 1
+            return
+        # Zombie RMB 施放中（腐蝕吐息）：完全僵直，比照巨大化放大/縮小階段
+        if player.zombie_spit_tick >= 0:
             if player._shoot_slow_timer > 0:
                 player._shoot_slow_timer -= 1
             return
@@ -1003,6 +1026,14 @@ class GameState:
     def step_blade_arcs(self) -> None:
         from game.chars.zombie.blade_state import step_blade_arcs
         step_blade_arcs(self)
+
+    def _activate_zombie_spit(self, owner_id: int, aim_x: float, aim_y: float) -> None:
+        from game.chars.zombie.spit_state import activate_spit
+        activate_spit(self, owner_id, aim_x, aim_y)
+
+    def step_zombie_spit(self) -> None:
+        from game.chars.zombie.spit_state import step_spit
+        step_spit(self)
 
     def _activate_burst(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.agent.burst_state import activate_burst
