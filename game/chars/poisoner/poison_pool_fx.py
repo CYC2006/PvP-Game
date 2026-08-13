@@ -6,6 +6,10 @@ from game.render_utils import ws, SCREEN_W, SCREEN_H
 
 POOL_TICKS = 300
 
+POOL_DARK    = (110, 55, 155)   # 紫色：邊框、飽和度較高
+POOL_LIGHT   = (170, 120, 215)  # 淺紫（薰衣草）：填充、飽和度較低
+BUBBLE_COLOR = (190, 150, 225)  # 氣泡：更淡的薰衣草紫
+
 # pool_id → {'last_bubble_t': float, 'bubbles': list}
 _pool_state: dict = {}
 
@@ -64,7 +68,7 @@ def draw(screen, state, cx: float, cy: float) -> None:
                 br_int  = max(1, int(br * (1.0 - t * 0.3)))
                 if abs(bx - sx) <= r + br_int and abs(by - sy) <= r + br_int:
                     bsurf = pygame.Surface((br_int * 2 + 2, br_int * 2 + 2), pygame.SRCALPHA)
-                    pygame.draw.circle(bsurf, (100, 230, 100, alpha),
+                    pygame.draw.circle(bsurf, (*BUBBLE_COLOR, alpha),
                                        (br_int + 1, br_int + 1), br_int, 2)
                     screen.blit(bsurf, (bx - br_int - 1, by - br_int - 1))
 
@@ -72,14 +76,14 @@ def draw(screen, state, cx: float, cy: float) -> None:
 def _draw_large_pool(screen, sx: int, sy: int, r: int, fade: float) -> None:
     surf = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
     sc   = (r + 2, r + 2)
-    pygame.draw.circle(surf, (60, 200, 60, int(50 * fade)),  sc, r)
-    pygame.draw.circle(surf, (30, 160, 30, int(200 * fade)), sc, r, 3)
+    pygame.draw.circle(surf, (*POOL_LIGHT, int(50 * fade)),  sc, r)
+    pygame.draw.circle(surf, (*POOL_DARK,  int(200 * fade)), sc, r, 3)
     screen.blit(surf, (sx - r - 2, sy - r - 2))
 
 
 def _draw_small_pool(screen, sx: int, sy: int, r: int, fade: float) -> None:
     surf = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
     sc   = (r + 2, r + 2)
-    pygame.draw.circle(surf, (80, 230, 80, int(80 * fade)),  sc, r)
-    pygame.draw.circle(surf, (40, 190, 40, int(220 * fade)), sc, r, 2)
+    pygame.draw.circle(surf, (*POOL_LIGHT, int(80 * fade)),  sc, r)
+    pygame.draw.circle(surf, (*POOL_DARK,  int(220 * fade)), sc, r, 2)
     screen.blit(surf, (sx - r - 2, sy - r - 2))

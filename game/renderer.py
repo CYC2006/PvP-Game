@@ -831,9 +831,9 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
                             sy + int(px * math.sin(a) + py * math.cos(a)))
                            for px, py in pts]
                 pygame.draw.polygon(screen, (255, 240, 80), rotated)
-            elif btype == 8:   # 毒液彈：綠色圓點
-                pygame.draw.circle(screen, (60, 200, 60),  (sx, sy), 9)
-                pygame.draw.circle(screen, (150, 255, 150),(sx, sy), 4)
+            elif btype == 8:   # 毒液彈：紫色圓點
+                pygame.draw.circle(screen, (150, 90, 195),  (sx, sy), 9)
+                pygame.draw.circle(screen, (210, 180, 235), (sx, sy), 4)
             elif btype == 7:   # 爆炸彈：橙色圓點
                 explosion_bullet_fx.track(bullet)
                 pygame.draw.circle(screen, (255, 140, 20), (sx, sy), 7)
@@ -1218,11 +1218,11 @@ def _draw_hp_bar(screen, state, my_id, font):
 
     ratio = max(0.0, hp / max_hp) if max_hp > 0 else 0.0
 
-    # Green bar when the local player is poisoned; red otherwise
+    # Purple bar when the local player is poisoned; red otherwise
     poisoned = player is not None and player.poison_stacks > 0
     if poisoned:
-        bg_col   = (10, 30, 10)
-        fill_col = (30, 140, 45) if ratio > 0.3 else (130, 160, 20)
+        bg_col   = (28, 12, 34)
+        fill_col = (130, 70, 175) if ratio > 0.3 else (185, 90, 165)
     else:
         bg_col   = COL_HP_BG
         fill_col = COL_HP_FILL if ratio > 0.3 else (255, 140, 30)
@@ -1345,14 +1345,14 @@ def _draw_poison_stack_label(screen: pygame.Surface,
             pygame.font.Font(
                 os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf"), 15))
     text = str(stacks)
-    surf = _poison_stack_font[0].render(text, True, (30, 140, 45))
+    surf = _poison_stack_font[0].render(text, True, (160, 80, 200))
     tx   = sx - surf.get_width() // 2
     ty   = bar_y - surf.get_height() - 4
     screen.blit(surf, (tx, ty))
 
 
 def _build_poison_vignette(alpha_mult: float) -> pygame.Surface:
-    """建立一張 SRCALPHA 的綠色暈邊 Surface，alpha_mult ∈ [0,1]。"""
+    """建立一張 SRCALPHA 的紫色暈邊 Surface，alpha_mult ∈ [0,1]。"""
     W, H   = LOGICAL_W, LOGICAL_H
     surf   = pygame.Surface((W, H), pygame.SRCALPHA)
     steps  = 36
@@ -1365,14 +1365,14 @@ def _build_poison_vignette(alpha_mult: float) -> pygame.Surface:
             continue
         inset = int(max_in * t)
         thick = max(1, max_in // steps + 2)
-        pygame.draw.rect(surf, (20, 180, 40, alpha),
+        pygame.draw.rect(surf, (140, 60, 190, alpha),
                          (inset, inset, W - 2 * inset, H - 2 * inset),
                          thick)
     return surf
 
 
 def _draw_poison_vignette(screen: pygame.Surface, stacks: int) -> None:
-    """本地玩家中毒時的綠色邊框脈動（機制與紅色殘血相同，層數越高越明顯）。"""
+    """本地玩家中毒時的紫色邊框脈動（機制與紅色殘血相同，層數越高越明顯）。"""
     # 強度：1 層=0.2，5 層=1.0；脈動 ~1.6 Hz
     intensity = stacks / 5.0
     pulse     = 0.60 + 0.40 * math.sin(time.perf_counter() * math.pi * 1.6)
