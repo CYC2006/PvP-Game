@@ -97,8 +97,9 @@ _SKILLS: dict = {
          "Scatters a cluster of small grenades in an arc. "
          "Each grenade lands independently and detonates with its own small explosion."),
         ("LOG BARRIER",   "E",     10,
-         "Erects wooden barriers in the aimed direction. "
-         "Blocks movement and line of sight, forcing enemies to reposition."),
+         "Plants three large crystalline log chunks in a fan ahead of you "
+         "(-45°/0°/+45°), sealing off the path forward. "
+         "Blocks enemy movement and bullets."),
         ("PHANTOM CLOAK",  "F",    15,
          "Vanishes for 3 seconds with 2× movement speed. "
          "You can still shoot and use all skills while invisible. "

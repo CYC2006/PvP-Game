@@ -34,7 +34,7 @@ _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
 _SMOKE_ENTRY   = struct.Struct("!BffHI")     # id x y radius*10 spawn_tick
 _BLADE_ENTRY      = struct.Struct("!BhhBbB")   # id x_i16 y_i16 age dir owner_id
 _AIRSTRIKE_ENTRY  = struct.Struct("!BhhBB")    # id cx_i16 cy_i16 age(u8) owner_id
-_LOG_BARRIER_ENTRY = struct.Struct("!BhhBB")  # id x_i16 y_i16 hp(u8) owner_id
+_LOG_BARRIER_ENTRY = struct.Struct("!BhhBBB")  # id x_i16 y_i16 hp(u8) owner_id radius_u8
 _MINE_ENTRY        = struct.Struct("!BhhHB")  # id x_i16 y_i16 triggered_age_u16(65535=idle) owner_id
 _POOL_ENTRY        = struct.Struct("!BhhHBBB") # id x_i16 y_i16 age_u16 owner_id source_u8(0=rmb,1=space) radius_u8
 _PUSH_ENTRY        = struct.Struct("!BhhHhB") # id x_i16 y_i16 age_u16 angle_i16 owner_id
@@ -185,7 +185,7 @@ def pack_state(state: GameState) -> bytes:
 
     barriers = list(state.log_barriers.values())
     lb_data = bytes([len(barriers)]) + b"".join(
-        _LOG_BARRIER_ENTRY.pack(lb.id, int(lb.x), int(lb.y), max(0, lb.hp), lb.owner_id)
+        _LOG_BARRIER_ENTRY.pack(lb.id, int(lb.x), int(lb.y), max(0, lb.hp), lb.owner_id, int(lb.radius))
         for lb in barriers
     )
 
@@ -367,10 +367,11 @@ def unpack_state(data: bytes) -> GameState:
     if offset < len(data):
         lb_count = data[offset]; offset += 1
         for _ in range(lb_count):
-            lid, lx, ly, lhp, lowner = _LOG_BARRIER_ENTRY.unpack(
+            lid, lx, ly, lhp, lowner, lradius = _LOG_BARRIER_ENTRY.unpack(
                 data[offset: offset + _LOG_BARRIER_ENTRY.size])
             state.log_barriers[lid] = LogBarrier(
-                id=lid, owner_id=lowner, x=float(lx), y=float(ly), hp=lhp)
+                id=lid, owner_id=lowner, x=float(lx), y=float(ly), hp=lhp,
+                radius=float(lradius))
             offset += _LOG_BARRIER_ENTRY.size
 
     if offset < len(data):

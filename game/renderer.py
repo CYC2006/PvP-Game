@@ -6,7 +6,9 @@ import pygame
 from game.state import (GameState, PLAYER_RADIUS, BULLET_RADIUS)
 import game.input as _inp
 from game.input import MAGAZINE_SIZE
-from game.render_utils import LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _ws, COL_BULLET as _COL_BULLET_UTILS
+from game.render_utils import (LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _ws,
+                               COL_BULLET as _COL_BULLET_UTILS,
+                               facet_offsets as _facet_offsets, crystal_points as _crystal_points)
 
 from game.chars.agent    import flash_fx
 from game.chars.agent    import burst_bullet_fx
@@ -687,14 +689,27 @@ def _draw_obstacles(screen, obstacles: dict, destroyed: set, cx, cy):
                                sy - rotated.get_height() // 2 + oy))
 
 
+_LOG_OUTER_COLOR = (120, 72, 28)   # 外層：木頭色主體
+_LOG_CORE_COLOR  = (70, 38, 10)    # 中心：較深的實心年輪
+_LOG_CORE_SCALE  = 0.5
+
+
 def _draw_log_barriers(screen, state, cx, cy) -> None:
+    """粗糙結晶多邊形（技法同 Zombie RMB 的 spit_fx），純視覺，碰撞仍是 lb.radius 圓形。"""
     for lb in state.log_barriers.values():
         sx, sy = _ws(lb.x, lb.y, cx, cy)
         r = int(lb.radius)
         if sx < -r - 10 or sx > SCREEN_W + r + 10 or sy < -r - 10 or sy > SCREEN_H + r + 10:
             continue
-        pygame.draw.circle(screen, (120, 72, 28), (sx, sy), r)
-        pygame.draw.circle(screen, (70, 38, 10), (sx, sy), r, 2)
+
+        offsets   = _facet_offsets(lb.id)
+        outer_pts = _crystal_points(r, r, r, offsets)
+        core_pts  = _crystal_points(r, r, r * _LOG_CORE_SCALE, offsets)
+
+        surf = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+        pygame.draw.polygon(surf, _LOG_OUTER_COLOR, outer_pts)
+        pygame.draw.polygon(surf, _LOG_CORE_COLOR, core_pts)
+        screen.blit(surf, (sx - r, sy - r))
 
 
 def _draw_trees(screen, obstacles: dict, destroyed: set,

@@ -2,7 +2,7 @@ import math
 from game.state import LogBarrier
 
 HP     = 60
-RADIUS = 18.0
+RADIUS = 35.0
 DIST   = 80.0
 
 
@@ -17,7 +17,7 @@ def activate_log_barriers(state, owner_id: int, aim_x: float, aim_y: float) -> N
     for lid in [k for k, lb in state.log_barriers.items() if lb.owner_id == owner_id]:
         state.log_barriers.pop(lid)
     ux, uy = aim_x / length, aim_y / length
-    for angle_offset in (0.0, math.radians(-45), math.radians(45)):
+    for angle_offset in (math.radians(-45), 0.0, math.radians(45)):
         ca, sa = math.cos(angle_offset), math.sin(angle_offset)
         dx = ux * ca - uy * sa
         dy = ux * sa + uy * ca
