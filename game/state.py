@@ -130,6 +130,7 @@ class Player:
     zombie_spit_aim_x: float    = 0.0  # locked aim direction x（施放當下鎖定）
     zombie_spit_aim_y: float    = 0.0
     zombie_spit_wave_fired: int = 0    # waves fired so far (0~WAVE_COUNT)
+    zombie_spit_hit_enemy: bool = False  # 本次施放是否已暈眩過對手（一次施放只暈眩一次）
     # ── Assassin R 技能狀態 ───────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -324,6 +325,8 @@ class ZombieOrb:
     radius:      float
     spawn_tick:  int
     expire_tick: int = -1   # tick when the orb disappears (server-only; unknown on client)
+    fade:        int = 255  # 0-255 alpha multiplier；由 step_spit 逐 tick 更新，client 直接讀取
+    hit_enemy:   bool = False  # 這顆球是否已命中過敵人（server-only；每顆球只造成一次傷害）
 
 
 @dataclass

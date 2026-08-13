@@ -4,8 +4,16 @@
 不能移動、不能射擊、不能使用任何技能）。從第 6 個 tick 起每 6 tick 一波，沿鎖定
 方向朝前吐出，共 10 波、每波 3 顆，總計 30 顆。前進距離與橫向偏移範圍皆隨 tick
 數線性增加（第 N 波：前進 10N px，橫向偏移 ±N px），球體半徑各自獨立隨機
-20~30px。每顆球生成後停留 60~72 tick（各自獨立隨機）作為地面上的暈眩區域，
-碰到敵人造成 1 秒暈眩、無傷害。
+30~40px。每顆球生成後作為地面上的暈眩區域存在 60~72 tick（各自獨立隨機），
+暈眩判定區間結束後不會立刻消失，而是再花 FADE_TICKS（0.3 秒）淡出至完全
+透明才真正移除，純視覺、不再判定碰撞。
+
+碰撞判定分兩種，互相獨立：
+- 傷害：每顆球只要碰到敵人就造成一次 6~8 傷害（orb.hit_enemy 旗標，單顆球
+  只會命中一次），多顆球同時疊在同一位置就會疊加成多倍傷害。
+- 暈眩：整次施放只會暈眩對手一次（zombie_spit_hit_enemy 旗標），避免對手
+  中招暈眩結束的瞬間又站在另一顆（或同一顆）尚存活的球體範圍內被連續暈眩
+  鎖死；即使暈眩已用掉，其餘球體仍會正常造成傷害。
 """
 
 import math
@@ -17,11 +25,14 @@ WAVE_INTERVAL    = 6                                  # ticks between waves
 BALLS_PER_WAVE   = 3
 TOTAL_TICKS      = WAVE_COUNT * WAVE_INTERVAL         # 60 ticks（完全僵直總時長）
 FORWARD_PER_TICK = 10.0                               # px：前進距離 = 波次 tick 數 × 此值
-ORB_RADIUS_MIN   = 20.0
-ORB_RADIUS_MAX   = 30.0
-ORB_LIFETIME_MIN = 60                                 # tick（1.0s）
-ORB_LIFETIME_MAX = 72                                 # tick（1.2s）
+ORB_RADIUS_MIN   = 30.0
+ORB_RADIUS_MAX   = 40.0
+ORB_LIFETIME_MIN = 60                                 # tick（1.0s）：暈眩判定區間
+ORB_LIFETIME_MAX = 72                                 # tick（1.2s）：暈眩判定區間
+FADE_TICKS       = 18                                 # tick（0.3s）：判定區間結束後的淡出時長
 STUN_TICKS       = 60                                 # 1 秒
+DAMAGE_MIN       = 6
+DAMAGE_MAX       = 8
 
 
 def activate_spit(state, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -35,6 +46,7 @@ def activate_spit(state, owner_id: int, aim_x: float, aim_y: float) -> None:
     player.zombie_spit_aim_y      = aim_y / length
     player.zombie_spit_tick       = state.tick
     player.zombie_spit_wave_fired = 0
+    player.zombie_spit_hit_enemy  = False
 
 
 def _fire_wave(state, player, wave_idx: int) -> None:
@@ -87,15 +99,36 @@ def step_spit(state) -> None:
 
     expired = []
     for oid, orb in state.zombie_orbs.items():
-        if state.tick >= orb.expire_tick:
-            expired.append(oid)
+        hazard_age  = state.tick - orb.spawn_tick
+        hazard_life = orb.expire_tick - orb.spawn_tick
+        if hazard_age >= hazard_life:
+            # 暈眩判定區間已結束：只淡出、不再判定碰撞
+            fade_age = hazard_age - hazard_life
+            orb.fade = max(0, 255 - int(255 * fade_age / FADE_TICKS))
+            if state.tick >= orb.expire_tick + FADE_TICKS:
+                expired.append(oid)
             continue
+
+        if orb.hit_enemy:
+            continue   # 這顆球已經命中過，不會重複造成傷害
         enemy_id = 3 - orb.owner_id
         enemy    = state.players.get(enemy_id)
-        if enemy and state.tick >= enemy.stun_until:
-            dist = math.hypot(enemy.x - orb.x, enemy.y - orb.y)
-            if dist <= orb.radius + PLAYER_RADIUS:
-                state.apply_stun(enemy_id, STUN_TICKS)
+        if not enemy:
+            continue
+        dist = math.hypot(enemy.x - orb.x, enemy.y - orb.y)
+        if dist > orb.radius + PLAYER_RADIUS:
+            continue
+
+        orb.hit_enemy = True
+        damage = random.randint(DAMAGE_MIN, DAMAGE_MAX)
+        if enemy.giant_tick >= 0:
+            damage = int(damage * 0.8)
+        state.apply_damage(enemy_id, damage)
+
+        owner = state.players.get(orb.owner_id)
+        if owner and not owner.zombie_spit_hit_enemy:
+            state.apply_stun(enemy_id, STUN_TICKS)
+            owner.zombie_spit_hit_enemy = True
 
     for oid in expired:
         state.zombie_orbs.pop(oid, None)
