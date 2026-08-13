@@ -452,6 +452,7 @@ def run(map_id: int = 0):
                         s.step_push_zones()
                         s.step_robot_marks()
                         s.step_robot_e()
+                        s.step_robot_auto_attack()
                         s.step_air_cannons()
                         s.step_rune_recovery()
 

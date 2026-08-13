@@ -159,6 +159,8 @@ class Player:
     # ── Server-side 射速限制 ──────────────────────────────────────────────────
     last_shot_tick: int       = -9999  # tick of last successful shot spawn
     fire_interval_ticks: int  = 0      # min ticks between shots（由 apply_char_stats 設定）
+    # ── Robot 普攻：自動鎖定範圍內敵人 ─────────────────────────────────────────
+    robot_auto_last_tick: int = -9999  # tick of last auto-fired laser
 
     def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -382,6 +384,7 @@ class Bullet:
 # 不在表中的角色使用預設普攻（_spawn_bullet）。
 _SHOOT_HANDLERS: dict = {
     'Zombie': lambda s, pid, ax, ay: s._activate_blade_arc(pid, ax, ay),
+    'Robot':  lambda s, pid, ax, ay: None,   # 普攻改為自動鎖定，左鍵不再觸發
 }
 
 # Robot 普攻使用特殊子彈類型（雷射），其餘角色用 NORMAL
@@ -843,6 +846,21 @@ class GameState:
 
     # ── 主要更新方法 ─────────────────────────────────────────────────────────
 
+    def _home_robot_laser(self, bullet: "Bullet") -> None:
+        """Robot 普攻雷射：每 tick 重新鎖定敵人當前位置，速度不變，方向持續修正。"""
+        target = self.players.get(3 - bullet.owner_id)
+        if target is None:
+            return
+        tdx = target.x - bullet.x
+        tdy = target.y - bullet.y
+        tdist = math.hypot(tdx, tdy)
+        if tdist == 0:
+            return
+        speed = math.hypot(bullet.dx, bullet.dy)
+        bullet.dx = tdx / tdist * speed
+        bullet.dy = tdy / tdist * speed
+        bullet.aim_angle = math.degrees(math.atan2(bullet.dy, bullet.dx))
+
     def step_bullets(self, obstacles: dict = None,
                      obstacle_hp: dict = None) -> None:
         if obstacles is None:
@@ -850,6 +868,8 @@ class GameState:
 
         expired: list = []
         for bid, bullet in self.bullets.items():
+            if bullet.bullet_type == BType.ROBOT_LASER:
+                self._home_robot_laser(bullet)
             bullet.step()
             if bullet.is_expired():
                 expired.append(bid)
@@ -1161,6 +1181,10 @@ class GameState:
     def step_push_zones(self) -> None:
         from game.chars.robot.push_state import step_push_zones
         step_push_zones(self)
+
+    def step_robot_auto_attack(self) -> None:
+        from game.chars.robot.auto_attack_state import step_robot_auto_attack
+        step_robot_auto_attack(self)
 
     # ── 魔紋 ─────────────────────────────────────────────────────────────────
 

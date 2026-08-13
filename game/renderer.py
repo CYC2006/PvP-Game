@@ -30,6 +30,7 @@ from game.chars.pioneer  import shield_fx as pioneer_shield_fx
 from game.chars.robot    import push_fx as robot_push_fx
 from game.chars.robot    import mark_fx as robot_mark_fx
 from game.chars.robot    import e_fx as robot_e_fx
+from game.chars.robot    import auto_attack_fx as robot_auto_attack_fx
 
 # colours
 COL_BG         = (30,  30,  30)
@@ -525,6 +526,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     my_char = (player_chars or {}).get(my_id, "Agent")
 
     _draw_map(screen, cx, cy)
+    robot_auto_attack_fx.draw(screen, state, my_id, cx, cy, my_char)
     r_dash_fx.draw_r_trail(screen, cx, cy)
     airstrike_fx.draw_preview(screen, cx, cy, me.x, me.y, my_id)
 
