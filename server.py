@@ -33,6 +33,7 @@ _SKILL_RMB: dict = {
     'Poisoner': lambda s, pid, ax, ay: s._spawn_pool_bullet(pid, ax, ay),
     'Hunter':   lambda s, pid, ax, ay: s._spawn_air_cannon(pid, ax, ay),
     'Zombie':   lambda s, pid, ax, ay: s._activate_zombie_spit(pid, ax, ay),
+    'Robot':    lambda s, pid, ax, ay: s._activate_robot_overload(pid),
 }
 
 _SKILL_SPACE: dict = {

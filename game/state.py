@@ -1192,6 +1192,10 @@ class GameState:
         from game.chars.pioneer.clone_state import spawn_clone_bullets
         spawn_clone_bullets(self, owner_id, aim_x, aim_y)
 
+    def _activate_robot_overload(self, owner_id: int) -> None:
+        from game.chars.robot.overload_state import activate_overload
+        activate_overload(self, owner_id)
+
     def _activate_robot_space(self, owner_id: int) -> None:
         from game.chars.robot.mark_state import activate_robot_space
         activate_robot_space(self, owner_id)

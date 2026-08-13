@@ -105,7 +105,9 @@ _SKILLS: dict = {
          "Every 0.5 s you briefly flicker into view — and you still take damage."),
     ],
     'Robot': [
-        ("—", "RMB",   0, "Skill under development."),
+        ("OVERLOAD", "RMB", 10,
+         "Doubles your movement speed for 3 seconds. "
+         "A pure mobility burst — no other effects."),
         ("MARK RECALL", "SPACE", 6,
          "Dashes in your movement direction and plants a mark at the origin. "
          "Press Space again within 4 seconds to instantly teleport back. "
