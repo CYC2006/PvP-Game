@@ -131,6 +131,8 @@ class Player:
     zombie_spit_aim_y: float    = 0.0
     zombie_spit_wave_fired: int = 0    # waves fired so far (0~WAVE_COUNT)
     zombie_spit_hit_enemy: bool = False  # 本次施放是否已暈眩過對手（一次施放只暈眩一次）
+    # ── Zombie E 技能狀態（嗜血 Bloodlust，無僵直）────────────────────
+    zombie_rage_tick: int       = -1   # tick when bloodlust started (-1 = inactive)
     # ── Assassin R 技能狀態 ───────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -1038,6 +1040,14 @@ class GameState:
         from game.chars.zombie.spit_state import step_spit
         step_spit(self)
 
+    def _activate_zombie_rage(self, owner_id: int) -> None:
+        from game.chars.zombie.rage_state import activate_rage
+        activate_rage(self, owner_id)
+
+    def step_zombie_rage(self) -> None:
+        from game.chars.zombie.rage_state import step_rage
+        step_rage(self)
+
     def _activate_burst(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.agent.burst_state import activate_burst
         activate_burst(self, owner_id, aim_x, aim_y)
@@ -1138,6 +1148,10 @@ class GameState:
         # 一般恢復魔紋：任何傷害（含護盾吸收前）即打斷回復
         if damage > 0 and player.rune_recovery_ticks > 0:
             player.rune_recovery_ticks = 0
+
+        # Zombie E 嗜血：所受傷害無條件捨去減半
+        if player.zombie_rage_tick >= 0:
+            damage = damage // 2
 
         shield = self.shields.get(player_id)
         if shield is not None and shield.broken_tick < 0:

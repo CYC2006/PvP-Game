@@ -78,6 +78,8 @@ def step_blade_arcs(state) -> None:
                 if dist < PLAYER_RADIUS + BLADE_HIT_RADIUS:
                     dmg = int(blade.damage * 0.8) if opponent.giant_tick >= 0 else blade.damage
                     state.apply_damage(opponent_id, dmg)
+                    if player.zombie_rage_tick >= 0:   # 嗜血：普攻傷害的一半回復自身血量
+                        player.hp = min(player.max_hp, player.hp + dmg // 2)
                     blade.hit = True
         if blade.age >= BLADE_LIFESPAN:
             to_remove.append(blade.id)

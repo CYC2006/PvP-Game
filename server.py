@@ -22,6 +22,7 @@ _SKILL_E: dict = {
     'Pioneer':  lambda s, pid, ax, ay: s._activate_shield(pid),
     'Poisoner': lambda s, pid, ax, ay: s._activate_poisoner_e(pid),
     'Robot':    lambda s, pid, ax, ay: s._activate_robot_e(pid),
+    'Zombie':   lambda s, pid, ax, ay: s._activate_zombie_rage(pid),
 }
 
 _SKILL_RMB: dict = {
@@ -430,6 +431,7 @@ def run(map_id: int = 0):
                         s.step_jumps()
                         s.step_zombie_jumps()
                         s.step_zombie_spit()
+                        s.step_zombie_rage()
                         s.step_vince_taunt()
                         s.step_vince_dash(room.obstacles)
                         s.resolve_player_collisions(room.obstacles)

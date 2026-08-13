@@ -27,7 +27,7 @@ PKT_PONG        = 0x0B   # server → client: probe 回應
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBBffH")  # +B: flags2（bit0=use_rune）
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBBBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age vince_taunt_age poison_stacks e_shockwave_seq air_cannon_hit_seq
+_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBBBBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age vince_taunt_age poison_stacks e_shockwave_seq air_cannon_hit_seq zombie_rage_age
 _AIR_CANNON_ENTRY = struct.Struct("!BhhB")  # id x_i16 y_i16 owner_id
 _BULLET_ENTRY  = struct.Struct("!BBffhBB")    # id owner x y angle_i16 bullet_type bullet_scale_u8(×10)
 _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
@@ -136,6 +136,7 @@ def pack_state(state: GameState) -> bytes:
             min(255, max(0, p.poison_stacks)),
             p.poisoner_e_shockwave_seq,
             p.air_cannon_hit_seq & 0xFF,
+            min(254, state.tick - p.zombie_rage_tick) if p.zombie_rage_tick >= 0 else 255,
         )
         for p in players
     )
@@ -286,7 +287,7 @@ def unpack_state(data: bytes) -> GameState:
         (pid, x, y, hp, max_hp, aim_i16, stance_u8, gold, flash,
          giant_age, stun_b, burst_b, clone_b, jump_age, cloak_rem,
          vince_dash, zombie_jump_age, vince_taunt_age,
-         poison_stacks_b, e_sw_seq_b, ac_hit_seq_b) = _PLAYER_ENTRY.unpack(
+         poison_stacks_b, e_sw_seq_b, ac_hit_seq_b, zombie_rage_age) = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
         p = Player(id=pid, x=x, y=y, hp=hp, max_hp=max_hp,
@@ -303,6 +304,7 @@ def unpack_state(data: bytes) -> GameState:
         p.poison_stacks            = poison_stacks_b
         p.poisoner_e_shockwave_seq = e_sw_seq_b
         p.air_cannon_hit_seq       = ac_hit_seq_b
+        p.zombie_rage_tick         = tick - zombie_rage_age if zombie_rage_age != 255 else -1
         state.players[pid] = p
         state.gold_counts[pid] = gold
         offset += _PLAYER_ENTRY.size

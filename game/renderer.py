@@ -19,6 +19,7 @@ from game.chars.hunter   import air_cannon_fx
 from game.chars.zombie   import blade_fx
 from game.chars.zombie   import jump_fx as zombie_jump_fx
 from game.chars.zombie   import spit_fx as zombie_spit_fx
+from game.chars.zombie   import rage_fx as zombie_rage_fx
 from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
 from game.chars.poisoner   import bubble_fx
 from game.chars.poisoner   import poison_pool_fx
@@ -541,6 +542,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     _draw_gold_ingots(screen, state, cx, cy)
     _draw_bullets(screen, state, cx, cy, player_chars or {})
     r_dash_fx.draw_afterimages(screen, cx, cy, state.tick)
+    zombie_rage_fx.draw(screen, state, cx, cy)
     _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg,
                   player_chars or {})
     blade_fx.draw(screen, state, cx, cy)

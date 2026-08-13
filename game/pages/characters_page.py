@@ -182,7 +182,12 @@ _SKILLS: dict = {
          "Leap 200 px toward your aim, then slam down. "
          "Enemies caught in the landing shockwave are knocked back and stunned. "
          "Instantly refills your magazine and cancels any reload in progress."),
-        ("—", "E",     0, "Skill under development."),
+        ("BLOODLUST", "E",     12,
+         "For 4 s, no stiffness — move, shoot, and use other skills freely. "
+         "All damage you take is halved (rounded down). Basic-attack (blade) "
+         "hits also heal you for half the damage dealt (rounded down, no "
+         "effect above max HP). A dark red glow pools under your feet, hidden "
+         "beneath your model and fading out toward its 60 px edge."),
         ("—", "F",     0, "Skill under development."),
     ],
 }
