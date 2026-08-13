@@ -303,6 +303,12 @@ def lobby_screen(screen: pygame.Surface,
                 else:
                     if event.key == pygame.K_ESCAPE:
                         confirm_quit = not confirm_quit
+                    elif not confirm_quit and page == "characters":
+                        n = len(characters_page.CHAR_THUMB_RS)
+                        if event.key == pygame.K_LEFT:
+                            char_page_idx = (char_page_idx - 1) % n
+                        elif event.key == pygame.K_RIGHT:
+                            char_page_idx = (char_page_idx + 1) % n
 
             # ── Mouse ─────────────────────────────────────────────────────
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
