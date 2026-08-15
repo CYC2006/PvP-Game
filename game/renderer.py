@@ -516,7 +516,9 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
          player_chars: dict = None,
          skill_cooldowns: dict = None,
          mx: int = 0, my: int = 0,
-         font_hud: pygame.font.Font = None) -> None:
+         font_hud: pygame.font.Font = None,
+         game_mode: str = "endless",
+         elapsed_ms: int = 0) -> None:
     # player_chars: {pid: char_name}，None 時全部用 Agent
 
     if my_id not in state.players:
@@ -609,6 +611,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
 
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns,
               font_hud=font_hud or font, my_char=my_char)
+    _draw_mode_hud(screen, state, font_hud or font, game_mode, elapsed_ms)
     _draw_settings_hud(screen, font, mx, my)
 
 
@@ -1068,6 +1071,98 @@ def _draw_opponent_hp_bar(screen, hp: int, max_hp: int, cx: int, y: int):
 
 
 # ── HUD ──────────────────────────────────────────────────────────────────────
+
+_COL_BLUE_TEAM = ( 80, 160, 255)   # Agent 子彈藍
+_COL_RED_TEAM  = (255,  70,  70)   # 紅方
+
+
+def _draw_mode_hud(screen, state, font, game_mode: str, elapsed_ms: int) -> None:
+    """頂部中央模式 HUD：Endless = 擊殺計數；Deathmatch = 菱形生命 + 計時器。"""
+    CX = SCREEN_W // 2
+    Y  = 14
+
+    pids = sorted(state.players.keys())   # 通常是 [1, 2]
+    if len(pids) < 2:
+        return
+    pid1, pid2 = pids[0], pids[1]
+
+    if game_mode == "endless":
+        k1 = state.kill_counts.get(pid1, 0)
+        k2 = state.kill_counts.get(pid2, 0)
+
+        big_font  = font
+        col_surf  = pygame.Surface((1, 1), pygame.SRCALPHA)   # dummy
+
+        s1  = big_font.render(str(k1), True, _COL_BLUE_TEAM)
+        s2  = big_font.render(str(k2), True, _COL_RED_TEAM)
+        sep = big_font.render(":", True, (220, 220, 220))
+
+        gap   = 10
+        total = s1.get_width() + gap + sep.get_width() + gap + s2.get_width()
+        x     = CX - total // 2
+
+        screen.blit(s1,  (x, Y))
+        x += s1.get_width() + gap
+        # 冒號垂直置中對齊數字
+        screen.blit(sep, (x, Y + (s1.get_height() - sep.get_height()) // 2))
+        x += sep.get_width() + gap
+        screen.blit(s2,  (x, Y))
+
+    elif game_mode == "deathmatch":
+        # 菱形尺寸 3:4 (寬:高)
+        DW, DH   = 18, 24
+        D_GAP    = 6
+        TIMER_GAP = 20
+
+        lives1 = state.lives.get(pid1, 3)
+        lives2 = state.lives.get(pid2, 3)
+
+        total_secs = elapsed_ms // 1000
+        mm = total_secs // 60
+        ss = total_secs % 60
+        timer_str = f"{mm:02d}:{ss:02d}"
+        timer_s   = font.render(timer_str, True, (220, 220, 220))
+
+        # 計時器置中
+        tx = CX - timer_s.get_width() // 2
+        ty = Y
+        screen.blit(timer_s, (tx, ty))
+        timer_cy = ty + timer_s.get_height() // 2
+
+        # 藍方菱形：從計時器左邊往左排，最靠近計時器的是最後一顆
+        diamonds_w = 3 * DW + 2 * D_GAP
+        bx_right   = tx - TIMER_GAP   # 藍方最右顆 x 右邊緣
+        for j in range(3):
+            # j=0 最左(最遠)，j=2 最靠近計時器
+            filled = (j < lives1)
+            col    = _COL_BLUE_TEAM
+            dx     = bx_right - (2 - j) * (DW + D_GAP)
+            dy     = timer_cy
+            _draw_diamond(screen, dx + DW // 2, dy, DW, DH, col, filled)
+
+        # 紅方菱形：從計時器右邊往右排，最靠近計時器的是第一顆
+        rx_left = tx + timer_s.get_width() + TIMER_GAP
+        for j in range(3):
+            filled = (j < lives2)
+            col    = _COL_RED_TEAM
+            dx     = rx_left + j * (DW + D_GAP)
+            dy     = timer_cy
+            _draw_diamond(screen, dx + DW // 2, dy, DW, DH, col, filled)
+
+
+def _draw_diamond(screen, cx, cy, w, h, color, filled: bool) -> None:
+    """在 (cx, cy) 畫一顆菱形。filled=True 實心；False 空心（只有邊框）。"""
+    pts = [
+        (cx,         cy - h // 2),   # 上
+        (cx + w // 2, cy),            # 右
+        (cx,         cy + h // 2),   # 下
+        (cx - w // 2, cy),            # 左
+    ]
+    if filled:
+        pygame.draw.polygon(screen, color, pts)
+    else:
+        pygame.draw.polygon(screen, color, pts, 2)
+
 
 def _draw_hud(screen, state, my_id, font, my_stance="stand",
               ammo: int = MAGAZINE_SIZE, is_reloading: bool = False,

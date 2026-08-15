@@ -55,16 +55,17 @@ def pack_all_joined() -> bytes:
     return bytes([PKT_ALL_JOINED])
 
 
-def pack_join(room_code: int, map_id: int = 0) -> bytes:
-    """map_id appended as optional trailing byte — old servers ignore it."""
-    return bytes([PKT_JOIN]) + struct.pack('>H', room_code) + bytes([map_id & 0xFF])
+def pack_join(room_code: int, map_id: int = 0, game_mode: int = 0) -> bytes:
+    """game_mode: 0=deathmatch, 1=endless"""
+    return bytes([PKT_JOIN]) + struct.pack('>H', room_code) + bytes([map_id & 0xFF, game_mode & 0xFF])
 
 
 def unpack_join(data: bytes) -> tuple:
-    """Returns (room_code, map_id). map_id defaults to 0 if not present."""
+    """Returns (room_code, map_id, game_mode)."""
     room_code = struct.unpack('>H', data[1:3])[0] if len(data) >= 3 else 0
     map_id    = data[3] if len(data) >= 4 else 0
-    return room_code, map_id
+    game_mode = data[4] if len(data) >= 5 else 0
+    return room_code, map_id, game_mode
 
 
 def pack_joined(player_id: int) -> bytes:
@@ -123,7 +124,7 @@ def pack_state(state: GameState) -> bytes:
             p.id, p.x, p.y, max(0, p.hp), max(1, p.max_hp),
             int(p.aim_angle),
             _STANCE_TO_INT.get(p.stance, 0),
-            state.gold_counts.get(p.id, 0),
+            (min(255, state.kill_counts.get(p.id, 0)) << 8) | min(255, state.gold_counts.get(p.id, 0)),
             min(255, max(0, p.flash_ticks)),
             min(65535, state.tick - p.giant_tick) if p.giant_tick >= 0 else 65535,
             min(255, p.stun_until - state.tick) if p.stun_until > state.tick else 0,
@@ -280,7 +281,13 @@ def pack_state(state: GameState) -> bytes:
         for o in orb_list
     )
 
-    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data + mark_data + turret_data + barrage_data + shield_data + cannon_data + e_ring_data + e_mark_data + orb_data
+    # lives（deathmatch 用）
+    lives_entries = sorted(state.lives.items())
+    lives_data    = bytes([len(lives_entries)]) + b"".join(
+        bytes([pid & 0xFF, min(255, lv)]) for pid, lv in lives_entries
+    )
+
+    return header + p_data + b_data + d_data + g_data + s_data + ba_data + as_data + lb_data + mine_data + pool_data + push_data + mark_data + turret_data + barrage_data + shield_data + cannon_data + e_ring_data + e_mark_data + orb_data + lives_data
 
 
 def unpack_state(data: bytes) -> GameState:
@@ -318,8 +325,9 @@ def unpack_state(data: bytes) -> GameState:
         p.zombie_spit_tick         = 0 if zombie_spit else -1
         p.r_skill_phase            = 1 if r_skill_active else 0
         p.zombie_energy            = float(zombie_energy)
-        state.players[pid] = p
-        state.gold_counts[pid] = gold
+        state.players[pid]     = p
+        state.gold_counts[pid] = gold & 0xFF          # lower byte = gem count
+        state.kill_counts[pid] = (gold >> 8) & 0xFF   # upper byte = kill count
         offset += _PLAYER_ENTRY.size
 
     b_count = data[offset]; offset += 1
@@ -340,7 +348,7 @@ def unpack_state(data: bytes) -> GameState:
     for _ in range(g_count):
         gid, gx, gy, kind_byte = _GOLD_ENTRY.unpack(data[offset: offset + _GOLD_ENTRY.size])
         state.gold_ingots[gid] = GoldIngot(id=gid, x=gx, y=gy,
-                                            kind="health" if kind_byte == 1 else "gold")
+                                            kind="health" if kind_byte == 1 else "gem")
         offset += _GOLD_ENTRY.size
 
     if offset < len(data):
@@ -509,6 +517,15 @@ def unpack_state(data: bytes) -> GameState:
                 fade=ofade)
             offset += _ZOMBIE_ORB_ENTRY.size
 
+    if offset < len(data):
+        lv_count = data[offset]; offset += 1
+        for _ in range(lv_count):
+            if offset + 1 <= len(data):
+                lv_pid   = data[offset]
+                lv_lives = data[offset + 1]
+                state.lives[lv_pid] = lv_lives
+                offset += 2
+
     return state
 
 
@@ -516,33 +533,34 @@ def pack_char_select(char_id: int, rune_id: int = 0) -> bytes:
     return bytes([PKT_CHAR_SELECT, char_id & 0xFF, rune_id & 0xFF])
 
 
-def pack_game_start(chars: dict = None, map_id: int = 0) -> bytes:
+def pack_game_start(chars: dict = None, map_id: int = 0,
+                    game_mode: int = 0, side_flip: bool = False) -> bytes:
     """
-    chars: {pid: char_id}（最多 2 對）
-    格式: PKT_GAME_START [pid char_id] ... map_id
-    map_id appended at the end so old servers (without map_id) remain compatible:
-    old clients/servers simply never read the trailing byte.
+    格式: PKT_GAME_START [pid char_id]... map_id game_mode side_flip
+    game_mode: 0=deathmatch, 1=endless
     """
     data = [PKT_GAME_START]
     if chars:
         for pid, char_id in sorted(chars.items()):
             data += [int(pid) & 0xFF, int(char_id) & 0xFF]
-    data += [int(map_id) & 0xFF]
+    data += [int(map_id) & 0xFF, int(game_mode) & 0xFF, 1 if side_flip else 0]
     return bytes(data)
 
 
 def unpack_game_start(data: bytes) -> tuple:
-    """回傳 ({pid: char_id}, map_id)。
-    向下相容：若封包長度與舊格式相同（無 map_id 尾端 byte），map_id 預設為 0。
+    """回傳 ({pid: char_id}, map_id, game_mode, side_flip)。
+    格式固定為 2 對 [pid char_id]，後接 map_id, game_mode, side_flip。
     """
     chars = {}
     i = 1
-    while i + 1 < len(data):
-        chars[data[i]] = data[i + 1]
-        i += 2
-    # i now points past the last pair; if one byte remains it's map_id
-    map_id = data[i] if i < len(data) else 0
-    return chars, map_id
+    for _ in range(2):   # MAX_PLAYERS = 2
+        if i + 1 < len(data):
+            chars[data[i]] = data[i + 1]
+            i += 2
+    map_id    = data[i]     if i     < len(data) else 0
+    game_mode = data[i + 1] if i + 1 < len(data) else 0
+    side_flip = bool(data[i + 2]) if i + 2 < len(data) else False
+    return chars, map_id, game_mode, side_flip
 
 
 def pack_quit(player_id: int) -> bytes:

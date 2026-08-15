@@ -1,4 +1,5 @@
 import json
+import random
 import socket
 import time
 import sys
@@ -87,6 +88,7 @@ class RoomState:
         'last_seen', 'obstacle_hp', 'game_started', 'paused', 'paused_since',
         'next_tick', 'waiting', 'portal_cooldowns',
         'map_id', 'obstacles', 'obstacle_hp_template', 'portals', 'map_w', 'map_h',
+        'game_mode', 'side_flip',
     )
 
     def __init__(self, map_id: int, map_data: dict):
@@ -109,6 +111,8 @@ class RoomState:
         self.next_tick         = time.perf_counter()
         self.waiting           = {}
         self.portal_cooldowns  = {}
+        self.game_mode         = 0   # 0=deathmatch, 1=endless
+        self.side_flip         = False
 
 
 def run(map_id: int = 0):
@@ -232,13 +236,15 @@ def run(map_id: int = 0):
 
             # ── PKT_JOIN ──────────────────────────────────────────────────
             if ptype == PKT_JOIN:
-                join_code, join_map_id = unpack_join(data)
+                join_code, join_map_id, join_game_mode = unpack_join(data)
                 room = rooms.get(join_code)
 
                 if room and addr in room.addr_to_id:
                     # Already in session — resend relevant packet(s)
                     pid = room.addr_to_id[addr]
-                    # Host (pid==1) may update map selection before game starts
+                    # Host (pid==1) may update map/mode selection before game starts
+                    if pid == 1 and not room.game_started:
+                        room.game_mode = join_game_mode
                     if (pid == 1 and not room.game_started
                             and join_map_id != room.map_id):
                         md = _load_map_data(join_map_id)
@@ -254,13 +260,17 @@ def run(map_id: int = 0):
                     if len(room.clients) == MAX_PLAYERS and not room.game_started:
                         sock.sendto(pack_all_joined(), addr)
                     elif room.game_started and room.player_chars:
-                        sock.sendto(pack_game_start(room.player_chars, room.map_id), addr)
+                        sock.sendto(pack_game_start(room.player_chars, room.map_id,
+                                                    room.game_mode, room.side_flip), addr)
                 else:
                     if room is None:
-                        # First player to join a room is treated as host — their map_id wins
+                        # First player to join a room is treated as host — their map_id/mode wins
                         room = RoomState(join_map_id, _load_map_data(join_map_id))
+                        room.game_mode = join_game_mode
                         configure_map(room.map_w, room.map_h)
                         rooms[join_code] = room
+                    else:
+                        room.game_mode = join_game_mode
                     room.waiting[addr] = time.perf_counter()
                     addr_room[addr]    = join_code
                     if len(room.clients) < MAX_PLAYERS:
@@ -286,22 +296,30 @@ def run(map_id: int = 0):
                     print(f"[Server] Player {pid} selected char {char_id}, rune {rune_id}")
 
                     if len(room.player_chars) == MAX_PLAYERS:
-                        room.game_started = True
-                        room.next_tick    = time.perf_counter()
+                        room.game_started  = True
+                        room.side_flip     = random.random() < 0.5
+                        room.next_tick     = time.perf_counter()
+                        _mode_str          = "deathmatch" if room.game_mode == 0 else "endless"
+                        room.state.game_mode   = _mode_str
+                        room.state.side_flip   = room.side_flip
+                        room.state.game_start_tick = room.state.tick
                         from game.char_data import CHAR_ORDER, reload
                         reload()
                         for p_id, c_id in room.player_chars.items():
                             char_name = CHAR_ORDER[c_id]
                             r_id      = room.player_runes.get(p_id, 0)
                             room.state.apply_char_stats(p_id, char_name, r_id)
+                            if _mode_str == "deathmatch":
+                                room.state.lives[p_id] = 3
                             print(f"[Server] Player {p_id} → {char_name}, rune {r_id}")
-                        payload = pack_game_start(room.player_chars, room.map_id)
+                        payload = pack_game_start(room.player_chars, room.map_id,
+                                                  room.game_mode, room.side_flip)
                         for a in room.clients.values():
                             try:
                                 sock.sendto(payload, a)
                             except Exception:
                                 pass
-                        print("[Server] Both selected — Game start!")
+                        print(f"[Server] Both selected — Game start! mode={_mode_str} side_flip={room.side_flip}")
 
             # ── PKT_QUIT ──────────────────────────────────────────────────
             elif ptype == PKT_QUIT:
@@ -478,6 +496,19 @@ def run(map_id: int = 0):
                         # Portal teleportation (Portal map only)
                         if room.portals:
                             _step_portals(s, room, room.portals)
+
+                        # Deathmatch: check if any player's lives reached 0
+                        if s.game_mode == "deathmatch" and s.lives:
+                            loser = next((pid for pid, lv in s.lives.items() if lv <= 0), None)
+                            if loser is not None:
+                                go_payload = pack_game_over()
+                                for a in room.clients.values():
+                                    try:
+                                        sock.sendto(go_payload, a)
+                                    except Exception:
+                                        pass
+                                _reset_room(room)
+                                continue
 
                         payload = pack_state(s)
                         for a in room.clients.values():

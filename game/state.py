@@ -71,6 +71,7 @@ class Player:
     speed: float        = PLAYER_SPEED
     hp: int             = DEFAULT_MAX_HP
     max_hp: int         = DEFAULT_MAX_HP   # 依角色設定，respawn 恢復到此值
+    spawn_x: float      = 0.0             # 記錄初始出生 x，respawn 回此處
     damage_min: int     = 1                # 子彈最小傷害（由 server 依角色設定）
     damage_max: int     = 1                # 子彈最大傷害
     bullet_speed: float = BULLET_SPEED    # 子彈速度（像素/tick），依角色設定
@@ -188,7 +189,7 @@ class Player:
 
     def respawn(self) -> None:
         self.hp = self.max_hp
-        self.x  = float(MAP_WIDTH  // 4 if self.id == 1 else MAP_WIDTH  * 3 // 4)
+        self.x  = self.spawn_x if self.spawn_x else float(MAP_WIDTH // 4 if self.id == 1 else MAP_WIDTH * 3 // 4)
         self.y  = float(MAP_HEIGHT // 2)
         self.poison_stacks         = 0
         self._poison_last_tick     = -1
@@ -430,7 +431,12 @@ class GameState:
     bullets: dict            = field(default_factory=dict)
     destroyed_obstacles: set = field(default_factory=set)
     gold_ingots: dict        = field(default_factory=dict)   # gid → GoldIngot
-    gold_counts: dict        = field(default_factory=dict)   # pid → int
+    gold_counts: dict        = field(default_factory=dict)   # pid → gem 撿取數（用於 client 觸發冷卻縮減）
+    kill_counts: dict        = field(default_factory=dict)   # pid → 擊殺數
+    lives: dict              = field(default_factory=dict)   # pid → 剩餘生命（deathmatch）
+    game_mode: str           = "endless"                      # "endless" | "deathmatch"
+    side_flip: bool          = False                          # True = pid1 在右側
+    game_start_tick: int     = 0
     tick: int                = 0
     _next_bullet_id: int     = 0
     _next_gold_id: int       = 0
@@ -469,11 +475,16 @@ class GameState:
     _next_zombie_orb_id: int = 0
 
     def add_player(self, player_id: int) -> "Player":
-        spawn_x = MAP_WIDTH  // 4 if player_id == 1 else MAP_WIDTH  * 3 // 4
+        left_x  = MAP_WIDTH  // 4
+        right_x = MAP_WIDTH  * 3 // 4
+        if self.side_flip:
+            spawn_x = right_x if player_id == 1 else left_x
+        else:
+            spawn_x = left_x  if player_id == 1 else right_x
         spawn_y = MAP_HEIGHT // 2
-        self.players[player_id] = Player(id=player_id,
-                                         x=float(spawn_x), y=float(spawn_y))
-        return self.players[player_id]
+        p = Player(id=player_id, x=float(spawn_x), y=float(spawn_y), spawn_x=float(spawn_x))
+        self.players[player_id] = p
+        return p
 
     def apply_char_stats(self, player_id: int, char_name: str,
                          rune_id: int = 0) -> None:
@@ -1164,6 +1175,11 @@ class GameState:
         # 無護盾：直接扣血
         player.hp -= damage
         if player.hp <= 0:
+            killer_id = next((pid for pid in self.players if pid != player_id), None)
+            if killer_id is not None:
+                self.kill_counts[killer_id] = self.kill_counts.get(killer_id, 0) + 1
+            if self.game_mode == "deathmatch":
+                self.lives[player_id] = max(0, self.lives.get(player_id, 3) - 1)
             player.respawn()
 
     def apply_knockback(self, player_id: int, dir_x: float, dir_y: float) -> None:

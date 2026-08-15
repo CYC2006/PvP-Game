@@ -98,15 +98,16 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
                        font_lg: pygame.font.Font,
                        font_sm: pygame.font.Font,
                        clock: pygame.time.Clock,
-                       map_id: int = 0):
+                       map_id: int = 0, game_mode: int = 0):
     """
     Send PKT_JOIN(room_code) every second to server_addr.
     Wait for PKT_JOINED + PKT_ALL_JOINED from the server.
     Returns (player_id, server_addr) on success, (None, None) on cancel.
     """
-    player_id  = None
-    all_joined = False
-    last_join  = -999.0
+    player_id         = None
+    all_joined        = False
+    last_join         = -999.0
+    _lobby_game_mode  = game_mode
 
     dot_count = 0
     dot_timer = 0.0
@@ -158,10 +159,10 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
                             actual_map_id = (random.randint(0, _RANDOM_IDX - 1)
                                              if _i == _RANDOM_IDX else _i)
 
-        # Send PKT_JOIN every second with current map selection
+        # Send PKT_JOIN every second with current map selection and game mode
         if now - last_join >= 1.0:
             try:
-                sock.sendto(pack_join(room_code, actual_map_id), server_addr)
+                sock.sendto(pack_join(room_code, actual_map_id, _lobby_game_mode), server_addr)
             except Exception:
                 pass
             last_join = now
@@ -314,14 +315,14 @@ def char_select_loop(sock, server_addr, player_id, room_code, screen,
                 data, _ = sock.recvfrom(BUF_SIZE)
                 pkt = packet_type(data)
                 if pkt == PKT_GAME_START:
-                    raw_chars, map_id = unpack_game_start(data)
+                    raw_chars, map_id, game_mode_wire, side_flip = unpack_game_start(data)
                     player_chars = {pid: _CHAR_LIST[cid]["name"]
                                     for pid, cid in raw_chars.items()
                                     if 0 <= cid < len(_CHAR_LIST)}
-                    return player_chars, charselect.selected_char()["name"], charselect.selected_rune(), map_id
+                    gmode = "deathmatch" if game_mode_wire == 0 else "endless"
+                    return player_chars, charselect.selected_char()["name"], charselect.selected_rune(), map_id, gmode, side_flip
                 elif pkt == PKT_GAME_OVER:
-                    # Opponent left (PKT_QUIT) or server force-reset — go back to lobby
-                    return None, None, 0, 0
+                    return None, None, 0, 0, "endless", False
             except (BlockingIOError, ConnectionResetError, OSError):
                 break
 
@@ -379,7 +380,7 @@ def run() -> None:
     while app_running:
 
         # ── Lobby ────────────────────────────────────────────────────
-        mode, join_code, lobby_map_id = lobby_screen(screen, font_lg, font_sm, clock)
+        mode, join_code, lobby_map_id, lobby_game_mode_idx = lobby_screen(screen, font_lg, font_sm, clock)
         if mode is None:
             break   # user closed window
 
@@ -402,7 +403,8 @@ def run() -> None:
         player_id, server_addr = matchmaking_screen(sock, server_addr,
                                                     room_code, is_host,
                                                     screen, font_lg, font_sm, clock,
-                                                    map_id=lobby_map_id)
+                                                    map_id=lobby_map_id,
+                                                    game_mode=lobby_game_mode_idx)
         if player_id is None:
             sock.close()
             continue
@@ -410,7 +412,7 @@ def run() -> None:
         pygame.display.set_caption(f"PvP Game — Player {player_id}")
 
         # ── Char select ──────────────────────────────────────────────
-        player_chars, my_char_name, my_rune_id, map_id = char_select_loop(
+        player_chars, my_char_name, my_rune_id, map_id, game_mode, side_flip = char_select_loop(
             sock, server_addr, player_id, room_code, screen, font_lg, font_sm, clock)
         if player_chars is None:
             sock.close()
@@ -435,6 +437,7 @@ def run() -> None:
         game_running       = True
         opponent_quit      = False
         _prev_gem_count    = 0
+        _game_start_ms     = pygame.time.get_ticks()
 
         while game_running:
             for event in pygame.event.get():
@@ -549,7 +552,9 @@ def run() -> None:
             draw(screen, state, player_id, font_sm, obstacles,
                  effective_stance, aim_angle_deg, ammo, is_reloading,
                  player_chars, skill_cooldowns,
-                 mx=mx, my=my_pos, font_hud=font_hud)
+                 mx=mx, my=my_pos, font_hud=font_hud,
+                 game_mode=game_mode,
+                 elapsed_ms=pygame.time.get_ticks() - _game_start_ms)
             pygame.display.flip()
             clock.tick(FPS)
 

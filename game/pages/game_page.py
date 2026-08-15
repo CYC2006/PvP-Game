@@ -44,11 +44,12 @@ _hj_x = _GX + _GTW + _GGAP
 
 # ── Static rects (module-level — shared with lobby.py event handler) ──────────
 MODES = [
-    (IC_CROSSHAIRS, "DEATHMATCH",       "Eliminate the enemy player"),
-    (IC_FLAG,       "CAPTURE THE FLAG", "Capture and return the flag"),
-    (IC_BULLSEYE,   "CAPTURE POINT",    "Hold key positions longer"),
-    (IC_USERS,      "2v2  TEAM",        "Two versus two squad battle"),
+    (IC_CROSSHAIRS, "DEATHMATCH",       "Eliminate the enemy player",    False),
+    (IC_FLAG,       "CAPTURE THE FLAG", "Coming Soon",                   True),
+    (IC_USERS,      "2v2  TEAM",        "Coming Soon",                   True),
+    (IC_GAMEPAD,    "ENDLESS MODE",     "Respawn and fight forever",     False),
 ]
+# MODES[i][3] = True → coming soon (not selectable)
 
 MODE_RS: list[pygame.Rect] = [
     pygame.Rect(
@@ -79,11 +80,13 @@ def draw(screen: pygame.Surface,
     screen.blit(lbl, (_GX, _GY - lbl.get_height() - 8))
 
     # 2×2 tile grid
-    for i, (r, (icon, name, _desc)) in enumerate(zip(MODE_RS, MODES)):
-        selected = (i == sel_mode)
-        hovering = (not selected) and r.collidepoint(mx, my)
+    for i, (r, (icon, name, desc, coming_soon)) in enumerate(zip(MODE_RS, MODES)):
+        selected = (i == sel_mode) and not coming_soon
+        hovering = (not selected) and (not coming_soon) and r.collidepoint(mx, my)
 
-        if selected:
+        if coming_soon:
+            bg, bd, tc = (18, 22, 32), (32, 38, 52), (55, 65, 88)
+        elif selected:
             bg, bd, tc = COL_M_SEL,  COL_M_SEL_BD, COL_M_SEL_TXT
         elif hovering:
             bg, bd, tc = COL_M_HOV,  COL_M_UN_BD,  COL_M_HOV_TXT
@@ -99,6 +102,11 @@ def draw(screen: pygame.Surface,
         screen.blit(ic_s, (r.x + 16,
                             ty + (nm_s.get_height() - ic_s.get_height()) // 2))
         screen.blit(nm_s, (r.x + 16 + ic_s.get_width() + 10, ty))
+
+        if coming_soon:
+            cs_col = (70, 80, 110)
+            cs_s   = font_sm.render("COMING SOON", True, cs_col)
+            screen.blit(cs_s, (r.x + 16, ty + nm_s.get_height() + 8))
 
     # HOST / JOIN
     btn(screen, HOST_R,
