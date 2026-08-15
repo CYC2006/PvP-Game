@@ -133,6 +133,9 @@ class Player:
     zombie_spit_hit_enemy: bool = False  # 本次施放是否已暈眩過對手（一次施放只暈眩一次）
     # ── Zombie E 技能狀態（嗜血 Bloodlust，無僵直）────────────────────
     zombie_rage_tick: int       = -1   # tick when bloodlust started (-1 = inactive)
+    # ── Zombie 普攻（血刃 blade arc）：6 片刀片視為同一次攻擊 ───────────
+    zombie_blade_hit_player:   bool = False  # 本次普攻是否已對玩家造成過傷害
+    zombie_blade_hit_obstacle: bool = False  # 本次普攻是否已對障礙物造成過傷害
     # ── Assassin R 技能狀態 ───────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -1028,9 +1031,9 @@ class GameState:
         from game.chars.zombie.blade_state import activate_blade_arc
         activate_blade_arc(self, owner_id, aim_x, aim_y)
 
-    def step_blade_arcs(self) -> None:
+    def step_blade_arcs(self, obstacles: dict = None, obstacle_hp: dict = None) -> None:
         from game.chars.zombie.blade_state import step_blade_arcs
-        step_blade_arcs(self)
+        step_blade_arcs(self, obstacles, obstacle_hp)
 
     def _activate_zombie_spit(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.zombie.spit_state import activate_spit

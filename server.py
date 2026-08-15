@@ -438,7 +438,7 @@ def run(map_id: int = 0):
                         s.step_gold_collection()
                         s.step_status_effects()
                         s.step_smoke_patches()
-                        s.step_blade_arcs()
+                        s.step_blade_arcs(room.obstacles, room.obstacle_hp)
                         s.step_r_skill()
                         s.step_air_strikes()
                         s.step_giant()
