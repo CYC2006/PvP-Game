@@ -252,7 +252,7 @@ def _cancel_matchmaking(sock, server_addr, player_id):
 # ── 選角畫面 ──────────────────────────────────────────────────────────────────
 
 def char_select_loop(sock, server_addr, player_id, room_code, screen,
-                     font_lg, font_sm, clock) -> tuple:
+                     font_lg, font_sm, clock, game_mode: int = 0) -> tuple:
     charselect.reset()
     my_ready        = False
     last_time       = pygame.time.get_ticks()
@@ -292,7 +292,7 @@ def char_select_loop(sock, server_addr, player_id, room_code, screen,
         if heartbeat_timer >= HEARTBEAT_INTERVAL:
             heartbeat_timer = 0.0
             try:
-                sock.sendto(pack_join(room_code), server_addr)
+                sock.sendto(pack_join(room_code, game_mode=game_mode), server_addr)
             except Exception:
                 pass
 
@@ -413,7 +413,8 @@ def run() -> None:
 
         # ── Char select ──────────────────────────────────────────────
         player_chars, my_char_name, my_rune_id, map_id, game_mode, side_flip = char_select_loop(
-            sock, server_addr, player_id, room_code, screen, font_lg, font_sm, clock)
+            sock, server_addr, player_id, room_code, screen, font_lg, font_sm, clock,
+            game_mode=lobby_game_mode_idx)
         if player_chars is None:
             sock.close()
             pygame.display.set_caption("PvP Game")
