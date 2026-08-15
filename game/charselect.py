@@ -30,14 +30,14 @@ CHARACTERS = [
 ]
 N = len(CHARACTERS)
 
-# ── 魔紋清單（所有角色共用，冷卻 30 秒）─────────────────────────────────────
+# ── 魔紋清單（所有角色共用，冷卻 20 秒）─────────────────────────────────────
 RUNES = [
     {
-        "id": 0, "name": "Recovery", "cd": 30, "key": "Q",
+        "id": 0, "name": "Recovery", "cd": 20, "key": "Q",
         "desc": ["5% HP/s for 6 sec"],
     },
     {
-        "id": 1, "name": "Burst Heal", "cd": 30, "key": "Q",
+        "id": 1, "name": "Burst Heal", "cd": 20, "key": "Q",
         "desc": ["Instantly restore 20% HP"],
     },
     {

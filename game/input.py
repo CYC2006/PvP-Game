@@ -370,9 +370,9 @@ def init_rune(rune_id: int) -> None:
     if rune_id == 2:   # 血量上限：被動，Q 無動作
         _state.skill_cds_ms['q']  = -1
         _state.skill_last_ms['q'] = 0
-    else:              # 一般恢復 / 強化恢復：30s CD，遊戲開始即可用
-        _state.skill_cds_ms['q']  = 30_000
-        _state.skill_last_ms['q'] = pygame.time.get_ticks() - 30_001
+    else:              # 一般恢復 / 強化恢復：20s CD，遊戲開始即可用
+        _state.skill_cds_ms['q']  = 20_000
+        _state.skill_last_ms['q'] = pygame.time.get_ticks() - 20_001
 
 
 # ─────────────────────────────────────────────────────────────────────────────
