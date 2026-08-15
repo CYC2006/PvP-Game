@@ -1,10 +1,11 @@
-"""Zombie RMB — 腐蝕吐息 Corrosive Spew
+"""Zombie F — 腐蝕吐息 Corrosive Spew
 
-按下 RMB 時鎖定當前瞄準方向，角色進入 0.5 秒完全僵直（比照巨人化 grow/shrink：
+按下 F 時鎖定當前瞄準方向，角色進入 0.5 秒完全僵直（比照巨人化 grow/shrink：
 不能移動、不能射擊、不能使用任何技能）。從第 3 個 tick 起每 3 tick 一波，沿鎖定
 方向朝前吐出，共 10 波、每波 3 顆，總計 30 顆。前進距離與橫向偏移範圍皆隨波次
-線性增加（第 N 波：前進 60N px，橫向偏移 ±6N px，與波次間隔的時長無關），球體半徑各自獨立隨機
-30~40px。每顆球生成後作為地面上的暈眩區域存在 60~72 tick（各自獨立隨機），
+線性增加（第 N 波：前進 60N px，橫向偏移 ±6N px，與波次間隔的時長無關），球體半徑各自獨立
+隨機取自 30~40px 再乘上波次倍率（第 N 波 ×(1+0.1(N-1))，第 1 波 1.0×、第 10 波 1.9×，
+碰撞半徑與視覺結晶同步放大）。每顆球生成後作為地面上的暈眩區域存在 60~72 tick（各自獨立隨機），
 暈眩判定區間結束後不會立刻消失，而是再花 FADE_TICKS（0.3 秒）淡出至完全
 透明才真正移除，純視覺、不再判定碰撞。
 
@@ -26,8 +27,9 @@ BALLS_PER_WAVE   = 3
 TOTAL_TICKS      = WAVE_COUNT * WAVE_INTERVAL         # 30 ticks（完全僵直總時長，0.5s）
 FORWARD_PER_WAVE = 60.0                               # px：前進距離 = 波次編號 × 此值
 LATERAL_PER_WAVE = 6.0                                # px：橫向偏移範圍 = ±(波次編號 × 此值)
-ORB_RADIUS_MIN   = 30.0
+ORB_RADIUS_MIN   = 30.0                               # 第 1 波基準（比例 1.0）
 ORB_RADIUS_MAX   = 40.0
+ORB_SCALE_PER_WAVE = 0.1                              # 每多一波，半徑再放大 10%（第 10 波 = 1.9×）
 ORB_LIFETIME_MIN = 60                                 # tick（1.0s）：暈眩判定區間
 ORB_LIFETIME_MAX = 72                                 # tick（1.2s）：暈眩判定區間
 FADE_TICKS       = 18                                 # tick（0.3s）：判定區間結束後的淡出時長
@@ -65,7 +67,8 @@ def _fire_wave(state, player, wave_idx: int) -> None:
         x = max(20.0, min(float(MAP_WIDTH  - 20), x))
         y = max(20.0, min(float(MAP_HEIGHT - 20), y))
 
-        radius   = random.uniform(ORB_RADIUS_MIN, ORB_RADIUS_MAX)
+        scale    = 1.0 + (wave_idx - 1) * ORB_SCALE_PER_WAVE
+        radius   = random.uniform(ORB_RADIUS_MIN, ORB_RADIUS_MAX) * scale
         lifetime = random.randint(ORB_LIFETIME_MIN, ORB_LIFETIME_MAX)
 
         oid = state._next_zombie_orb_id

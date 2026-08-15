@@ -531,8 +531,6 @@ def read_input(player_id: int, keys_held: set,
             if rmb_just_pressed and (rmb_cd_ms - (now - _state.skill_last_ms['rmb'])) <= 0:
                 use_skill_rmb = True
                 _state.skill_last_ms['rmb'] = now
-                if _state.char_name == 'Zombie':
-                    _state.zombie_spit_end_ms = now + int(_ZOMBIE_SPIT_TICKS * 1000 / 60) + 150
     elif is_stunned and rmb_just_released:
         # 暈眩中放開 RMB：清除 Vince 蓄力狀態，但不觸發技能
         _state.r_holding = False
@@ -563,6 +561,8 @@ def read_input(player_id: int, keys_held: set,
             if _state.char_name == 'Agent':
                 _state.mercury_end_ms   = now + int(_MERCURY_ULT_TICKS * 1000 / 60) + 150  # duration + safety margin
                 _state.mercury_aim_angle = math.degrees(math.atan2(aim_x, -aim_y))
+            if _state.char_name == 'Zombie':
+                _state.zombie_spit_end_ms = now + int(_ZOMBIE_SPIT_TICKS * 1000 / 60) + 150
 
     # ── R 鍵：手動換彈 ────────────────────────────────────────────────────
     _NO_RELOAD = {'Robot', 'Assassin', 'Zombie'}

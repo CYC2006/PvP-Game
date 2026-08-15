@@ -33,7 +33,6 @@ _SKILL_RMB: dict = {
     'Marksman': lambda s, pid, ax, ay: s._spawn_explosion_bullet(pid, ax, ay),
     'Poisoner': lambda s, pid, ax, ay: s._spawn_pool_bullet(pid, ax, ay),
     'Hunter':   lambda s, pid, ax, ay: s._spawn_air_cannon(pid, ax, ay),
-    'Zombie':   lambda s, pid, ax, ay: s._activate_zombie_spit(pid, ax, ay),
     'Robot':    lambda s, pid, ax, ay: s._activate_robot_overload(pid),
 }
 
@@ -57,6 +56,7 @@ _SKILL_R: dict = {
     'Hunter':   lambda s, pid, ax, ay: s._activate_cloak(pid),
     'Marksman': lambda s, pid, ax, ay: s._activate_barrage(pid, ax, ay),
     'Agent':    lambda s, pid, ax, ay: s._activate_mercury_barrage(pid, ax, ay),
+    'Zombie':   lambda s, pid, ax, ay: s._activate_zombie_spit(pid, ax, ay),
 }
 
 

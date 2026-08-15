@@ -172,13 +172,7 @@ _SKILLS: dict = {
         ("—", "F",     0, "Skill under development."),
     ],
     'Zombie': [
-        ("CORROSIVE SPEW", "RMB",   8,
-         "Lock your aim and enter a 1 s full-body freeze — no moving, shooting, "
-         "or other skills. Spews 10 waves of 3 orbs (30 total) along the locked "
-         "direction, one wave every 6 ticks. Each wave lands farther out and "
-         "spreads wider (wave N: 10N px forward, ±N px lateral spread). "
-         "Orbs are light gray, semi-transparent spheres, radius 20-30 px, that linger "
-         "on the ground for 1-1.2 s. Touching one stuns the enemy for 1 s — no damage."),
+        ("—", "RMB",   0, "Skill under development."),
         ("GROUND POUND",  "SPACE", 8,
          "Leap 200 px toward your aim, then slam down. "
          "Enemies caught in the landing shockwave are knocked back and stunned. "
@@ -189,7 +183,14 @@ _SKILLS: dict = {
          "hits also heal you for half the damage dealt (rounded down, no "
          "effect above max HP). A dark red glow pools under your feet, hidden "
          "beneath your model and fading out toward its 60 px edge."),
-        ("—", "F",     0, "Skill under development."),
+        ("CORROSIVE SPEW", "F",   8,
+         "Lock your aim and enter a 0.5 s full-body freeze — no moving, shooting, "
+         "or other skills. Spews 10 waves of 3 orbs (30 total) along the locked "
+         "direction, one wave every 3 ticks. Each wave lands 60 px farther and "
+         "spreads ±6 px wider than the last, up to 600 px / ±60 px on wave 10 — "
+         "orb size grows with each wave too, up to 1.9x by wave 10. Each orb "
+         "deals 6-8 dmg on contact (stacks if orbs overlap), and the first hit "
+         "of the cast also stuns for 1 s."),
     ],
 }
 
