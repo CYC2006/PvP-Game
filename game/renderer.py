@@ -99,6 +99,8 @@ _map_portals: list = []
 # Portal teleport flash effect (additive tint fading over several frames)
 _portal_flash_frames: int = 0
 _PORTAL_FLASH_TOTAL:  int = 18
+# Deathmatch zone: ember particles along the shrinking ring
+_zone_embers: list = []
 # skill HUD 圓形背景 Surface（固定大小，建立一次重複使用）
 _skill_bg_surf: "pygame.Surface | None" = None
 # skill HUD 冷卻扇形 Surface（固定大小，每幀 fill 清空後重繪，省掉 allocation）
@@ -248,6 +250,7 @@ def reset_game_state() -> None:
     _skill_bg_surf       = None
     _skill_pie_surf      = None
     _portal_flash_frames = 0
+    _zone_embers.clear()
 
 
 # 各障礙物種類的粒子顏色（同色系深淺變化）
@@ -539,6 +542,9 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     r_dash_fx.detect_rush_sfx(state, my_id, player_chars or {})
 
     _draw_map(screen, cx, cy)
+    if game_mode == "deathmatch":
+        from game.state import MAP_WIDTH as _mw, MAP_HEIGHT as _mh
+        _draw_zone(screen, cx, cy, state.tick, _mw, _mh)
     r_dash_fx.draw_r_trail(screen, cx, cy)
     airstrike_fx.draw_preview(screen, cx, cy, me.x, me.y, my_id)
 
@@ -674,6 +680,78 @@ def _draw_map(screen, cx, cy):
     if _map_surface is None:
         _map_surface = _build_map_surface()
     screen.blit(_map_surface, (int(cx), int(cy)))
+
+
+def _draw_zone(screen: pygame.Surface, cx: float, cy: float,
+               tick: int, map_w: int, map_h: int) -> None:
+    """Render the deathmatch shrinking zone: danger-area tint, pulsing border, ember particles."""
+    from game.state import get_zone_bounds
+    bounds = get_zone_bounds(tick, map_w, map_h)
+    if bounds is None:
+        return
+    left, top, right, bottom = bounds
+
+    sx_l = int(left  + cx)
+    sx_r = int(right + cx)
+    sy_t = int(top   + cy)
+    sy_b = int(bottom + cy)
+
+    # ── Danger-area additive orange tint (4 strips outside safe zone) ───
+    TINT = (40, 12, 0)
+    for x, y, w, h in (
+        (0,    0,    SCREEN_W,            max(0, sy_t)),
+        (0,    sy_b, SCREEN_W,            max(0, SCREEN_H - sy_b)),
+        (0,    sy_t, max(0, sx_l),        sy_b - sy_t),
+        (sx_r, sy_t, max(0, SCREEN_W - sx_r), sy_b - sy_t),
+    ):
+        if w > 0 and h > 0:
+            screen.fill(TINT, (x, y, w, h), special_flags=pygame.BLEND_RGB_ADD)
+
+    # ── Pulsing orange border ────────────────────────────────────────────
+    bw = max(2, int(4 + 3 * abs(math.sin(tick * 0.08))))
+    zone_rect = pygame.Rect(sx_l, sy_t, sx_r - sx_l, sy_b - sy_t)
+    pygame.draw.rect(screen, (210, 120, 15), zone_rect, bw)
+
+    # ── Ember particles: spawn along border every other tick ─────────────
+    if tick % 2 == 0:
+        for _ in range(random.randint(1, 3)):
+            side = random.randint(0, 3)
+            if side == 0:
+                wx, wy = random.uniform(left, right), float(top)
+            elif side == 1:
+                wx, wy = random.uniform(left, right), float(bottom)
+            elif side == 2:
+                wx, wy = float(left), random.uniform(top, bottom)
+            else:
+                wx, wy = float(right), random.uniform(top, bottom)
+            bright = random.randint(0, 55)
+            _zone_embers.append([
+                wx, wy,
+                random.uniform(-0.5, 0.5),
+                random.uniform(-1.6, -0.5),
+                random.randint(50, 90),
+                0,
+                200 + bright, 90 + bright,
+                random.randint(2, 4),
+            ])
+
+    # ── Update and draw embers ────────────────────────────────────────────
+    alive = []
+    for e in _zone_embers:
+        wx, wy, vx, vy, life, age, er, eg, erad = e
+        age += 1
+        if age >= life:
+            continue
+        wx += vx
+        wy += vy
+        e[0], e[1], e[5] = wx, wy, age
+        alpha = 1.0 - age / life
+        col = (int(er * alpha), int(eg * alpha), 0)
+        ex, ey = int(wx + cx), int(wy + cy)
+        if 0 <= ex < SCREEN_W and 0 <= ey < SCREEN_H:
+            pygame.draw.circle(screen, col, (ex, ey), erad)
+        alive.append(e)
+    _zone_embers[:] = alive
 
 
 # ── 障礙物 ────────────────────────────────────────────────────────────────────

@@ -492,6 +492,8 @@ def run(map_id: int = 0):
                         s.step_robot_e()
                         s.step_air_cannons()
                         s.step_rune_recovery()
+                        if s.game_mode == "deathmatch":
+                            s.step_zone(s.tick, room.map_w, room.map_h)
 
                         # Portal teleportation (Portal map only)
                         if room.portals:

@@ -30,6 +30,9 @@ BULLET_RADIUS    = 5
 DEFAULT_MAX_HP   = 100      # 預設血量（未設定角色時使用）
 BULLET_MAX_RANGE = 900
 
+ZONE_START_TICK  = 10800   # 3 min at 60 Hz — when shrink begins
+ZONE_SHRINK_RATE = 6       # ticks per pixel of half-size reduction
+
 
 class BType(IntEnum):
     """子彈類型常數（取代散落各處的魔術數字）。"""
@@ -178,6 +181,8 @@ class Player:
     # ── Server-side 射速限制 ──────────────────────────────────────────────────
     last_shot_tick: int       = -9999  # tick of last successful shot spawn
     fire_interval_ticks: int  = 0      # min ticks between shots（由 apply_char_stats 設定）
+    # ── Deathmatch zone ───────────────────────────────────────────────────
+    zone_ticks: int           = 0      # consecutive ticks spent in danger zone
 
     def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -200,6 +205,7 @@ class Player:
         self._poison_src_e         = 0
         from game.chars.zombie.sprint_state import ENERGY_MAX
         self.zombie_energy = ENERGY_MAX
+        self.zone_ticks = 0
 
 
 GOLD_RADIUS = 10   # 玩家撿取金錠的碰撞半徑
@@ -423,6 +429,17 @@ _SHOOT_HANDLERS: dict = {
 _BULLET_TYPE_BY_CHAR: dict = {
     'Robot': BType.ROBOT_LASER,
 }
+
+
+def get_zone_bounds(tick: int, map_w: int, map_h: int):
+    """Return (left, top, right, bottom) of the safe zone square, or None if not active."""
+    if tick < ZONE_START_TICK:
+        return None
+    cx = map_w // 2
+    cy = map_h // 2
+    elapsed = tick - ZONE_START_TICK
+    half = max(50, 960 - elapsed // ZONE_SHRINK_RATE)
+    return (cx - half, cy - half, cx + half, cy + half)
 
 
 @dataclass
@@ -1279,6 +1296,29 @@ class GameState:
                 heal = int(p.base_max_hp * 0.05)
                 p.hp = min(p.max_hp, p.hp + heal)
             p.rune_recovery_ticks -= 1
+
+    def step_zone(self, tick: int, map_w: int, map_h: int) -> None:
+        """Deal escalating damage to players outside the shrinking safe zone."""
+        bounds = get_zone_bounds(tick, map_w, map_h)
+        if bounds is None:
+            return
+        left, top, right, bottom = bounds
+        for pid, p in list(self.players.items()):
+            if p.hp <= 0:
+                continue
+            in_safe = left <= p.x <= right and top <= p.y <= bottom
+            if not in_safe:
+                p.zone_ticks += 1
+                if p.zone_ticks % 60 == 0:
+                    second_count = p.zone_ticks // 60
+                    p.hp -= 2 * second_count
+                    if p.hp <= 0:
+                        if self.game_mode == "deathmatch":
+                            self.lives[pid] = max(0, self.lives.get(pid, 3) - 1)
+                        p.zone_ticks = 0
+                        p.respawn()
+            else:
+                p.zone_ticks = 0
 
     def _spawn_stun_bullet(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.pioneer.stun_bullet_state import spawn_stun_bullet
