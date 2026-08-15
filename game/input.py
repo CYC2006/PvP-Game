@@ -1,6 +1,8 @@
 import math
+import random
 import pygame
 from dataclasses import dataclass, field
+from game import audio
 from game.command import PlayerCommand
 from game.chars.vince.giant_state import GROW_TICKS, ACTIVE_TICKS, SHRINK_TICKS, TOTAL_TICKS
 from game.chars.agent.mercury_state import ULT_DURATION as _MERCURY_ULT_TICKS
@@ -16,6 +18,9 @@ _DASH_V0          = 15.0   # 初速 (px/tick)
 _DASH_DECEL       = 0.9    # 每 tick 減速 (px/tick²)
 _DASH_MIN_SPEED   = 7.5    # 低於此速度停止衝刺
 _RAMBO_DASH_SPEED = 8.33   # 等速衝刺速度 (px/tick，保留供未來角色使用)
+
+# ── Agent 音效 ────────────────────────────────────────────────────────────────
+_AGENT_PISTOL_SFX = ('weapon/agent_pistol_1.wav', 'weapon/agent_pistol_2.wav')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -578,6 +583,8 @@ def read_input(player_id: int, keys_held: set,
             _state.current_reload_ms = _state.reload_time_ms
         _state.reloading       = True
         _state.reload_start_ms = now
+        if _state.char_name == 'Agent':
+            audio.play('reload/agent_reload.wav', audio.VOLUME_SELF)
 
     # ── Q 鍵：啟動魔紋（血量上限為被動，cd=-1 不觸發）───────────────────
     use_rune = False
@@ -602,6 +609,8 @@ def read_input(player_id: int, keys_held: set,
             and (now - _state.last_shot_time) >= _state.shoot_cooldown_ms):
         shooting              = True
         _state.last_shot_time = now
+        if _state.char_name == 'Agent':
+            audio.play(random.choice(_AGENT_PISTOL_SFX), audio.VOLUME_SELF)
         if _state.magazine_size < 9999:
             _state.ammo -= 1
             if _state.ammo <= 0:
@@ -609,6 +618,8 @@ def read_input(player_id: int, keys_held: set,
                 _state.reloading         = True
                 _state.reload_start_ms   = now
                 _state.current_reload_ms = _state.reload_time_ms
+                if _state.char_name == 'Agent':
+                    audio.play('reload/agent_reload.wav', audio.VOLUME_SELF)
 
     # ── 技能冷卻資訊（給 HUD）────────────────────────────────────────────
     skill_cooldowns: dict = {}
