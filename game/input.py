@@ -19,8 +19,17 @@ _DASH_DECEL       = 0.9    # 每 tick 減速 (px/tick²)
 _DASH_MIN_SPEED   = 7.5    # 低於此速度停止衝刺
 _RAMBO_DASH_SPEED = 8.33   # 等速衝刺速度 (px/tick，保留供未來角色使用)
 
-# ── Agent 音效 ────────────────────────────────────────────────────────────────
-_AGENT_PISTOL_SFX = ('weapon/agent_pistol_1.wav', 'weapon/agent_pistol_2.wav')
+# ── 角色普攻音效 ──────────────────────────────────────────────────────────────
+_AGENT_PISTOL_SFX  = ('weapon/agent_pistol_1.wav', 'weapon/agent_pistol_2.wav')
+_PIONEER_RIFLE_SFX = ('weapon/pioneer_rifle_1.wav', 'weapon/pioneer_rifle_2.wav',
+                      'weapon/pioneer_rifle_3.wav', 'weapon/pioneer_rifle_4.wav')
+_MARKSMAN_MACHINE_SFX = ('weapon/marksman_machine_1.wav', 'weapon/marksman_machine_2.wav',
+                         'weapon/marksman_machine_3.wav', 'weapon/marksman_machine_4.wav')
+_RELOAD_SFX: dict = {
+    'Agent':    'reload/agent_reload.wav',
+    'Pioneer':  'reload/pioneer_reload.wav',
+    'Marksman': 'reload/marksman_reload.wav',
+}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -583,8 +592,9 @@ def read_input(player_id: int, keys_held: set,
             _state.current_reload_ms = _state.reload_time_ms
         _state.reloading       = True
         _state.reload_start_ms = now
-        if _state.char_name == 'Agent':
-            audio.play('reload/agent_reload.wav', audio.VOLUME_SELF)
+        reload_sfx = _RELOAD_SFX.get(_state.char_name)
+        if reload_sfx:
+            audio.play(reload_sfx, audio.VOLUME_SELF)
 
     # ── Q 鍵：啟動魔紋（血量上限為被動，cd=-1 不觸發）───────────────────
     use_rune = False
@@ -611,6 +621,10 @@ def read_input(player_id: int, keys_held: set,
         _state.last_shot_time = now
         if _state.char_name == 'Agent':
             audio.play(random.choice(_AGENT_PISTOL_SFX), audio.VOLUME_SELF)
+        elif _state.char_name == 'Pioneer':
+            audio.play(random.choice(_PIONEER_RIFLE_SFX), audio.VOLUME_SELF)
+        elif _state.char_name == 'Marksman':
+            audio.play(random.choice(_MARKSMAN_MACHINE_SFX), audio.VOLUME_SELF)
         if _state.magazine_size < 9999:
             _state.ammo -= 1
             if _state.ammo <= 0:
@@ -618,8 +632,9 @@ def read_input(player_id: int, keys_held: set,
                 _state.reloading         = True
                 _state.reload_start_ms   = now
                 _state.current_reload_ms = _state.reload_time_ms
-                if _state.char_name == 'Agent':
-                    audio.play('reload/agent_reload.wav', audio.VOLUME_SELF)
+                reload_sfx = _RELOAD_SFX.get(_state.char_name)
+                if reload_sfx:
+                    audio.play(reload_sfx, audio.VOLUME_SELF)
 
     # ── 技能冷卻資訊（給 HUD）────────────────────────────────────────────
     skill_cooldowns: dict = {}
