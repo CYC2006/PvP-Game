@@ -265,14 +265,6 @@ PARTICLE_COLORS: dict = {
                     (168, 162, 153), (105, 100,  93)],
 }
 
-# HUD stance 顯示顏色
-COL_STANCE = {
-    "stand":   (160, 160, 160),
-    "machine": (255, 200,  60),
-    "hold":    ( 80, 160, 255),
-    "reload":  (255,  90,  90),
-}
-
 
 def _process_hits(state: GameState, obstacles: dict) -> None:
     """
@@ -615,7 +607,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
         _draw_poison_vignette(screen, me.poison_stacks)
     _draw_low_hp_vignette(screen, me.hp, me.max_hp)
 
-    _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns,
+    _draw_hud(screen, state, my_id, font, ammo, is_reloading, skill_cooldowns,
               font_hud=font_hud or font, my_char=my_char)
     _draw_mode_hud(screen, state, font_hud or font, game_mode, elapsed_ms)
     _draw_settings_hud(screen, font, mx, my)
@@ -1247,20 +1239,15 @@ def _draw_diamond(screen, cx, cy, w, h, color, filled: bool) -> None:
     if filled:
         pygame.draw.polygon(screen, color, pts)
     else:
-        pygame.draw.polygon(screen, color, pts, 2)
+        pygame.draw.polygon(screen, color, pts, 4)
 
 
-def _draw_hud(screen, state, my_id, font, my_stance="stand",
+def _draw_hud(screen, state, my_id, font,
               ammo: int = MAGAZINE_SIZE, is_reloading: bool = False,
               skill_cooldowns: dict = None, font_hud=None, my_char: str = "Agent"):
     if font_hud is None:
         font_hud = font
     if my_id in state.players:
-        me = state.players[my_id]
-        screen.blit(font.render(f"Tick {state.tick}", True, COL_TEXT), (8, 8))
-        screen.blit(font.render(f"P{my_id}  ({int(me.x)}, {int(me.y)})", True, COL_TEXT), (8, 26))
-        stance_col = COL_STANCE.get(my_stance, COL_TEXT)
-        screen.blit(font.render(f"[E] {my_stance.upper()}", True, stance_col), (8, 44))
         _draw_ammo_hud(screen, font_hud, ammo, is_reloading)
     if skill_cooldowns:
         _draw_skill_hud(screen, font, skill_cooldowns)
