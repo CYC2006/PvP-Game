@@ -36,7 +36,6 @@ from game.chars.pioneer  import jump_fx as pioneer_jump_fx
 from game.chars.robot    import push_fx as robot_push_fx
 from game.chars.robot    import mark_fx as robot_mark_fx
 from game.chars.robot    import e_fx as robot_e_fx
-from game.chars.robot    import auto_attack_fx as robot_auto_attack_fx
 
 # colours
 COL_BG         = (30,  30,  30)
@@ -538,7 +537,6 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     r_dash_fx.detect_rush_sfx(state, my_id, player_chars or {})
 
     _draw_map(screen, cx, cy)
-    robot_auto_attack_fx.draw(screen, state, my_id, cx, cy, my_char)
     r_dash_fx.draw_r_trail(screen, cx, cy)
     airstrike_fx.draw_preview(screen, cx, cy, me.x, me.y, my_id)
 

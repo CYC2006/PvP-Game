@@ -10,7 +10,7 @@
 透明才真正移除，純視覺、不再判定碰撞。
 
 碰撞判定分兩種，互相獨立：
-- 傷害：每顆球只要碰到敵人就造成一次 6~8 傷害（orb.hit_enemy 旗標，單顆球
+- 傷害：每顆球只要碰到敵人就造成一次固定 5 傷害（orb.hit_enemy 旗標，單顆球
   只會命中一次），多顆球同時疊在同一位置就會疊加成多倍傷害。
 - 暈眩：整次施放只會暈眩對手一次（zombie_spit_hit_enemy 旗標），避免對手
   中招暈眩結束的瞬間又站在另一顆（或同一顆）尚存活的球體範圍內被連續暈眩
@@ -34,8 +34,7 @@ ORB_LIFETIME_MIN = 60                                 # tick（1.0s）：暈眩�
 ORB_LIFETIME_MAX = 72                                 # tick（1.2s）：暈眩判定區間
 FADE_TICKS       = 18                                 # tick（0.3s）：判定區間結束後的淡出時長
 STUN_TICKS       = 60                                 # 1 秒
-DAMAGE_MIN       = 6
-DAMAGE_MAX       = 8
+DAMAGE           = 5                                  # 每顆球固定傷害
 
 
 def activate_spit(state, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -72,7 +71,7 @@ def _fire_wave(state, player, wave_idx: int) -> None:
         lifetime = random.randint(ORB_LIFETIME_MIN, ORB_LIFETIME_MAX)
 
         oid = state._next_zombie_orb_id
-        state._next_zombie_orb_id = (state._next_zombie_orb_id + 1) % 65536
+        state._next_zombie_orb_id = (state._next_zombie_orb_id + 1) % 256
         state.zombie_orbs[oid] = ZombieOrb(
             id=oid, owner_id=player.id, x=x, y=y, radius=radius,
             spawn_tick=state.tick, expire_tick=state.tick + lifetime,
@@ -124,7 +123,7 @@ def step_spit(state) -> None:
             continue
 
         orb.hit_enemy = True
-        damage = random.randint(DAMAGE_MIN, DAMAGE_MAX)
+        damage = DAMAGE
         if enemy.giant_tick >= 0:
             damage = int(damage * 0.8)
         state.apply_damage(enemy_id, damage)

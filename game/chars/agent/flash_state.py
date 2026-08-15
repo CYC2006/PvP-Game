@@ -1,8 +1,8 @@
 import math
 from game.state import Bullet, BType, PLAYER_RADIUS, BULLET_MAX_RANGE
 
-FLASH_RADIUS = 120.0
-FLASH_TICKS  = 180   # 1s 全白 + 2s 恢復 × 60 fps
+FLASH_RADIUS = 200.0
+FLASH_TICKS  = 240   # 2s 全白 + 2s 恢復 × 60 fps
 
 
 def spawn_flash_grenade(state, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -13,7 +13,7 @@ def spawn_flash_grenade(state, owner_id: int, aim_x: float, aim_y: float) -> Non
     if length == 0:
         return
     ux, uy = aim_x / length, aim_y / length
-    SPEED  = 8.8
+    SPEED  = 10.0
     DECEL  = 0.2
     LINGER = 12
     bid = state._next_bullet_id
