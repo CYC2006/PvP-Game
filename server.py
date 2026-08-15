@@ -269,8 +269,7 @@ def run(map_id: int = 0):
                         room.game_mode = join_game_mode
                         configure_map(room.map_w, room.map_h)
                         rooms[join_code] = room
-                    else:
-                        room.game_mode = join_game_mode
+                    # else: room already exists — joiner's mode is ignored; host's mode wins
                     room.waiting[addr] = time.perf_counter()
                     addr_room[addr]    = join_code
                     if len(room.clients) < MAX_PLAYERS:
