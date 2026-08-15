@@ -16,11 +16,25 @@
 import math
 import random
 import pygame
+from game import audio
 from game.render_utils import ws, SCREEN_W, SCREEN_H
 
 BASE_COLOR  = (25, 120, 55)     # 深綠：主體，佔大部分面積
 BASE_ALPHA  = 190
 BASE_SCALE  = 1.0
+
+_was_spitting: dict = {}   # pid → bool，上一幀 zombie_spit_tick 是否 >= 0
+
+
+def detect_spit_sfx(state, my_id: int, player_chars: dict) -> None:
+    for pid, player in state.players.items():
+        if player_chars.get(pid) != 'Zombie':
+            continue
+        spitting = player.zombie_spit_tick >= 0
+        if spitting and not _was_spitting.get(pid, False):
+            volume = audio.VOLUME_SELF if pid == my_id else audio.VOLUME_OTHER
+            audio.play('others/zombie_spew.wav', volume)
+        _was_spitting[pid] = spitting
 
 GLINT_COLOR = (150, 210, 140)   # 淺綠：只作內部小亮點
 GLINT_ALPHA = 110

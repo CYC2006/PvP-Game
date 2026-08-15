@@ -27,11 +27,11 @@ PKT_PONG        = 0x0B   # server → client: probe 回應
 _JOINED_STRUCT = struct.Struct("!BB")
 _CMD_STRUCT    = struct.Struct("!BBffBBffH")  # +B: flags2（bit0=use_rune）
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBBBBBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age vince_taunt_age poison_stacks e_shockwave_seq air_cannon_hit_seq zombie_rage_age agent_dash
+_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBBBBBBBBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age vince_taunt_age poison_stacks e_shockwave_seq air_cannon_hit_seq zombie_rage_age agent_dash assassin_smoke zombie_spit r_skill_phase
 _AIR_CANNON_ENTRY = struct.Struct("!BhhB")  # id x_i16 y_i16 owner_id
 _BULLET_ENTRY  = struct.Struct("!BBffhBB")    # id owner x y angle_i16 bullet_type bullet_scale_u8(×10)
 _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
-_SMOKE_ENTRY   = struct.Struct("!BffHI")     # id x y radius*10 spawn_tick
+_SMOKE_ENTRY   = struct.Struct("!BffHIB")    # id x y radius*10 spawn_tick owner_id
 _BLADE_ENTRY      = struct.Struct("!BhhBbB")   # id x_i16 y_i16 age dir owner_id
 _AIRSTRIKE_ENTRY  = struct.Struct("!BhhBB")    # id cx_i16 cy_i16 age(u8) owner_id
 _LOG_BARRIER_ENTRY = struct.Struct("!BhhBBB")  # id x_i16 y_i16 hp(u8) owner_id radius_u8
@@ -138,6 +138,9 @@ def pack_state(state: GameState) -> bytes:
             p.air_cannon_hit_seq & 0xFF,
             min(254, state.tick - p.zombie_rage_tick) if p.zombie_rage_tick >= 0 else 255,
             1 if p.agent_dash_tick >= 0 else 0,
+            1 if p.assassin_smoke_tick >= 0 else 0,
+            1 if p.zombie_spit_tick >= 0 else 0,
+            1 if p.r_skill_phase > 0 else 0,
         )
         for p in players
     )
@@ -165,7 +168,7 @@ def pack_state(state: GameState) -> bytes:
 
     smokes = list(state.smoke_patches.values())
     s_data = bytes([len(smokes)]) + b"".join(
-        _SMOKE_ENTRY.pack(s.id, s.x, s.y, int(s.radius * 10), s.spawn_tick)
+        _SMOKE_ENTRY.pack(s.id, s.x, s.y, int(s.radius * 10), s.spawn_tick, s.owner_id)
         for s in smokes
     )
 
@@ -289,7 +292,7 @@ def unpack_state(data: bytes) -> GameState:
          giant_age, stun_b, burst_b, clone_b, jump_age, cloak_rem,
          vince_dash, zombie_jump_age, vince_taunt_age,
          poison_stacks_b, e_sw_seq_b, ac_hit_seq_b, zombie_rage_age,
-         agent_dash) = _PLAYER_ENTRY.unpack(
+         agent_dash, assassin_smoke, zombie_spit, r_skill_active) = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
         p = Player(id=pid, x=x, y=y, hp=hp, max_hp=max_hp,
@@ -308,6 +311,9 @@ def unpack_state(data: bytes) -> GameState:
         p.air_cannon_hit_seq       = ac_hit_seq_b
         p.zombie_rage_tick         = tick - zombie_rage_age if zombie_rage_age != 255 else -1
         p.agent_dash_tick          = 0 if agent_dash else -1
+        p.assassin_smoke_tick      = 0 if assassin_smoke else -1
+        p.zombie_spit_tick         = 0 if zombie_spit else -1
+        p.r_skill_phase            = 1 if r_skill_active else 0
         state.players[pid] = p
         state.gold_counts[pid] = gold
         offset += _PLAYER_ENTRY.size
@@ -336,10 +342,10 @@ def unpack_state(data: bytes) -> GameState:
     if offset < len(data):
         s_count = data[offset]; offset += 1
         for _ in range(s_count):
-            sid, sx, sy, r_u16, stick = _SMOKE_ENTRY.unpack(
+            sid, sx, sy, r_u16, stick, sowner = _SMOKE_ENTRY.unpack(
                 data[offset: offset + _SMOKE_ENTRY.size])
             state.smoke_patches[sid] = SmokePatch(
-                id=sid, x=sx, y=sy, radius=r_u16 / 10.0, spawn_tick=stick)
+                id=sid, x=sx, y=sy, radius=r_u16 / 10.0, spawn_tick=stick, owner_id=sowner)
             offset += _SMOKE_ENTRY.size
 
     if offset < len(data):

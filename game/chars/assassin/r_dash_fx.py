@@ -4,7 +4,21 @@ import time
 
 import pygame
 
+from game import audio
 from game.render_utils import SCREEN_W, SCREEN_H, ws
+
+_was_rushing: dict = {}   # pid → bool，上一幀 r_skill_phase 是否 > 0
+
+
+def detect_rush_sfx(state, my_id: int, player_chars: dict) -> None:
+    for pid, player in state.players.items():
+        if player_chars.get(pid) != 'Assassin':
+            continue
+        rushing = player.r_skill_phase > 0
+        if rushing and not _was_rushing.get(pid, False):
+            volume = audio.VOLUME_SELF if pid == my_id else audio.VOLUME_OTHER
+            audio.play('others/assassin_rush.wav', volume)
+        _was_rushing[pid] = rushing
 
 # ── 殘影（速度提升 + R 技能共用）──────────────────────────────────────────────
 # 每筆：[rotated_surface, world_x, world_y, spawn_tick, max_age]

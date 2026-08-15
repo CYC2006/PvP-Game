@@ -32,6 +32,7 @@ from game.chars.marksman     import mine_fx as marksman_mine_fx
 from game.chars.marksman     import turret_fx as marksman_turret_fx
 from game.chars.marksman     import barrage_fx as marksman_barrage_fx
 from game.chars.pioneer  import shield_fx as pioneer_shield_fx
+from game.chars.pioneer  import jump_fx as pioneer_jump_fx
 from game.chars.robot    import push_fx as robot_push_fx
 from game.chars.robot    import mark_fx as robot_mark_fx
 from game.chars.robot    import e_fx as robot_e_fx
@@ -531,6 +532,10 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     my_char = (player_chars or {}).get(my_id, "Agent")
 
     agent_dash_fx.detect(state, my_id, player_chars or {})
+    smoke_fx.detect_smoke_sfx(state, my_id, player_chars or {})
+    zombie_spit_fx.detect_spit_sfx(state, my_id, player_chars or {})
+    pioneer_jump_fx.detect_jump_sfx(state, my_id, player_chars or {})
+    r_dash_fx.detect_rush_sfx(state, my_id, player_chars or {})
 
     _draw_map(screen, cx, cy)
     robot_auto_attack_fx.draw(screen, state, my_id, cx, cy, my_char)
@@ -545,7 +550,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     _draw_debris(screen, cx, cy)
     _draw_particles(screen, cx, cy)
     _draw_gold_ingots(screen, state, cx, cy)
-    _draw_bullets(screen, state, cx, cy, player_chars or {})
+    _draw_bullets(screen, state, cx, cy, player_chars or {}, my_id)
     r_dash_fx.draw_afterimages(screen, cx, cy, state.tick)
     zombie_rage_fx.draw(screen, state, cx, cy)
     _draw_players(screen, state, my_id, cx, cy, font, my_stance, aim_angle_deg,
@@ -822,7 +827,7 @@ def _draw_bullet_shape(screen, char_name: str, color, sx, sy, angle_deg: float,
         pygame.draw.circle(screen, color, (sx, sy), max(1, int(BULLET_RADIUS * bullet_scale)))
 
 
-def _draw_bullets(screen, state, cx, cy, player_chars: dict):
+def _draw_bullets(screen, state, cx, cy, player_chars: dict, my_id: int = None):
     now = time.perf_counter()
     current_bids = set(state.bullets.keys())
 
@@ -831,7 +836,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict):
     bubble_fx.cleanup(current_bids)
     burst_bullet_fx.cleanup(current_bids)
     flash_fx.detect_disappeared(state, now)
-    grenade_fx.detect_disappeared(state, now)
+    grenade_fx.detect_disappeared(state, now, my_id)
     mini_grenade_fx.detect_disappeared(state, now)
     stun_bullet_fx.detect_disappeared(state, now)
     explosion_bullet_fx.detect_disappeared(state, now)

@@ -4,6 +4,7 @@ import time
 
 import pygame
 
+from game import audio
 from game.render_utils import SCREEN_W, SCREEN_H, ws, COL_BULLET
 
 _bullet_pos: dict = {}   # bid → (x, y, owner_id)
@@ -12,14 +13,17 @@ _spin_angle: dict = {}   # bid → 累積 radians
 _sprites:    dict = {}   # owner_id → Surface
 
 
-def detect_disappeared(state, now: float) -> None:
-    """偵測已消失的手榴彈 → 加入爆炸特效佇列。"""
+def detect_disappeared(state, now: float, my_id: int = None) -> None:
+    """偵測已消失的手榴彈 → 加入爆炸特效佇列，並各自播放一次爆炸音效。"""
     current = {bid for bid, b in state.bullets.items()
                if getattr(b, 'bullet_type', 0) == 2}
     for bid in set(_bullet_pos) - current:
         if bid in _bullet_pos:
             bx, by, bowner = _bullet_pos[bid]
             _explosions.append((bx, by, now, bowner))
+            if my_id is not None:
+                volume = audio.VOLUME_SELF if bowner == my_id else audio.VOLUME_OTHER
+                audio.play('others/vince_grenade.wav', volume)
         _bullet_pos.pop(bid, None)
         _spin_angle.pop(bid, None)
 

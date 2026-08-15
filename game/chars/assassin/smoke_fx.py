@@ -2,11 +2,33 @@ import math
 
 import pygame
 
+from game import audio
 from game.render_utils import SCREEN_W, SCREEN_H, ws
 from game.state import PLAYER_RADIUS
 
 _SMOKE_FULL = 360   # 與 smoke_state.SMOKE_DURATION 一致
 _SMOKE_FADE = 60
+
+_SFX_DELAY_TICKS = 72   # 1.2s × 60fps：從煙霧彈施放到真正「變成煙霧」的預估時間差
+
+_was_casting: dict = {}   # pid → bool，上一幀 assassin_smoke_tick 是否 >= 0
+_sfx_due_tick: dict = {}  # pid → 排定播放音效的 tick（None = 沒有排程中）
+
+
+def detect_smoke_sfx(state, my_id: int, player_chars: dict) -> None:
+    for pid, player in state.players.items():
+        if player_chars.get(pid) != 'Assassin':
+            continue
+        casting = player.assassin_smoke_tick >= 0
+        if casting and not _was_casting.get(pid, False):
+            _sfx_due_tick[pid] = state.tick + _SFX_DELAY_TICKS
+        _was_casting[pid] = casting
+
+        due = _sfx_due_tick.get(pid)
+        if due is not None and state.tick >= due:
+            volume = audio.VOLUME_SELF if pid == my_id else audio.VOLUME_OTHER
+            audio.play('others/assassin_smoke.wav', volume)
+            _sfx_due_tick[pid] = None
 
 
 def is_hidden_by_smoke(opponent, local_player, state) -> bool:

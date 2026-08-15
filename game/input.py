@@ -25,6 +25,11 @@ _PIONEER_RIFLE_SFX = ('weapon/pioneer_rifle_1.wav', 'weapon/pioneer_rifle_2.wav'
                       'weapon/pioneer_rifle_3.wav', 'weapon/pioneer_rifle_4.wav')
 _MARKSMAN_MACHINE_SFX = ('weapon/marksman_machine_1.wav', 'weapon/marksman_machine_2.wav',
                          'weapon/marksman_machine_3.wav', 'weapon/marksman_machine_4.wav')
+_HUNTER_SNIPER_SFX = 'weapon/hunter_sniper.wav'
+_ASSASSIN_SHURIKEN_SFX = ('weapon/assassin_shuriken_1.wav', 'weapon/assassin_shuriken_2.wav')
+_ASSASSIN_PELLET_COUNT = 5
+_ASSASSIN_PELLET_INTERVAL_MS = 50   # pellet_interval=3 tick × (1000/60)
+_VINCE_SHOTGUN_SFX = ('weapon/vince_shotgun_1.wav', 'weapon/vince_shotgun_2.wav')
 _RELOAD_SFX: dict = {
     'Agent':    'reload/agent_reload.wav',
     'Pioneer':  'reload/pioneer_reload.wav',
@@ -55,6 +60,7 @@ class InputState:
     ammo:                int   = 12
     reloading:           bool  = False
     reload_start_ms:     int   = 0
+    pending_sfx:         list  = field(default_factory=list)   # [(due_ms, relpath)]，供錯開發射的音效排程用
     # ── 按鍵緣偵測 ───────────────────────────────────────────────────────────
     space_prev:          bool  = False
     e_prev:              bool  = False
@@ -384,6 +390,16 @@ def read_input(player_id: int, keys_held: set,
     from game.render_utils import LOGICAL_W, LOGICAL_H
     now = pygame.time.get_ticks()
 
+    # ── 排程音效（例如錯開發射的連續彈丸）────────────────────────────────
+    if _state.pending_sfx:
+        still_pending = []
+        for due_ms, relpath in _state.pending_sfx:
+            if now >= due_ms:
+                audio.play(relpath, audio.VOLUME_SELF)
+            else:
+                still_pending.append((due_ms, relpath))
+        _state.pending_sfx = still_pending
+
     # ── 換彈完成判斷 ──────────────────────────────────────────────────────
     if _state.reloading and (now - _state.reload_start_ms) >= _state.current_reload_ms:
         _state.reloading = False
@@ -625,6 +641,14 @@ def read_input(player_id: int, keys_held: set,
             audio.play(random.choice(_PIONEER_RIFLE_SFX), audio.VOLUME_SELF)
         elif _state.char_name == 'Marksman':
             audio.play(random.choice(_MARKSMAN_MACHINE_SFX), audio.VOLUME_SELF)
+        elif _state.char_name == 'Hunter':
+            audio.play(_HUNTER_SNIPER_SFX, audio.VOLUME_SELF)
+        elif _state.char_name == 'Assassin':
+            for pellet_i in range(_ASSASSIN_PELLET_COUNT):
+                due_ms = now + pellet_i * _ASSASSIN_PELLET_INTERVAL_MS
+                _state.pending_sfx.append((due_ms, random.choice(_ASSASSIN_SHURIKEN_SFX)))
+        elif _state.char_name == 'Vince':
+            audio.play(random.choice(_VINCE_SHOTGUN_SFX), audio.VOLUME_SELF)
         if _state.magazine_size < 9999:
             _state.ammo -= 1
             if _state.ammo <= 0:

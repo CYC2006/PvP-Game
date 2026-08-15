@@ -143,6 +143,8 @@ class Player:
     r_skill_dy: float         = 0.0  # 第一段滑動方向 y
     r_skill_start_angle: float = 0.0 # 技能啟動時的 aim_angle
     r_skill_dmg_done: int     = 0    # bitmask: 1=phase1 已傷害, 2=phase2 已傷害
+    # ── Assassin E：煙霧彈施放（欄位僅供雙方端音效同步用）────────────────
+    assassin_smoke_tick: int  = -1   # tick when smoke grenade E was cast (-1 = inactive)
     # ── Poisoner 毒素層數系統 ──────────────────────────────────────────
     poison_stacks: int        = 0    # 當前毒素層數（0~5）
     _poison_last_tick: int    = -1   # 上次受到毒素傷害的 tick（-1=從未）
@@ -214,6 +216,7 @@ class SmokePatch:
     y: float
     radius: float
     spawn_tick: int
+    owner_id: int = 0
 
 
 @dataclass
@@ -865,7 +868,7 @@ class GameState:
             elif b.bullet_type == BType.GRENADE:
                 self._trigger_grenade_explosion(b.x, b.y, b.owner_id)
             elif b.bullet_type == BType.SMOKE:
-                self._trigger_smoke_explosion(b.x, b.y)
+                self._trigger_smoke_explosion(b.x, b.y, b.owner_id)
             elif b.bullet_type == BType.MINI_GRENADE:
                 self._trigger_mini_grenade_explosion(b.x, b.y, b.owner_id)
         # 以下無論何種原因消失都觸發
@@ -993,9 +996,9 @@ class GameState:
         from game.chars.assassin.smoke_state import spawn_smoke_grenade
         spawn_smoke_grenade(self, owner_id, aim_x, aim_y)
 
-    def _trigger_smoke_explosion(self, x: float, y: float) -> None:
+    def _trigger_smoke_explosion(self, x: float, y: float, owner_id: int) -> None:
         from game.chars.assassin.smoke_state import trigger_smoke_explosion
-        trigger_smoke_explosion(self, x, y)
+        trigger_smoke_explosion(self, x, y, owner_id)
 
     def step_smoke_patches(self) -> None:
         from game.chars.assassin.smoke_state import step_smoke_patches

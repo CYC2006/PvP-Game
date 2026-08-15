@@ -2,8 +2,9 @@ import math
 import random
 from game.state import Bullet, BType, SmokePatch, PLAYER_RADIUS, BULLET_MAX_RANGE
 
-SMOKE_DURATION = 360   # 6s × 60 fps
-SMOKE_FADE     = 60    # 1s 淡出
+SMOKE_DURATION    = 360   # 6s × 60 fps
+SMOKE_FADE        = 60    # 1s 淡出
+SMOKE_CAST_TICKS  = 90    # 施放狀態同步欄位保留時長（需長於音效延遲 72 tick）
 
 
 def spawn_smoke_grenade(state, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -13,6 +14,7 @@ def spawn_smoke_grenade(state, owner_id: int, aim_x: float, aim_y: float) -> Non
     length = math.hypot(aim_x, aim_y)
     if length == 0:
         return
+    player.assassin_smoke_tick = state.tick
     ux, uy = aim_x / length, aim_y / length
     DECEL  = 0.2
     LINGER = 12
@@ -50,12 +52,12 @@ def spawn_smoke_grenade(state, owner_id: int, aim_x: float, aim_y: float) -> Non
             state._pending_seq += 1
 
 
-def trigger_smoke_explosion(state, x: float, y: float) -> None:
+def trigger_smoke_explosion(state, x: float, y: float, owner_id: int) -> None:
     radius = 130 * random.uniform(0.8, 1.2)
     sid = state._next_smoke_id
     state._next_smoke_id = (state._next_smoke_id + 1) % 256
     state.smoke_patches[sid] = SmokePatch(
-        id=sid, x=x, y=y, radius=radius, spawn_tick=state.tick)
+        id=sid, x=x, y=y, radius=radius, spawn_tick=state.tick, owner_id=owner_id)
 
 
 def step_smoke_patches(state) -> None:
@@ -63,3 +65,8 @@ def step_smoke_patches(state) -> None:
                if state.tick - s.spawn_tick >= SMOKE_DURATION + SMOKE_FADE]
     for sid in expired:
         del state.smoke_patches[sid]
+
+    for player in state.players.values():
+        if (player.assassin_smoke_tick >= 0
+                and state.tick - player.assassin_smoke_tick >= SMOKE_CAST_TICKS):
+            player.assassin_smoke_tick = -1
