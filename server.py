@@ -238,6 +238,18 @@ def run(map_id: int = 0):
                 if room and addr in room.addr_to_id:
                     # Already in session — resend relevant packet(s)
                     pid = room.addr_to_id[addr]
+                    # Host (pid==1) may update map selection before game starts
+                    if (pid == 1 and not room.game_started
+                            and join_map_id != room.map_id):
+                        md = _load_map_data(join_map_id)
+                        room.map_id               = join_map_id
+                        room.obstacles            = md["obstacles"]
+                        room.obstacle_hp_template = md["obstacle_hp_template"]
+                        room.obstacle_hp          = dict(md["obstacle_hp_template"])
+                        room.portals              = md["portals"]
+                        room.map_w                = md["width"]
+                        room.map_h                = md["height"]
+                        configure_map(room.map_w, room.map_h)
                     sock.sendto(pack_joined(pid), addr)
                     if len(room.clients) == MAX_PLAYERS and not room.game_started:
                         sock.sendto(pack_all_joined(), addr)
