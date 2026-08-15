@@ -30,10 +30,13 @@ _ASSASSIN_SHURIKEN_SFX = ('weapon/assassin_shuriken_1.wav', 'weapon/assassin_shu
 _ASSASSIN_PELLET_COUNT = 5
 _ASSASSIN_PELLET_INTERVAL_MS = 50   # pellet_interval=3 tick × (1000/60)
 _VINCE_SHOTGUN_SFX = ('weapon/vince_shotgun_1.wav', 'weapon/vince_shotgun_2.wav')
+_ZOMBIE_MOAN_SFX = ('weapon/zombie_moan_1.wav', 'weapon/zombie_moan_2.wav',
+                    'weapon/zombie_moan_3.wav', 'weapon/zombie_moan_4.wav')
 _RELOAD_SFX: dict = {
     'Agent':    'reload/agent_reload.wav',
     'Pioneer':  'reload/pioneer_reload.wav',
     'Marksman': 'reload/marksman_reload.wav',
+    'Hunter':   'reload/sniper_reload.wav',
 }
 
 
@@ -649,6 +652,8 @@ def read_input(player_id: int, keys_held: set,
                 _state.pending_sfx.append((due_ms, random.choice(_ASSASSIN_SHURIKEN_SFX)))
         elif _state.char_name == 'Vince':
             audio.play(random.choice(_VINCE_SHOTGUN_SFX), audio.VOLUME_SELF)
+        elif _state.char_name == 'Zombie':
+            audio.play(random.choice(_ZOMBIE_MOAN_SFX), audio.VOLUME_SELF)
         if _state.magazine_size < 9999:
             _state.ammo -= 1
             if _state.ammo <= 0:
