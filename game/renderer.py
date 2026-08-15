@@ -12,6 +12,7 @@ from game.render_utils import (LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _
 
 from game.chars.agent    import flash_fx
 from game.chars.agent    import burst_bullet_fx
+from game.chars.agent    import dash_fx as agent_dash_fx
 from game.chars.vince    import grenade_fx, airstrike_fx
 from game.chars.vince    import taunt_fx as vince_taunt_fx
 from game.chars.pioneer  import stun_bullet_fx
@@ -528,6 +529,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     cx, cy = _camera(me)
 
     my_char = (player_chars or {}).get(my_id, "Agent")
+
+    agent_dash_fx.detect(state, my_id, player_chars or {})
 
     _draw_map(screen, cx, cy)
     robot_auto_attack_fx.draw(screen, state, my_id, cx, cy, my_char)

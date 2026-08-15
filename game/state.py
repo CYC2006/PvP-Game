@@ -165,6 +165,8 @@ class Player:
     mercury_aim_x: float      = 0.0  # locked aim direction (unit vector)
     mercury_aim_y: float      = 0.0
     mercury_volley_fired: int = 0    # volleys fired so far (0–7)
+    # ── Agent Space：衝刺（純位移，欄位僅供對手端音效同步用）──────────────────
+    agent_dash_tick: int      = -1   # tick when dash started (-1 = inactive)
     # ── Hunter RMB 空氣炮命中序號 ─────────────────────────────────────────────
     air_cannon_hit_seq: int   = 0    # increments each time owner's air cannon hits; client resets RMB CD
     # ── Server-side 射速限制 ──────────────────────────────────────────────────
@@ -1361,6 +1363,15 @@ class GameState:
     def step_vince_dash(self, obstacles: dict = None) -> None:
         from game.chars.vince.dash_state import step_vince_dash
         step_vince_dash(self, obstacles)
+
+    # ── Agent Space：衝刺 ────────────────────────────────────────────────────
+    def _activate_agent_dash(self, owner_id: int) -> None:
+        from game.chars.agent.dash_state import activate_agent_dash
+        activate_agent_dash(self, owner_id)
+
+    def step_agent_dash(self) -> None:
+        from game.chars.agent.dash_state import step_agent_dash
+        step_agent_dash(self)
 
     # ── Zombie Space：跳躍衝擊 ───────────────────────────────────────────────
     def _activate_zombie_jump(self, owner_id: int, aim_x: float, aim_y: float) -> None:

@@ -230,6 +230,23 @@ def _space_poisoner(st: InputState, dx: float, dy: float,
     return True, dx, dy, 1.0
 
 
+def _space_agent(st: InputState, dx: float, dy: float,
+                 aim_x: float, aim_y: float, now: int) -> tuple:
+    """衝刺：client 端位移預測同 _default_space_dash，另通知 server 供對手端音效同步。"""
+    length = math.hypot(dx, dy)
+    if length == 0:
+        return False, dx, dy, 1.0
+    ndx = dx / length
+    ndy = dy / length
+    st.dash_active            = True
+    st.dash_dx                = ndx
+    st.dash_dy                = ndy
+    st.dash_speed             = _DASH_V0 - _DASH_DECEL
+    st.skill_last_ms['space'] = now
+    speed_mult = _DASH_V0 / max(st.player_speed, 0.001)
+    return True, ndx, ndy, speed_mult
+
+
 def _default_space_dash(st: InputState, dx: float, dy: float,
                         aim_x: float, aim_y: float, now: int) -> tuple:
     """預設：純 client 端衝刺，不通知 server（use_skill_space=False）。"""
@@ -251,6 +268,7 @@ def _default_space_dash(st: InputState, dx: float, dy: float,
 # Vince 與 Marksman 各自獨立：目前程式碼相同，但設計意圖不同（嘲諷 vs 衝刺）。
 # Assassin：no-op 佔位，避免 fallthrough 到 _default_space_dash。
 _SPACE_HANDLERS: dict = {
+    'Agent':    _space_agent,
     'Vince':    _space_vince,
     'Marksman': _space_marksman,
     'Hunter':   _space_hunter,

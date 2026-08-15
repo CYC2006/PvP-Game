@@ -38,6 +38,7 @@ _SKILL_RMB: dict = {
 }
 
 _SKILL_SPACE: dict = {
+    'Agent':    lambda s, pid, ax, ay: s._activate_agent_dash(pid),
     'Assassin': lambda s, pid, ax, ay: s._activate_speed_boost(pid),
     'Hunter':   lambda s, pid, ax, ay: s._spawn_mini_grenades(pid),
     'Robot':    lambda s, pid, ax, ay: s._activate_robot_space(pid),
@@ -434,6 +435,7 @@ def run(map_id: int = 0):
                         s.step_zombie_rage()
                         s.step_vince_taunt()
                         s.step_vince_dash(room.obstacles)
+                        s.step_agent_dash()
                         s.resolve_player_collisions(room.obstacles)
                         s.step_gold_collection()
                         s.step_status_effects()
