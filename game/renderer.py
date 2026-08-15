@@ -1153,6 +1153,8 @@ def _draw_opponent_hp_bar(screen, hp: int, max_hp: int, cx: int, y: int):
 _COL_BLUE_TEAM = ( 80, 160, 255)   # Agent 子彈藍
 _COL_RED_TEAM  = (255,  70,  70)   # 紅方
 
+_dm_timer_font: list = []   # lazy-loaded 48pt bold for deathmatch timer
+
 
 def _draw_mode_hud(screen, state, font, game_mode: str, elapsed_ms: int) -> None:
     """頂部中央模式 HUD：Endless = 擊殺計數；Deathmatch = 菱形生命 + 計時器。"""
@@ -1168,12 +1170,9 @@ def _draw_mode_hud(screen, state, font, game_mode: str, elapsed_ms: int) -> None
         k1 = state.kill_counts.get(pid1, 0)
         k2 = state.kill_counts.get(pid2, 0)
 
-        big_font  = font
-        col_surf  = pygame.Surface((1, 1), pygame.SRCALPHA)   # dummy
-
-        s1  = big_font.render(str(k1), True, _COL_BLUE_TEAM)
-        s2  = big_font.render(str(k2), True, _COL_RED_TEAM)
-        sep = big_font.render(":", True, (220, 220, 220))
+        s1  = font.render(str(k1), True, _COL_BLUE_TEAM)
+        s2  = font.render(str(k2), True, _COL_RED_TEAM)
+        sep = font.render(":", True, (220, 220, 220))
 
         gap   = 10
         total = s1.get_width() + gap + sep.get_width() + gap + s2.get_width()
@@ -1181,16 +1180,23 @@ def _draw_mode_hud(screen, state, font, game_mode: str, elapsed_ms: int) -> None
 
         screen.blit(s1,  (x, Y))
         x += s1.get_width() + gap
-        # 冒號垂直置中對齊數字
         screen.blit(sep, (x, Y + (s1.get_height() - sep.get_height()) // 2))
         x += sep.get_width() + gap
         screen.blit(s2,  (x, Y))
 
     elif game_mode == "deathmatch":
-        # 菱形尺寸 3:4 (寬:高)
-        DW, DH   = 18, 24
-        D_GAP    = 6
-        TIMER_GAP = 20
+        # 菱形尺寸 3:4（放大 1.5×）
+        DW, DH    = 27, 36
+        D_GAP     = 9
+        TIMER_GAP = 24
+
+        # 計時器字體（48pt，lazy-load）
+        if not _dm_timer_font:
+            import os as _os
+            _dm_timer_font.append(
+                pygame.font.Font(
+                    _os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf"), 48))
+        timer_font = _dm_timer_font[0]
 
         lives1 = state.lives.get(pid1, 3)
         lives2 = state.lives.get(pid2, 3)
@@ -1199,33 +1205,35 @@ def _draw_mode_hud(screen, state, font, game_mode: str, elapsed_ms: int) -> None
         mm = total_secs // 60
         ss = total_secs % 60
         timer_str = f"{mm:02d}:{ss:02d}"
-        timer_s   = font.render(timer_str, True, (220, 220, 220))
+        timer_s   = timer_font.render(timer_str, True, (220, 220, 220))
 
-        # 計時器置中
-        tx = CX - timer_s.get_width() // 2
+        # 菱形群組寬度
+        diamonds_w = 3 * DW + 2 * D_GAP
+
+        # 整體 HUD 寬度置中
+        total_w = diamonds_w + TIMER_GAP + timer_s.get_width() + TIMER_GAP + diamonds_w
+        hud_x   = CX - total_w // 2
+
+        # 計時器位置
+        tx = hud_x + diamonds_w + TIMER_GAP
         ty = Y
         screen.blit(timer_s, (tx, ty))
         timer_cy = ty + timer_s.get_height() // 2
 
-        # 藍方菱形：從計時器左邊往左排，最靠近計時器的是最後一顆
-        diamonds_w = 3 * DW + 2 * D_GAP
-        bx_right   = tx - TIMER_GAP   # 藍方最右顆 x 右邊緣
+        # 藍方菱形：緊貼計時器左側，j=0 最左（最遠），j=2 最右（最近中心）
+        # 失去生命從中心（j=2）往外（j=0）變空心
         for j in range(3):
-            # j=0 最左(最遠)，j=2 最靠近計時器
-            filled = (j < lives1)
-            col    = _COL_BLUE_TEAM
-            dx     = bx_right - (2 - j) * (DW + D_GAP)
-            dy     = timer_cy
-            _draw_diamond(screen, dx + DW // 2, dy, DW, DH, col, filled)
+            filled = (j < lives1)           # j=2 最先變空 → 正確
+            dx = hud_x + j * (DW + D_GAP)
+            _draw_diamond(screen, dx + DW // 2, timer_cy, DW, DH, _COL_BLUE_TEAM, filled)
 
-        # 紅方菱形：從計時器右邊往右排，最靠近計時器的是第一顆
-        rx_left = tx + timer_s.get_width() + TIMER_GAP
+        # 紅方菱形：緊貼計時器右側，j=0 最左（最近中心），j=2 最右（最遠）
+        # 失去生命從中心（j=0）往外（j=2）變空心 → filled = (j >= 3 - lives2)
+        rx_start = tx + timer_s.get_width() + TIMER_GAP
         for j in range(3):
-            filled = (j < lives2)
-            col    = _COL_RED_TEAM
-            dx     = rx_left + j * (DW + D_GAP)
-            dy     = timer_cy
-            _draw_diamond(screen, dx + DW // 2, dy, DW, DH, col, filled)
+            filled = (j >= 3 - lives2)      # j=0 最先變空 → 從中心開始
+            dx = rx_start + j * (DW + D_GAP)
+            _draw_diamond(screen, dx + DW // 2, timer_cy, DW, DH, _COL_RED_TEAM, filled)
 
 
 def _draw_diamond(screen, cx, cy, w, h, color, filled: bool) -> None:
