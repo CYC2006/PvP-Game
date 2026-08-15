@@ -136,6 +136,9 @@ class Player:
     # ── Zombie 普攻（血刃 blade arc）：6 片刀片視為同一次攻擊 ───────────
     zombie_blade_hit_player:   bool = False  # 本次普攻是否已對玩家造成過傷害
     zombie_blade_hit_obstacle: bool = False  # 本次普攻是否已對障礙物造成過傷害
+    # ── Zombie RMB 體力衝刺 ─────────────────────────────────────────
+    zombie_energy:      float = 300.0  # 0~300，按住 RMB 消耗、放開回復
+    zombie_base_speed:  float = 0.0    # 由 apply_char_stats 記錄，供放開 RMB 時還原
     # ── Assassin R 技能狀態 ───────────────────────────────────────
     r_skill_phase: int        = 0    # 0=inactive 1=phase1 2=phase2
     r_skill_tick: int         = 0    # 當前階段已過 ticks
@@ -196,6 +199,8 @@ class Player:
         self._poison_src_rmb       = 0
         self._poison_src_space_pool = 0
         self._poison_src_e         = 0
+        from game.chars.zombie.sprint_state import ENERGY_MAX
+        self.zombie_energy = ENERGY_MAX
 
 
 GOLD_RADIUS = 10   # 玩家撿取金錠的碰撞半徑
@@ -486,6 +491,7 @@ class GameState:
         p.base_max_hp  = p.max_hp   # 記錄原始血量上限（供魔紋回復計算）
         p.hp           = p.max_hp
         p.speed        = float(get_stat(char_name, "speed"))
+        p.zombie_base_speed = p.speed
         p.damage_min   = get_stat(char_name, "damage_min")
         p.damage_max   = get_stat(char_name, "damage_max")
         p.bullet_speed = float(get_stat(char_name, "bullet_speed")) * BULLET_SPEED
@@ -521,7 +527,7 @@ class GameState:
     def apply_command(self, player_id: int, dx: float, dy: float,
                       shooting: bool, aim_x: float, aim_y: float,
                       running: bool = False, stance: str = "machine",
-                      speed_mult: float = 1.0) -> None:
+                      speed_mult: float = 1.0, rmb_held: bool = False) -> None:
         if player_id not in self.players:
             return
         player = self.players[player_id]
@@ -542,7 +548,7 @@ class GameState:
             if player._shoot_slow_timer > 0:
                 player._shoot_slow_timer -= 1
             return
-        # Zombie RMB 施放中（腐蝕吐息）：完全僵直，比照巨大化放大/縮小階段
+        # Zombie F 鍵施放中（腐蝕吐息）：完全僵直，比照巨大化放大/縮小階段
         if player.zombie_spit_tick >= 0:
             if player._shoot_slow_timer > 0:
                 player._shoot_slow_timer -= 1
@@ -557,6 +563,10 @@ class GameState:
             player._shoot_slow_timer = player._shoot_slow_ticks
         elif player._shoot_slow_timer > 0:
             player._shoot_slow_timer -= 1
+        # Zombie RMB：體力衝刺（更新 player.speed，供下方 move() 使用）
+        if player.char_name == 'Zombie':
+            from game.chars.zombie.sprint_state import step_zombie_sprint
+            step_zombie_sprint(player, rmb_held)
         if speed_mult != 1.0:
             mult = speed_mult          # 技能位移（衝刺等）：最高優先，不疊加 boost
         elif player._shoot_slow_timer > 0:

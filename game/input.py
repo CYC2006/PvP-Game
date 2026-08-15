@@ -690,5 +690,6 @@ def read_input(player_id: int, keys_held: set,
         use_skill_space = use_skill_space,
         use_skill_r     = use_skill_r,
         use_rune        = use_rune,
+        rmb_held        = rmb_held,
     )
     return cmd, effective_stance, _state.ammo, _state.reloading, skill_cooldowns

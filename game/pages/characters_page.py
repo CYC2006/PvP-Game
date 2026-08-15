@@ -172,7 +172,11 @@ _SKILLS: dict = {
         ("—", "F",     0, "Skill under development."),
     ],
     'Zombie': [
-        ("—", "RMB",   0, "Skill under development."),
+        ("ENERGY SPRINT", "RMB", 0,
+         "Base move speed is a slow 100 px/s — hold RMB to sprint, drawing from a "
+         "300-point energy bar (-1/tick while held, +0.5/tick while released). "
+         "Sprint speed scales with remaining energy, from 300 px/s down to a "
+         "120 px/s floor at empty. No cooldown — it's a resource, not a skill."),
         ("GROUND POUND",  "SPACE", 8,
          "Leap 200 px toward your aim, then slam down. "
          "Enemies caught in the landing shockwave are knocked back and stunned. "

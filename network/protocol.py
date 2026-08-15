@@ -25,9 +25,9 @@ PKT_PONG        = 0x0B   # server → client: probe 回應
 #   | ba_count(B) | [id(B) x(h) y(h) age(B) dir(b) owner(B)] * ba_count |
 
 _JOINED_STRUCT = struct.Struct("!BB")
-_CMD_STRUCT    = struct.Struct("!BBffBBffH")  # +B: flags2（bit0=use_rune）
+_CMD_STRUCT    = struct.Struct("!BBffBBffH")  # +B: flags2（bit0=use_rune bit1=rmb_held）
 _STATE_HDR     = struct.Struct("!BI")
-_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBBBBBBBBBBB")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age vince_taunt_age poison_stacks e_shockwave_seq air_cannon_hit_seq zombie_rage_age agent_dash assassin_smoke zombie_spit r_skill_phase
+_PLAYER_ENTRY  = struct.Struct("!BffHHhBHBHBBBBBBBBBBBBBBBBH")  # id x y hp max_hp aim_angle stance gold flash_ticks giant_age stun_ticks burst_shots_left clone_ticks jump_age cloak_rem vince_dash zombie_jump_age vince_taunt_age poison_stacks e_shockwave_seq air_cannon_hit_seq zombie_rage_age agent_dash assassin_smoke zombie_spit r_skill_phase zombie_energy
 _AIR_CANNON_ENTRY = struct.Struct("!BhhB")  # id x_i16 y_i16 owner_id
 _BULLET_ENTRY  = struct.Struct("!BBffhBB")    # id owner x y angle_i16 bullet_type bullet_scale_u8(×10)
 _GOLD_ENTRY    = struct.Struct("!BffB")       # id x y kind(0=gold,1=health)
@@ -79,7 +79,7 @@ def unpack_joined(data: bytes) -> int:
 def pack_command(cmd: PlayerCommand) -> bytes:
     # flags bit 0=shooting  bit 1=running  bits 2-3=stance  bit 4=use_skill_e
     #       bit 5=use_skill_rmb  bit 6=use_skill_space  bit 7=use_skill_r
-    # flags2 bit 0=use_rune
+    # flags2 bit 0=use_rune  bit 1=rmb_held（持續狀態，非邊緣觸發；Zombie 體力衝刺用）
     stance_bits = _STANCE_TO_INT.get(cmd.stance, 0) << 2
     flags = (int(cmd.shooting)
              | (int(cmd.running)          << 1)
@@ -88,7 +88,7 @@ def pack_command(cmd: PlayerCommand) -> bytes:
              | (int(cmd.use_skill_rmb)   << 5)
              | (int(cmd.use_skill_space) << 6)
              | (int(cmd.use_skill_r)     << 7))
-    flags2    = int(cmd.use_rune)
+    flags2    = int(cmd.use_rune) | (int(cmd.rmb_held) << 1)
     speed_raw = max(0, min(65535, int(cmd.speed_mult * 1000)))
     return _CMD_STRUCT.pack(
         PKT_CMD, cmd.player_id,
@@ -110,7 +110,8 @@ def unpack_command(data: bytes) -> PlayerCommand:
                          use_skill_rmb=bool((flags >> 5) & 0x01),
                          use_skill_space=bool((flags >> 6) & 0x01),
                          use_skill_r=bool((flags >> 7) & 0x01),
-                         use_rune=bool(flags2 & 0x01))
+                         use_rune=bool(flags2 & 0x01),
+                         rmb_held=bool((flags2 >> 1) & 0x01))
 
 
 def pack_state(state: GameState) -> bytes:
@@ -141,6 +142,7 @@ def pack_state(state: GameState) -> bytes:
             1 if p.assassin_smoke_tick >= 0 else 0,
             1 if p.zombie_spit_tick >= 0 else 0,
             1 if p.r_skill_phase > 0 else 0,
+            max(0, min(300, int(round(p.zombie_energy)))),
         )
         for p in players
     )
@@ -292,7 +294,8 @@ def unpack_state(data: bytes) -> GameState:
          giant_age, stun_b, burst_b, clone_b, jump_age, cloak_rem,
          vince_dash, zombie_jump_age, vince_taunt_age,
          poison_stacks_b, e_sw_seq_b, ac_hit_seq_b, zombie_rage_age,
-         agent_dash, assassin_smoke, zombie_spit, r_skill_active) = _PLAYER_ENTRY.unpack(
+         agent_dash, assassin_smoke, zombie_spit, r_skill_active,
+         zombie_energy) = _PLAYER_ENTRY.unpack(
             data[offset: offset + _PLAYER_ENTRY.size])
         stance = _INT_TO_STANCE.get(stance_u8, "stand")
         p = Player(id=pid, x=x, y=y, hp=hp, max_hp=max_hp,
@@ -314,6 +317,7 @@ def unpack_state(data: bytes) -> GameState:
         p.assassin_smoke_tick      = 0 if assassin_smoke else -1
         p.zombie_spit_tick         = 0 if zombie_spit else -1
         p.r_skill_phase            = 1 if r_skill_active else 0
+        p.zombie_energy            = float(zombie_energy)
         state.players[pid] = p
         state.gold_counts[pid] = gold
         offset += _PLAYER_ENTRY.size

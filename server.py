@@ -358,7 +358,7 @@ def run(map_id: int = 0):
                         cmd.move_x, cmd.move_y,
                         cmd.shooting, cmd.aim_x, cmd.aim_y,
                         cmd.running, cmd.stance,
-                        cmd.speed_mult,
+                        cmd.speed_mult, cmd.rmb_held,
                     )
                 except Exception as cmd_err:
                     import traceback

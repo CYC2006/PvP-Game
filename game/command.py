@@ -17,3 +17,4 @@ class PlayerCommand:
     use_skill_space: bool = False
     use_skill_r: bool = False
     use_rune:    bool = False
+    rmb_held:    bool = False  # 持續狀態（非邊緣觸發），目前只有 Zombie 體力衝刺使用

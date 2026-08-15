@@ -610,7 +610,7 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     _draw_low_hp_vignette(screen, me.hp, me.max_hp)
 
     _draw_hud(screen, state, my_id, font, my_stance, ammo, is_reloading, skill_cooldowns,
-              font_hud=font_hud or font)
+              font_hud=font_hud or font, my_char=my_char)
     _draw_settings_hud(screen, font, mx, my)
 
 
@@ -1073,7 +1073,7 @@ def _draw_opponent_hp_bar(screen, hp: int, max_hp: int, cx: int, y: int):
 
 def _draw_hud(screen, state, my_id, font, my_stance="stand",
               ammo: int = MAGAZINE_SIZE, is_reloading: bool = False,
-              skill_cooldowns: dict = None, font_hud=None):
+              skill_cooldowns: dict = None, font_hud=None, my_char: str = "Agent"):
     if font_hud is None:
         font_hud = font
     if my_id in state.players:
@@ -1085,7 +1085,7 @@ def _draw_hud(screen, state, my_id, font, my_stance="stand",
         _draw_ammo_hud(screen, font_hud, ammo, is_reloading)
     if skill_cooldowns:
         _draw_skill_hud(screen, font, skill_cooldowns)
-    _draw_hp_bar(screen, state, my_id, font_hud)
+    _draw_hp_bar(screen, state, my_id, font_hud, my_char)
 
 
 def _draw_ammo_hud(screen, font, ammo: int, is_reloading: bool) -> None:
@@ -1235,7 +1235,7 @@ def _draw_rune_hud(screen, font, skill_cooldowns: dict) -> None:
                                hud_y + name_surf.get_height() + 4 - 2))
 
 
-def _draw_hp_bar(screen, state, my_id, font):
+def _draw_hp_bar(screen, state, my_id, font, my_char: str = "Agent"):
     bar_y  = SCREEN_H - HP_BAR_Y_FROM_BOTTOM
     player = state.players.get(my_id)
     hp     = player.hp     if player else 0
@@ -1270,27 +1270,51 @@ def _draw_hp_bar(screen, state, my_id, font):
     screen.blit(lbl_left,  (HP_BAR_X, label_y))
     screen.blit(lbl_right, (HP_BAR_X + HP_BAR_W - lbl_right.get_width(), label_y))
 
-    # ── 護盾血條（Soldier E，在 HP 條右方）────────────────────────────────
+    # ── 護盾條 / 能量條共用位置：疊在 HP 條「上方」，避免向右延伸擋到技能圓圈 ──
+    upper_bar_y   = bar_y - HP_BAR_H - 34
+    upper_label_y = upper_bar_y - 30
+
+    # ── 護盾血條（Soldier E）─────────────────────────────────────────────
     shield = state.shields.get(my_id)
     if shield is not None and shield.broken_tick < 0:
-        sh_x      = HP_BAR_X + HP_BAR_W + 20
         sh_ratio  = max(0.0, shield.hp / shield.max_hp) if shield.max_hp > 0 else 0.0
         COL_SH_BG     = (40, 40, 50)
         COL_SH_FILL   = (190, 200, 220)
         COL_SH_BORDER = (150, 160, 180)
         pygame.draw.rect(screen, COL_SH_BG,
-                         (sh_x, bar_y, HP_BAR_W, HP_BAR_H), border_radius=4)
+                         (HP_BAR_X, upper_bar_y, HP_BAR_W, HP_BAR_H), border_radius=4)
         sh_fill_w = int(HP_BAR_W * sh_ratio)
         if sh_fill_w > 0:
             pygame.draw.rect(screen, COL_SH_FILL,
-                             (sh_x, bar_y, sh_fill_w, HP_BAR_H), border_radius=4)
+                             (HP_BAR_X, upper_bar_y, sh_fill_w, HP_BAR_H), border_radius=4)
         pygame.draw.rect(screen, COL_SH_BORDER,
-                         (sh_x, bar_y, HP_BAR_W, HP_BAR_H), 2, border_radius=4)
+                         (HP_BAR_X, upper_bar_y, HP_BAR_W, HP_BAR_H), 2, border_radius=4)
         # 護盾標籤：置左 "SHIELD"，置右 "x / max"
         sh_lbl_left  = font.render("SHIELD", True, COL_SH_FILL)
         sh_lbl_right = font.render(f"{shield.hp} / {shield.max_hp}", True, COL_SH_FILL)
-        screen.blit(sh_lbl_left,  (sh_x, label_y))
-        screen.blit(sh_lbl_right, (sh_x + HP_BAR_W - sh_lbl_right.get_width(), label_y))
+        screen.blit(sh_lbl_left,  (HP_BAR_X, upper_label_y))
+        screen.blit(sh_lbl_right, (HP_BAR_X + HP_BAR_W - sh_lbl_right.get_width(), upper_label_y))
+
+    # ── 能量條（Zombie RMB 體力衝刺；與護盾條互斥，共用同一格）──────────────
+    if my_char == 'Zombie' and player is not None:
+        en_ratio     = max(0.0, min(1.0, player.zombie_energy / 300.0))
+        en_displayed = int(player.zombie_energy // 5)   # 顯示用：除以 5 無條件捨去，避免每 tick 跳動看起來太快
+        COL_EN_BG     = (20, 40, 25)
+        COL_EN_FILL   = (70, 210, 90)
+        COL_EN_BORDER = (50, 150, 65)
+        pygame.draw.rect(screen, COL_EN_BG,
+                         (HP_BAR_X, upper_bar_y, HP_BAR_W, HP_BAR_H), border_radius=4)
+        en_fill_w = int(HP_BAR_W * en_ratio)
+        if en_fill_w > 0:
+            pygame.draw.rect(screen, COL_EN_FILL,
+                             (HP_BAR_X, upper_bar_y, en_fill_w, HP_BAR_H), border_radius=4)
+        pygame.draw.rect(screen, COL_EN_BORDER,
+                         (HP_BAR_X, upper_bar_y, HP_BAR_W, HP_BAR_H), 2, border_radius=4)
+        # 能量標籤：置左 "ENERGY"，置右 "x / 60"（顯示值，內部仍以 0~300 記錄）
+        en_lbl_left  = font.render("ENERGY", True, COL_EN_FILL)
+        en_lbl_right = font.render(f"{en_displayed} / 60", True, COL_EN_FILL)
+        screen.blit(en_lbl_left,  (HP_BAR_X, upper_label_y))
+        screen.blit(en_lbl_right, (HP_BAR_X + HP_BAR_W - en_lbl_right.get_width(), upper_label_y))
 
 
 def _draw_waiting(screen, font):
