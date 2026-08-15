@@ -358,10 +358,8 @@ def read_input(player_id: int, keys_held: set,
         _state.ammo      = _state.magazine_size
 
     from game.char_data import CHAR_STATS as _cs
-    _cdata           = _cs.get(_state.char_name, {})
-    _default_sprite  = _cdata.get('sprite', 'machine')
-    _has_reload      = _cdata.get('has_reload_sprite', False)
-    effective_stance = ("reload" if _has_reload else _default_sprite) if _state.reloading else _default_sprite
+    _default_sprite  = _cs.get(_state.char_name, {}).get('sprite', 'machine')
+    effective_stance = "reload" if _state.reloading else _default_sprite
 
     lx, ly            = logical_mouse
     aim_x             = float(lx - LOGICAL_W // 2)

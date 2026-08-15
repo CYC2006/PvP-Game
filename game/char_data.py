@@ -73,7 +73,6 @@ def _load() -> tuple[dict, list]:
             'bullet_speed':      f('bspeed_pxs') / _BSPEED_DENOM,
             'spread':            f('spread'),
             'sprite':            s('sprite') or 'machine',       # 預設造型後綴
-            'has_reload_sprite': bool(i('has_reload_sprite')),   # 是否有換彈造型
         }
 
         # 特殊武器欄位（空白 → 略過；apply_char_stats 會用預設值）
