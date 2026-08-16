@@ -36,166 +36,154 @@ _RATINGS: dict = {
 _SKILLS: dict = {
     'Agent': [
         ("POWER SHOT",    "RMB",   4,
-         "Fire a single enhanced bullet — twice the normal size, double damage, "
-         "zero spread, and a knockback on hit. A glowing afterimage trail marks its path."),
+         "Fires a single oversized bullet — twice the normal size — trailing "
+         "a glowing afterimage. It flies dead straight for double damage and "
+         "knocks the target back on hit."),
         ("DASH",          "SPACE", 3,
-         "Lunge in the current movement direction for a rapid burst of speed. "
-         "Requires an active movement input to trigger; no direction, no dash."),
+         "Lunges forward in a quick burst of speed, moving in whatever "
+         "direction you're currently heading."),
         ("FLASH GRENADE", "E",     6,
-         "Lobs a stun grenade that detonates on landing. "
-         "Any enemy inside the blast radius is briefly blinded and disoriented."),
+         "Lobs a grenade that flashes on landing, blinding and disorienting "
+         "any enemy caught in the blast."),
         ("MERCURY BARRAGE","F",    12,
-         "Lock your aim and unleash 7 volleys of 5 bullets in a spread fan "
-         "(-12° / -6° / 0° / +6° / +12°), one volley every 6 ticks. "
-         "35 bullets total over 0.6 seconds. "
-         "No spread, same damage and range as normal shots. "
-         "Aim is fixed for the full duration; LMB, RMB, SPACE, and E are locked. "
-         "Q (rune) and movement remain available."),
+         "Locks your aim and unleashes a fan-shaped barrage of 7 volleys, "
+         "5 bullets each. Movement and your rune stay usable, but shooting "
+         "and other skills are locked until it finishes."),
     ],
     'Vince': [
         ("AIRSTRIKE",     "RMB",   5,
-         "Calls a sequence of bombs along the aimed trajectory. "
-         "Impacts land in a line with a short delay, covering a wide zone."),
+         "Calls in a line of bombs along your aim, each impact landing a "
+         "moment after the last to blanket a wide area."),
         ("TAUNT",         "SPACE", 9,
-         "Release a lavender shockwave that expands from 60 px to 600 px over 1 second. "
-         "Any enemy caught by the ring is stunned for 0.8 s and forcibly pulled toward you "
-         "at 120 px/s — they cannot resist while stunned."),
+         "Releases a lavender shockwave that expands outward, stunning any "
+         "enemy it touches for 0.8 seconds and dragging them helplessly "
+         "toward you."),
         ("FRAG GRENADE",  "E",     6,
-         "Hurls a fragmentation grenade that explodes on impact, "
-         "dealing heavy damage to all enemies within the blast radius."),
+         "Hurls a grenade that explodes on impact, dealing heavy damage to "
+         "everyone caught in the blast."),
         ("GIANT FORM",    "F",     20,
-         "Transforms into a massive giant for a limited time. "
-         "Greatly increases body size, armor thickness, and raw damage output."),
+         "Transforms you into a massive giant for a limited time, growing "
+         "far larger and tougher while hitting much harder."),
     ],
     'Marksman': [
         ("IMPACT ROUND",  "RMB",   4,
-         "Fires an explosive bullet that detonates on contact. "
-         "Deals burst damage to everything in a small radius around the point of impact."),
+         "Fires an explosive round that detonates on contact, damaging "
+         "everything close to the point of impact."),
         ("CHARGE",        "SPACE", 9,
-         "Dash toward the cursor for 360 px. "
-         "Hitting an enemy stops the dash and stuns them for 1 second. "
-         "Stopped by intact obstacles; destroyed debris and trees are ignored."),
+         "Dashes toward your cursor, crashing through debris and trees but "
+         "halted by solid obstacles. Slamming into an enemy stops the dash "
+         "and stuns them for 1 second."),
         ("AUTO TURRET",   "E",     8,
-         "Deploys a stationary turret at your position. "
-         "It fires automatically at any enemy within 250 px, matching your gun's damage and fire rate. "
-         "The turret has 180 HP — loses 1 HP per shot and 1 HP every 0.5 s passively. "
-         "Enemy bullets also damage it. Only you can see the detection radius."),
+         "Deploys a stationary turret with 180 HP that automatically fires "
+         "at nearby enemies, matching your gun's damage and fire rate. It "
+         "slowly loses HP over time and also takes damage from enemy fire."),
         ("ROLLING BARRAGE","F",    10,
-         "Calls in 18 waves of 3 strikes (54 total) toward the cursor in rapid "
-         "succession (~3.3 s). Each wave lands 60 px farther than the last, from "
-         "60 px up to 1080 px ahead, and every strike in a wave is independently "
-         "spread ±100 px left/right. Each strike shows a fixed crosshair marker "
-         "before detonating in an 80 px radius."),
+         "Calls in 18 waves of 3 strikes that creep outward toward your "
+         "cursor in rapid succession, each strike marked by a crosshair a "
+         "moment before it detonates."),
     ],
     'Hunter': [
         ("AIR CANNON",    "RMB",   4,
-         "Fires a high-speed invisible air blast (800 px/s) in the aimed direction. "
-         "Deals no damage, but launches the enemy on contact. "
-         "On hit, the RMB cooldown is immediately reset — "
-         "land the shot and you can fire again right away."),
+         "Fires an invisible blast of air that launches any enemy it hits, "
+         "though it deals no damage. Landing the hit instantly resets this "
+         "skill's cooldown."),
         ("MINI GRENADES", "SPACE", 8,
-         "Launches you backward, away from your aim, while scattering a cluster of "
-         "small grenades around the launch point. "
-         "Each grenade lands independently and detonates with its own small explosion."),
+         "Launches you backward away from your aim while scattering a "
+         "cluster of small grenades that each explode independently where "
+         "they land."),
         ("LOG BARRIER",   "E",     10,
-         "Plants three large crystalline log chunks in a fan ahead of you "
-         "(-45°/0°/+45°), sealing off the path forward. "
-         "Blocks enemy movement and bullets."),
+         "Plants three crystalline log chunks in a fan ahead of you, "
+         "sealing off the path forward and blocking enemy movement and "
+         "bullets."),
         ("PHANTOM CLOAK",  "F",    15,
-         "Vanishes for 3 seconds with 2× movement speed. "
-         "You can still shoot and use all skills while invisible. "
-         "Every 0.5 s you briefly flicker into view — and you still take damage."),
+         "Turns you invisible for 3 seconds and doubles your movement "
+         "speed, though you still take damage. You can keep shooting and "
+         "using skills, and briefly flicker into view every so often."),
     ],
     'Robot': [
         ("OVERLOAD", "RMB", 10,
-         "Doubles your movement speed for 3 seconds. "
-         "A pure mobility burst — no other effects."),
+         "Doubles your movement speed for 3 seconds — a pure mobility burst "
+         "with no other effect."),
         ("MARK RECALL", "SPACE", 6,
-         "Dashes in your movement direction and plants a mark at the origin. "
-         "Press Space again within 4 seconds to instantly teleport back. "
-         "A yellow timer bar above your head shows the recall window — only you can see it."),
+         "Dashes forward and drops a mark at your starting point. Press "
+         "Space again within 4 seconds to instantly teleport back to it."),
         ("PULSE RING", "E",  9,
-         "Instantly expands a 200 px electromagnetic ring centered on you. "
-         "Any enemy caught inside is stunned for 1 second. "
-         "A glowing marker is also placed at a random cardinal point on the ring and orbits clockwise — "
-         "press E again within 4 seconds to instantly blink to the marker's current position. "
-         "If your Space mark is active, the ring still fires and stuns, but no orbiting marker is created."),
+         "Bursts an electromagnetic ring outward around you, stunning any "
+         "enemy it touches for 1 second. A marker also orbits the ring's "
+         "edge — press E again within 4 seconds to instantly blink to it."),
         ("PUSH ZONE", "F", 5,
-         "Projects a 160×100 px force field toward the cursor. "
-         "Enemies caught inside are launched away and stunned for 1 second. "
-         "Only you see the targeting rectangle before it fires."),
+         "Projects a force field toward your cursor that launches and "
+         "stuns any enemy caught inside for 1 second."),
     ],
     'Pioneer': [
         ("STUN ROUND",    "RMB",   6,
-         "Fires a specialized round that stuns the target on impact. "
-         "Briefly halts enemy movement, leaving them exposed to follow-up fire."),
+         "Fires a specialized round that stuns the target on impact, "
+         "briefly halting their movement and leaving them open to "
+         "follow-up fire."),
         ("TACTICAL JUMP",  "SPACE", 8,
-         "Leaps 150 px toward the aimed direction. "
-         "Instantly refills the magazine and cancels any reload in progress. "
-         "Invincible while airborne — can fly over obstacles and is immune to all projectiles."),
+         "Leaps toward your aim, instantly refilling your magazine and "
+         "canceling any reload in progress. You're invincible in the air, "
+         "flying over obstacles and immune to all projectiles."),
         ("FORCE SHIELD", "E", 12,
-         "Surrounds yourself with a 60 px shield that absorbs 80 HP of incoming damage for 5 seconds. "
-         "Damage never overflows to your HP — the excess is fully blocked. "
-         "When the shield breaks or expires, it releases a shockwave ring (60→350 px in 0.5 s): "
-         "the first enemy caught by the expanding ring is knocked back and stunned for 0.5 s (no damage)."),
+         "Surrounds you with a shield that fully absorbs up to 80 HP of "
+         "damage for 5 seconds, with no overflow to your health. When it "
+         "breaks or expires, it releases an expanding shockwave ring that "
+         "knocks back and stuns the first enemy it touches for 0.5 seconds."),
         ("CLONE CORPS", "F", 18,
-         "Summons two semi-transparent clones flanking your position. "
-         "For 8 seconds, every basic attack fires three parallel shots — "
-         "one from each clone — without extra ammo cost."),
+         "Summons two semi-transparent clones flanking you. For 8 seconds, "
+         "every basic attack fires three parallel shots — one from each "
+         "clone — at no extra ammo cost."),
     ],
     'Assassin': [
         ("BLADE STRIKE",  "RMB",   5,
-         "Hurls a powered shuriken in the aimed direction. "
-         "Deals concentrated damage and cuts through any enemy in its path."),
+         "Hurls a powered shuriken that pierces through every enemy in its "
+         "path, dealing concentrated damage."),
         ("SPEED SURGE",   "SPACE", 10,
-         "Activates a short burst of enhanced movement speed. "
-         "Use it to close the gap on an enemy or escape a dangerous situation."),
+         "Activates a short burst of greatly increased movement speed."),
         ("SMOKE SCREEN",  "E",     6,
-         "Deploys a smoke grenade creating a persistent cloud. "
-         "Both sides lose visibility in the area, ideal for breaking line of sight."),
+         "Deploys a smoke grenade that fills the area with a lingering "
+         "cloud, blocking sight for both sides."),
         ("SHADOW RUSH",   "F",     8,
-         "Dashes swiftly toward the cursor, releasing a spinning blade arc "
-         "upon arrival that strikes any enemy caught in the sweep."),
+         "Dashes swiftly toward your cursor and releases a spinning blade "
+         "arc on arrival, striking any enemy caught in the sweep."),
     ],
     'Poisoner': [
         ("POISON POOL", "RMB", 9,
-         "Fires a toxic projectile that splashes on contact, creating a large poison zone (r 150). "
-         "Enemies inside take 3 dmg/tick and move 20% slower. "
-         "Each tick in the pool adds 1 poison stack (cap 2 from this source)."),
+         "Fires a toxic projectile that bursts into a lingering poison "
+         "pool on contact. Enemies standing in it are slowed by 20%, take "
+         "3 damage per pulse, and build up to 2 stacks of poison the "
+         "longer they stay."),
         ("TOXIC SPRINT", "SPACE", 8,
-         "Dash forward at +20% speed for 3 s, leaving afterimages. "
-         "Drops 9 small poison pools (r 20-30) at your feet every 20 ticks as you run. "
-         "Standing in a mini-pool adds 1 poison stack per 30 ticks (cap 2 from this source)."),
+         "Dashes forward at 20% increased speed for 3 seconds, leaving a "
+         "trail of afterimages and 9 small poison pools behind you. "
+         "Standing in one stacks poison, up to 2 stacks from this skill."),
         ("TOXIC RESONANCE", "E", 10,
-         "For 3 s, every 30 ticks a green shockwave (r 60→60→400, 0.6 s) erupts from your position. "
-         "No pool required. When the ring hits the enemy: deals 3 dmg, adds 1 poison stack, "
-         "and heals you for 3 \xd7 (enemy's current poison stacks). Up to 5 shockwaves per activation."),
+         "For 3 seconds, a green shockwave ring pulses outward from you "
+         "again and again — up to 5 in total. Each ring that touches an "
+         "enemy deals 3 damage, adds a poison stack, and heals you for "
+         "3 times their current poison stacks."),
         ("—", "F",     0, "Skill under development."),
     ],
     'Zombie': [
         ("ENERGY SPRINT", "RMB", 0,
-         "Base move speed is a slow 100 px/s — hold RMB to sprint, drawing from a "
-         "300-point energy bar (-1/tick while held, +0.5/tick while released). "
-         "Sprint speed scales with remaining energy, from 300 px/s down to a "
-         "120 px/s floor at empty. No cooldown — it's a resource, not a skill."),
+         "Hold RMB to sprint at greatly increased speed, drawing from an "
+         "energy meter that drains while sprinting and slowly refills when "
+         "released. Sprint speed fades as the meter runs low, but never "
+         "drops below a light jog. No cooldown — it runs on the energy "
+         "meter instead."),
         ("GROUND POUND",  "SPACE", 4,
-         "Leap 200 px toward your aim, then slam down. "
-         "Enemies caught in the landing shockwave are knocked back and stunned. "
-         "Instantly refills your magazine and cancels any reload in progress."),
+         "Leaps toward your aim and slams down, knocking back and "
+         "stunning enemies caught in the shockwave. Also instantly refills "
+         "your magazine and cancels any reload in progress."),
         ("BLOODLUST", "E",     10,
-         "For 4 s, no stiffness — move, shoot, and use other skills freely. "
-         "All damage you take is halved (rounded down). Basic-attack (blade) "
-         "hits also heal you for half the damage dealt (rounded down, no "
-         "effect above max HP). A dark red glow pools under your feet, hidden "
-         "beneath your model and fading out toward its 60 px edge."),
+         "For 4 seconds, you move and act with no stiffness, take 50% "
+         "less damage, and heal for half of the damage dealt by your "
+         "basic attacks. A dark red glow pools beneath your feet."),
         ("CORROSIVE SPEW", "F",   8,
-         "Lock your aim and enter a 0.5 s full-body freeze — no moving, shooting, "
-         "or other skills. Spews 10 waves of 3 orbs (30 total) along the locked "
-         "direction, one wave every 3 ticks. Each wave lands 60 px farther and "
-         "spreads ±6 px wider than the last, up to 600 px / ±60 px on wave 10 — "
-         "orb size grows with each wave too, up to 1.9x by wave 10. Each orb "
-         "deals 6-8 dmg on contact (stacks if orbs overlap), and the first hit "
-         "of the cast also stuns for 1 s."),
+         "Locks your aim and freezes you in place for 0.5 seconds, then "
+         "spews 10 waves of 3 orbs outward in a growing spray, each wave "
+         "landing farther and wider than the last. Orbs deal 6-8 damage "
+         "on contact, and the very first hit also stuns for 1 second."),
     ],
 }
 
