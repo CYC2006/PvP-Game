@@ -102,7 +102,7 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
     """
     Send PKT_JOIN(room_code) every second to server_addr.
     Wait for PKT_JOINED + PKT_ALL_JOINED from the server.
-    Returns (player_id, server_addr) on success, (None, None) on cancel.
+    Returns (player_id, server_addr, actual_map_id) on success, (None, None, 0) on cancel.
     """
     player_id         = None
     all_joined        = False
@@ -144,14 +144,14 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 _cancel_matchmaking(sock, server_addr, player_id)
-                return None, None
+                return None, None, 0
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 _cancel_matchmaking(sock, server_addr, player_id)
-                return None, None
+                return None, None, 0
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if BACK_R.collidepoint(mx, my):
                     _cancel_matchmaking(sock, server_addr, player_id)
-                    return None, None
+                    return None, None, 0
                 if is_host:
                     for _i, _r in enumerate(_MAP_BTN_RS):
                         if _r.collidepoint(mx, my):
@@ -175,11 +175,11 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
                 if pkt == PKT_JOINED:
                     player_id = unpack_joined(data)
                     if all_joined:
-                        return player_id, server_addr
+                        return player_id, server_addr, actual_map_id
                 elif pkt == PKT_ALL_JOINED:
                     all_joined = True
                     if player_id is not None:
-                        return player_id, server_addr
+                        return player_id, server_addr, actual_map_id
             except (BlockingIOError, ConnectionResetError, OSError):
                 break
 
@@ -252,7 +252,7 @@ def _cancel_matchmaking(sock, server_addr, player_id):
 # ── 選角畫面 ──────────────────────────────────────────────────────────────────
 
 def char_select_loop(sock, server_addr, player_id, room_code, screen,
-                     font_lg, font_sm, clock, game_mode: int = 0) -> tuple:
+                     font_lg, font_sm, clock, map_id: int = 0, game_mode: int = 0) -> tuple:
     charselect.reset()
     my_ready        = False
     last_time       = pygame.time.get_ticks()
@@ -292,7 +292,7 @@ def char_select_loop(sock, server_addr, player_id, room_code, screen,
         if heartbeat_timer >= HEARTBEAT_INTERVAL:
             heartbeat_timer = 0.0
             try:
-                sock.sendto(pack_join(room_code, game_mode=game_mode), server_addr)
+                sock.sendto(pack_join(room_code, map_id, game_mode), server_addr)
             except Exception:
                 pass
 
@@ -400,11 +400,10 @@ def run() -> None:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setblocking(False)
 
-        player_id, server_addr = matchmaking_screen(sock, server_addr,
-                                                    room_code, is_host,
-                                                    screen, font_lg, font_sm, clock,
-                                                    map_id=lobby_map_id,
-                                                    game_mode=lobby_game_mode_idx)
+        player_id, server_addr, selected_map_id = matchmaking_screen(
+            sock, server_addr, room_code, is_host,
+            screen, font_lg, font_sm, clock,
+            map_id=lobby_map_id, game_mode=lobby_game_mode_idx)
         if player_id is None:
             sock.close()
             continue
@@ -414,7 +413,7 @@ def run() -> None:
         # ── Char select ──────────────────────────────────────────────
         player_chars, my_char_name, my_rune_id, map_id, game_mode, side_flip = char_select_loop(
             sock, server_addr, player_id, room_code, screen, font_lg, font_sm, clock,
-            game_mode=lobby_game_mode_idx)
+            map_id=selected_map_id, game_mode=lobby_game_mode_idx)
         if player_chars is None:
             sock.close()
             pygame.display.set_caption("PvP Game")
