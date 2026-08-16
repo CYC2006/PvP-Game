@@ -98,10 +98,12 @@ COL_BTN_TXT     = (220, 235, 220)
 COL_BTN_TXT_DIM = (90,  98, 120)
 
 # ── Carousel 狀態（模組全域）────────────────────────────────────────────
-_target_idx:    int   = 0
-_anim_offset:   float = 0.0
-_confirmed:     bool  = False
-_selected_rune: int   = 0   # 選中的魔紋 ID（0/1/2）
+_target_idx:         int   = 0
+_anim_offset:        float = 0.0
+_confirmed:          bool  = False
+_selected_rune:      int   = 0   # 選中的魔紋 ID（0/1/2）
+_countdown_start_ms: int   = 0
+_COUNTDOWN_TOTAL:    int   = 30  # seconds
 
 # ── 點擊區域（每幀在 draw 裡更新）────────────────────────────────────────
 _left_arr_rect:    pygame.Rect = pygame.Rect(0, 0, 0, 0)
@@ -136,11 +138,12 @@ def _load_sprite(char: dict) -> pygame.Surface:
 # ── 公開 API ──────────────────────────────────────────────────────────────
 
 def reset() -> None:
-    global _target_idx, _anim_offset, _confirmed, _selected_rune
-    _target_idx    = 0
-    _anim_offset   = 0.0
-    _confirmed     = False
-    _selected_rune = 0
+    global _target_idx, _anim_offset, _confirmed, _selected_rune, _countdown_start_ms
+    _target_idx          = 0
+    _anim_offset         = 0.0
+    _confirmed           = False
+    _selected_rune       = 0
+    _countdown_start_ms  = pygame.time.get_ticks()
 
 
 def is_confirmed() -> bool:
@@ -213,13 +216,21 @@ def draw_char_select(screen: pygame.Surface,
                      font_sm: pygame.font.Font,
                      my_ready: bool,
                      opponent_ready: bool) -> None:
-    global _left_arr_rect, _right_arr_rect
+    global _left_arr_rect, _right_arr_rect, _confirmed
 
     screen.fill(COL_BG)
 
-    # ── 標題 ──────────────────────────────────────────────────────
-    title = font_lg.render("SELECT YOUR CHARACTER", True, COL_TITLE)
-    screen.blit(title, (CENTER_X - title.get_width() // 2, 28))
+    # ── 倒數計時（取代標題）──────────────────────────────────────
+    elapsed_s = (pygame.time.get_ticks() - _countdown_start_ms) // 1000
+    remaining = max(0, _COUNTDOWN_TOTAL - elapsed_s)
+    if remaining <= 0 and not _confirmed:
+        _confirmed = True
+    cd_col  = (255, 120, 150) if remaining <= 9 else COL_TITLE
+    cd_raw  = font_lg.render(str(remaining), True, cd_col)
+    cd_w    = int(cd_raw.get_width()  * 1.5)
+    cd_h    = int(cd_raw.get_height() * 1.5)
+    cd_surf = pygame.transform.smoothscale(cd_raw, (max(1, cd_w), max(1, cd_h)))
+    screen.blit(cd_surf, (CENTER_X - cd_w // 2, 18))
 
     # ── Carousel 卡片 ──────────────────────────────────────────────
     for i, char in enumerate(CHARACTERS):
