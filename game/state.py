@@ -162,7 +162,7 @@ class Player:
     poison_stacks: int        = 0    # 當前毒素層數（0~5）
     _poison_last_tick: int    = -1   # 上次受到毒素傷害的 tick（-1=從未）
     _poison_stk_dmg_timer: int = 0  # 每秒傷害計時器（60 tick → 造成一次）
-    _poison_src_normal: int   = 0   # 普攻已貢獻層數（上限 1）
+    _poison_src_normal: int   = 0   # 普攻已貢獻層數（上限 2）
     _poison_src_rmb: int      = 0   # RMB 毒液池已貢獻層數（上限 2）
     _poison_src_space_pool: int = 0 # Space 小毒液池已貢獻層數（上限 2）
     _poison_src_e: int        = 0   # E 衝擊波已貢獻層數（上限 2）
@@ -175,6 +175,8 @@ class Player:
     poisoner_e_last_check_tick: int     = -1  # 上次 30-tick 檢查的 tick
     poisoner_e_check_count: int         = 0   # 本次已檢查次數
     poisoner_e_shockwave_seq: int       = 0   # 每次釋放衝擊波時遞增（供 client FX 偵測）
+    # ── Poisoner 普攻連射初速遞增 ──────────────────────────────────────
+    poison_streak: int                  = 0   # 連續發射泡泡數（放開左鍵/換彈中斷歸零，上限 100）
     # ── Agent 大招：水銀彈幕 ───────────────────────────────────────────────────
     mercury_start_tick: int   = -1   # -1=inactive; tick when barrage started
     mercury_aim_x: float      = 0.0  # locked aim direction (unit vector)
@@ -209,6 +211,7 @@ class Player:
         self._poison_src_rmb       = 0
         self._poison_src_space_pool = 0
         self._poison_src_e         = 0
+        self.poison_streak         = 0
         from game.chars.zombie.sprint_state import ENERGY_MAX
         self.zombie_energy = ENERGY_MAX
         self.zone_ticks = 0
@@ -634,6 +637,11 @@ class GameState:
             if self.tick - player.last_shot_tick < player.fire_interval_ticks:
                 shooting = False   # 本幀忽略，不產生子彈
         if shooting:
+            # Poisoner 連射初速遞增：與上一發間隔過久（真的放開左鍵/換彈中斷）才歸零，
+            # 而非每 tick 判斷──client 端 shooting 本來就是每發脈衝式送出，中間 tick 皆為 False。
+            if (player.char_name == 'Poisoner'
+                    and self.tick - player.last_shot_tick > player.fire_interval_ticks * 3):
+                player.poison_streak = 0
             player.last_shot_tick = self.tick
             fn = _SHOOT_HANDLERS.get(player.char_name)
             if fn:
@@ -676,6 +684,11 @@ class GameState:
         spawn_y = player.y + uy * barrel_fwd + ry * barrel_right
 
         effective_spread = spread_override if spread_override >= 0 else player.spread
+        # Poisoner 連射遞增：每連續一發，初速上下界各 +5 px/s（上限 100 發）
+        _poison_speed_bonus = 0.0
+        if player.char_name == 'Poisoner':
+            player.poison_streak = min(player.poison_streak + 1, 100)
+            _poison_speed_bonus = player.poison_streak * 5.0 / 60.0
         for pellet_i in range(player.pellet_count):
             # 每顆散彈獨立隨機偏角
             pux, puy = ux, uy
@@ -687,9 +700,10 @@ class GameState:
 
             # 初速隨機（bullet_speed_min > 0）；decel 固定，速度慢的飛得近
             if player.bullet_speed_min > 0:
-                spd = random.uniform(player.bullet_speed_min, player.bullet_speed)
+                spd = random.uniform(player.bullet_speed_min + _poison_speed_bonus,
+                                      player.bullet_speed + _poison_speed_bonus)
             else:
-                spd = player.bullet_speed
+                spd = player.bullet_speed + _poison_speed_bonus
             ndx = pux * spd
             ndy = puy * spd
             # 射程：減速子彈靠速度歸零消失，無需限制距離

@@ -955,7 +955,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict, my_id: int = None):
             elif btype == 2:
                 grenade_fx.draw_bullet(screen, bullet, sx, sy, color)
             elif char_name == "Poisoner":
-                bubble_fx.draw_bullet(screen, bullet, sx, sy, color, now)
+                bubble_fx.draw_bullet(screen, bullet, sx, sy, now)
             else:
                 bscale = getattr(bullet, 'bullet_scale', 1.0)
                 # Agent burst 子彈（scale > 1）加殘影

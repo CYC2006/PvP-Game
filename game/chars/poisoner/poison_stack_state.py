@@ -1,7 +1,7 @@
 """Poisoner — 毒素層數系統（server-only）
 
 規則：
-- 最大 5 層；各來源獨立上限（normal=1, rmb=2, space_pool=2, e=2）
+- 最大 5 層；各來源獨立上限 2 層（normal/rmb/space_pool/e 皆同）
 - 每秒造成 3×層數 傷害（60 tick 一次）
 - 3 秒無毒素傷害 → 層數歸 0、計時器重置
 - 任何毒素傷害命中 → 計時器刷新（即使未增加層數）
@@ -9,13 +9,8 @@
 
 STACK_MAX         = 5
 STACK_DECAY_TICKS = 180   # 3s × 60 fps
+SRC_STACK_CAP      = 2    # 每個來源各自最多貢獻 2 層
 
-_SRC_CAPS = {
-    'normal':     1,
-    'rmb':        2,
-    'space_pool': 2,
-    'e':          2,
-}
 _SRC_ATTRS = {
     'normal':     '_poison_src_normal',
     'rmb':        '_poison_src_rmb',
@@ -31,11 +26,10 @@ def add_poison_stack(state, victim_id: int, source: str) -> None:
         return
     victim._poison_last_tick = state.tick   # 總是刷新計時器
 
-    cap  = _SRC_CAPS.get(source, 0)
     attr = _SRC_ATTRS.get(source)
-    if not cap or attr is None:
+    if attr is None:
         return
-    if getattr(victim, attr, 0) >= cap:
+    if getattr(victim, attr, 0) >= SRC_STACK_CAP:
         return   # 此來源已達上限
     if victim.poison_stacks >= STACK_MAX:
         return   # 全域上限
