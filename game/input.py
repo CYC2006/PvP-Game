@@ -26,6 +26,10 @@ _PIONEER_RIFLE_SFX = ('weapon/pioneer_rifle_1.wav', 'weapon/pioneer_rifle_2.wav'
 _MARKSMAN_MACHINE_SFX = ('weapon/marksman_machine_1.wav', 'weapon/marksman_machine_2.wav',
                          'weapon/marksman_machine_3.wav', 'weapon/marksman_machine_4.wav')
 _HUNTER_SNIPER_SFX = 'weapon/hunter_sniper.wav'
+_HUNTER_RELOAD_BASIC_SFX   = 'reload/hunter_reload_basic.wav'
+_HUNTER_RELOAD_1AMMO_SFX   = 'reload/hunter_reload_1ammo.wav'
+_HUNTER_RELOAD_BASE_MS     = 1000   # 固定基礎時間
+_HUNTER_RELOAD_PER_AMMO_MS = 600    # 每顆子彈增加的時間
 _ASSASSIN_SHURIKEN_SFX = ('weapon/assassin_shuriken_1.wav', 'weapon/assassin_shuriken_2.wav')
 _ASSASSIN_PELLET_COUNT = 5
 _ASSASSIN_PELLET_INTERVAL_MS = 50   # pellet_interval=3 tick × (1000/60)
@@ -36,8 +40,18 @@ _RELOAD_SFX: dict = {
     'Agent':    'reload/agent_reload.wav',
     'Pioneer':  'reload/pioneer_reload.wav',
     'Marksman': 'reload/marksman_reload.wav',
-    'Hunter':   'reload/sniper_reload.wav',
 }
+
+
+def _start_hunter_reload(_state, now: int, bullets_needed: int) -> None:
+    """Hunter 換彈：時間 = 1 + 0.6x 秒（x=換彈顆數）。
+    開頭播 hunter_reload_basic，接著每顆排程播一次 hunter_reload_1ammo。
+    """
+    _state.current_reload_ms = _HUNTER_RELOAD_BASE_MS + _HUNTER_RELOAD_PER_AMMO_MS * bullets_needed
+    audio.play(_HUNTER_RELOAD_BASIC_SFX, audio.VOLUME_SELF)
+    for i in range(bullets_needed):
+        due_ms = now + _HUNTER_RELOAD_BASE_MS + _HUNTER_RELOAD_PER_AMMO_MS * i
+        _state.pending_sfx.append((due_ms, _HUNTER_RELOAD_1AMMO_SFX))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -603,17 +617,20 @@ def read_input(player_id: int, keys_held: set,
             and not _state.reloading
             and _state.char_name not in _NO_RELOAD
             and _state.ammo < _state.magazine_size):
-        if _state.char_name == 'Vince':
-            _state.current_reload_ms = (_state.magazine_size - _state.ammo) * 500
-        elif _state.char_name == 'Hunter':
-            _state.current_reload_ms = (_state.magazine_size - _state.ammo) * 1000
-        else:
-            _state.current_reload_ms = _state.reload_time_ms
         _state.reloading       = True
         _state.reload_start_ms = now
-        reload_sfx = _RELOAD_SFX.get(_state.char_name)
-        if reload_sfx:
-            audio.play(reload_sfx, audio.VOLUME_SELF)
+        if _state.char_name == 'Vince':
+            _state.current_reload_ms = (_state.magazine_size - _state.ammo) * 500
+            reload_sfx = _RELOAD_SFX.get(_state.char_name)
+            if reload_sfx:
+                audio.play(reload_sfx, audio.VOLUME_SELF)
+        elif _state.char_name == 'Hunter':
+            _start_hunter_reload(_state, now, _state.magazine_size - _state.ammo)
+        else:
+            _state.current_reload_ms = _state.reload_time_ms
+            reload_sfx = _RELOAD_SFX.get(_state.char_name)
+            if reload_sfx:
+                audio.play(reload_sfx, audio.VOLUME_SELF)
 
     # ── Q 鍵：啟動魔紋（血量上限為被動，cd=-1 不觸發）───────────────────
     use_rune = False
@@ -660,10 +677,13 @@ def read_input(player_id: int, keys_held: set,
                 _state.ammo              = 0
                 _state.reloading         = True
                 _state.reload_start_ms   = now
-                _state.current_reload_ms = _state.reload_time_ms
-                reload_sfx = _RELOAD_SFX.get(_state.char_name)
-                if reload_sfx:
-                    audio.play(reload_sfx, audio.VOLUME_SELF)
+                if _state.char_name == 'Hunter':
+                    _start_hunter_reload(_state, now, _state.magazine_size)
+                else:
+                    _state.current_reload_ms = _state.reload_time_ms
+                    reload_sfx = _RELOAD_SFX.get(_state.char_name)
+                    if reload_sfx:
+                        audio.play(reload_sfx, audio.VOLUME_SELF)
 
     # ── 技能冷卻資訊（給 HUD）────────────────────────────────────────────
     skill_cooldowns: dict = {}
