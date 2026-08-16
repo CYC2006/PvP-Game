@@ -35,16 +35,16 @@ _RATINGS: dict = {
 # (skill_name, key_label, cooldown_secs, description)
 _SKILLS: dict = {
     'Agent': [
-        ("POWER SHOT",    "RMB",   5,
+        ("POWER SHOT",    "RMB",   4,
          "Fire a single enhanced bullet — twice the normal size, double damage, "
          "zero spread, and a knockback on hit. A glowing afterimage trail marks its path."),
         ("DASH",          "SPACE", 3,
          "Lunge in the current movement direction for a rapid burst of speed. "
          "Requires an active movement input to trigger; no direction, no dash."),
-        ("FLASH GRENADE", "E",     8,
+        ("FLASH GRENADE", "E",     6,
          "Lobs a stun grenade that detonates on landing. "
          "Any enemy inside the blast radius is briefly blinded and disoriented."),
-        ("MERCURY BARRAGE","F",    15,
+        ("MERCURY BARRAGE","F",    12,
          "Lock your aim and unleash 7 volleys of 5 bullets in a spread fan "
          "(-12° / -6° / 0° / +6° / +12°), one volley every 6 ticks. "
          "35 bullets total over 0.6 seconds. "
@@ -56,11 +56,11 @@ _SKILLS: dict = {
         ("AIRSTRIKE",     "RMB",   5,
          "Calls a sequence of bombs along the aimed trajectory. "
          "Impacts land in a line with a short delay, covering a wide zone."),
-        ("TAUNT",         "SPACE", 10,
+        ("TAUNT",         "SPACE", 9,
          "Release a lavender shockwave that expands from 60 px to 600 px over 1 second. "
          "Any enemy caught by the ring is stunned for 0.8 s and forcibly pulled toward you "
          "at 120 px/s — they cannot resist while stunned."),
-        ("FRAG GRENADE",  "E",     8,
+        ("FRAG GRENADE",  "E",     6,
          "Hurls a fragmentation grenade that explodes on impact, "
          "dealing heavy damage to all enemies within the blast radius."),
         ("GIANT FORM",    "F",     20,
@@ -75,7 +75,7 @@ _SKILLS: dict = {
          "Dash toward the cursor for 360 px. "
          "Hitting an enemy stops the dash and stuns them for 1 second. "
          "Stopped by intact obstacles; destroyed debris and trees are ignored."),
-        ("AUTO TURRET",   "E",     10,
+        ("AUTO TURRET",   "E",     8,
          "Deploys a stationary turret at your position. "
          "It fires automatically at any enemy within 250 px, matching your gun's damage and fire rate. "
          "The turret has 180 HP — loses 1 HP per shot and 1 HP every 0.5 s passively. "
@@ -88,13 +88,14 @@ _SKILLS: dict = {
          "before detonating in an 80 px radius."),
     ],
     'Hunter': [
-        ("AIR CANNON",    "RMB",   5,
+        ("AIR CANNON",    "RMB",   4,
          "Fires a high-speed invisible air blast (800 px/s) in the aimed direction. "
          "Deals no damage, but launches the enemy on contact. "
          "On hit, the RMB cooldown is immediately reset — "
          "land the shot and you can fire again right away."),
-        ("MINI GRENADES", "SPACE", 4,
-         "Scatters a cluster of small grenades in an arc. "
+        ("MINI GRENADES", "SPACE", 8,
+         "Launches you backward, away from your aim, while scattering a cluster of "
+         "small grenades around the launch point. "
          "Each grenade lands independently and detonates with its own small explosion."),
         ("LOG BARRIER",   "E",     10,
          "Plants three large crystalline log chunks in a fan ahead of you "
@@ -137,7 +138,7 @@ _SKILLS: dict = {
          "Damage never overflows to your HP — the excess is fully blocked. "
          "When the shield breaks or expires, it releases a shockwave ring (60→350 px in 0.5 s): "
          "the first enemy caught by the expanding ring is knocked back and stunned for 0.5 s (no damage)."),
-        ("CLONE CORPS", "F", 20,
+        ("CLONE CORPS", "F", 18,
          "Summons two semi-transparent clones flanking your position. "
          "For 8 seconds, every basic attack fires three parallel shots — "
          "one from each clone — without extra ammo cost."),
@@ -149,10 +150,10 @@ _SKILLS: dict = {
         ("SPEED SURGE",   "SPACE", 10,
          "Activates a short burst of enhanced movement speed. "
          "Use it to close the gap on an enemy or escape a dangerous situation."),
-        ("SMOKE SCREEN",  "E",     8,
+        ("SMOKE SCREEN",  "E",     6,
          "Deploys a smoke grenade creating a persistent cloud. "
          "Both sides lose visibility in the area, ideal for breaking line of sight."),
-        ("SHADOW RUSH",   "F",     7,
+        ("SHADOW RUSH",   "F",     8,
          "Dashes swiftly toward the cursor, releasing a spinning blade arc "
          "upon arrival that strikes any enemy caught in the sweep."),
     ],
@@ -177,11 +178,11 @@ _SKILLS: dict = {
          "300-point energy bar (-1/tick while held, +0.5/tick while released). "
          "Sprint speed scales with remaining energy, from 300 px/s down to a "
          "120 px/s floor at empty. No cooldown — it's a resource, not a skill."),
-        ("GROUND POUND",  "SPACE", 8,
+        ("GROUND POUND",  "SPACE", 4,
          "Leap 200 px toward your aim, then slam down. "
          "Enemies caught in the landing shockwave are knocked back and stunned. "
          "Instantly refills your magazine and cancels any reload in progress."),
-        ("BLOODLUST", "E",     12,
+        ("BLOODLUST", "E",     10,
          "For 4 s, no stiffness — move, shoot, and use other skills freely. "
          "All damage you take is halved (rounded down). Basic-attack (blade) "
          "hits also heal you for half the damage dealt (rounded down, no "
