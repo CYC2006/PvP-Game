@@ -17,6 +17,8 @@ COL_ONLINE_HOV = ( 32, 118, 148)
 COL_ONLINE_BD  = ( 60, 195, 235)
 COL_ONLINE_TXT = (155, 225, 248)
 
+_IC_ONLINE = chr(0xf1eb)  # fa-wifi
+
 # ── Mode colours ──────────────────────────────────────────────────────────────
 COL_M_SEL     = (22,  54,  92)
 COL_M_SEL_BD  = (68, 150, 238)
@@ -60,11 +62,9 @@ MODE_RS: list[pygame.Rect] = [
     for i in range(len(MODES))
 ]
 
-# 保留 HOST_R / JOIN_R 定義供還原使用（見 RESTORE.md）
 HOST_R   = pygame.Rect(_hj_x,                  _HJBY, _HJBW, _HJBH)
 JOIN_R   = pygame.Rect(_hj_x + _HJBW + _GGAP, _HJBY, _HJBW, _HJBH)
-# ONLINE 按鈕橫跨原本 HOST + JOIN 的完整寬度
-ONLINE_R = pygame.Rect(_hj_x, _HJBY, _GTW, _HJBH)
+ONLINE_R = pygame.Rect(_hj_x - _HJBW - _GGAP, _HJBY, _HJBW, _HJBH)
 
 
 # ── Draw ──────────────────────────────────────────────────────────────────────
@@ -108,7 +108,11 @@ def draw(screen: pygame.Surface,
             cs_s   = font_sm.render("COMING SOON", True, cs_col)
             screen.blit(cs_s, (r.x + 16, ty + nm_s.get_height() + 8))
 
-    # HOST / JOIN
+    # ONLINE / HOST / JOIN
+    btn(screen, ONLINE_R,
+        COL_ONLINE_HOV if ONLINE_R.collidepoint(mx, my) else COL_ONLINE,
+        COL_ONLINE_BD, font_lg, f"{_IC_ONLINE}  ONLINE", COL_ONLINE_TXT, radius=10)
+
     btn(screen, HOST_R,
         COL_HOST_HOV if HOST_R.collidepoint(mx, my) else COL_HOST,
         COL_HOST_BD, font_lg, f"{IC_SERVER}  HOST", COL_HOST_TXT, radius=10)

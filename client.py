@@ -192,7 +192,11 @@ def matchmaking_screen(sock: socket.socket, server_addr: tuple,
         t = font_lg.render(msg, True, COL_TEXT)
         screen.blit(t, (CX - t.get_width() // 2, 130))
 
-        if is_host:
+        if room_code == 0:
+            # ONLINE auto-queue: show animated search indicator
+            hint = font_sm.render(f"Searching for opponent{dots}", True, COL_HINT)
+            screen.blit(hint, (CX - hint.get_width() // 2, 300))
+        elif is_host:
             lbl_surf = font_sm.render("ROOM CODE  —  SHARE WITH YOUR FRIEND", True, COL_HINT)
             screen.blit(lbl_surf, (CX - lbl_surf.get_width() // 2, 210))
             _draw_spaced_digits(screen, _get_giant_font(), str(room_code),
@@ -385,13 +389,16 @@ def run() -> None:
             break   # user closed window
 
         # ── Resolve server address + room code ────────────────────────
-        is_host = (mode == "host")
+        is_host   = (mode == "host")
+        is_online = (mode == "online")
         if is_host:
             room_code = random.randint(1000, 9999)
             if CLOUD_SERVER_IP == "127.0.0.1":
                 if not _local_server_started:
                     _start_server_thread(map_id=lobby_map_id)
                     _local_server_started = True
+        elif is_online:
+            room_code = 0   # server-side auto-queue signal
         else:
             room_code = int(join_code)
         server_addr = (CLOUD_SERVER_IP, CLOUD_SERVER_PORT)

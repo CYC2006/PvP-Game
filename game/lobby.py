@@ -338,7 +338,9 @@ def lobby_screen(screen: pygame.Surface,
                             zip(game_page.MODE_RS, game_page.MODES)):
                         if r.collidepoint(mx, my) and not coming_soon:
                             sel_mode = i
-                    if game_page.HOST_R.collidepoint(mx, my):
+                    if game_page.ONLINE_R.collidepoint(mx, my):
+                        return "online", None, 0, sel_mode
+                    elif game_page.HOST_R.collidepoint(mx, my):
                         return "host", None, 0, sel_mode
                     elif game_page.JOIN_R.collidepoint(mx, my):
                         join_mode = True

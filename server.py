@@ -137,8 +137,9 @@ def run(map_id: int = 0):
     sock.setblocking(False)
     print(f"[Server] Listening on {HOST}:{PORT}")
 
-    rooms:     dict = {}   # room_code (int) → RoomState
-    addr_room: dict = {}   # addr (tuple)    → room_code (int)
+    rooms:        dict = {}   # room_code (int) → RoomState
+    addr_room:    dict = {}   # addr (tuple)    → room_code (int)
+    online_queue: list = []   # [(addr, timestamp)] — auto-matchmaking queue
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -237,6 +238,28 @@ def run(map_id: int = 0):
             # ── PKT_JOIN ──────────────────────────────────────────────────
             if ptype == PKT_JOIN:
                 join_code, join_map_id, join_game_mode = unpack_join(data)
+
+                # room_code == 0 → ONLINE auto-matchmaking queue
+                if join_code == 0:
+                    if addr not in addr_room:
+                        online_queue[:] = [(a, t) for a, t in online_queue if a != addr]
+                        online_queue.append((addr, time.perf_counter()))
+                        if len(online_queue) >= 2:
+                            addr1, _ = online_queue.pop(0)
+                            addr2, _ = online_queue.pop(0)
+                            chosen_map = random.randint(0, max(0, len(meta) - 1))
+                            code = random.randint(1000, 9999)
+                            while code in rooms:
+                                code = random.randint(1000, 9999)
+                            new_room = RoomState(chosen_map, _load_map_data(chosen_map))
+                            configure_map(new_room.map_w, new_room.map_h)
+                            rooms[code] = new_room
+                            new_room.waiting[addr1] = time.perf_counter()
+                            new_room.waiting[addr2] = time.perf_counter()
+                            _try_match(new_room)
+                            print(f"[Server] Online match: room {code} map {chosen_map}")
+                    continue
+
                 room = rooms.get(join_code)
 
                 if room and addr in room.addr_to_id:
@@ -322,6 +345,7 @@ def run(map_id: int = 0):
 
             # ── PKT_QUIT ──────────────────────────────────────────────────
             elif ptype == PKT_QUIT:
+                online_queue[:] = [(a, t) for a, t in online_queue if a != addr]
                 code = addr_room.get(addr)
                 if code is None:
                     continue
@@ -403,6 +427,9 @@ def run(map_id: int = 0):
         # ── Per-room disconnect detection + game tick ──────────────────────
         now = time.perf_counter()
         empty_codes = []
+
+        # Expire stale online-queue entries (client stopped sending heartbeat)
+        online_queue[:] = [(a, t) for a, t in online_queue if now - t < QUEUE_TIMEOUT]
 
         for code, room in list(rooms.items()):
 
