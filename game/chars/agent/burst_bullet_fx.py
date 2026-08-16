@@ -1,11 +1,25 @@
 import time
 import pygame
+from game import audio
 from game.render_utils import ws
 
 _TRAIL_MAX  = 10     # 最多保留幾個殘影點
 _TRAIL_GAP  = 0.010  # 兩個殘影點之間的最短時間間隔（秒）
 
 _trails: dict = {}   # bid → [(world_x, world_y, timestamp), ...]
+
+_was_casting: dict = {}   # pid → bool，上一幀 agent_powershot_tick 是否 >= 0
+
+
+def detect_powershot_sfx(state, my_id: int, player_chars: dict) -> None:
+    for pid, player in state.players.items():
+        if player_chars.get(pid) != 'Agent':
+            continue
+        casting = player.agent_powershot_tick >= 0
+        if casting and not _was_casting.get(pid, False):
+            volume = audio.VOLUME_SELF if pid == my_id else audio.VOLUME_OTHER
+            audio.play('others/agent_powershot.wav', volume)
+        _was_casting[pid] = casting
 
 
 def track(bullet) -> None:

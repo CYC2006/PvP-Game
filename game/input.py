@@ -36,6 +36,7 @@ _ASSASSIN_PELLET_INTERVAL_MS = 50   # pellet_interval=3 tick × (1000/60)
 _VINCE_SHOTGUN_SFX = ('weapon/vince_shotgun_1.wav', 'weapon/vince_shotgun_2.wav')
 _ZOMBIE_MOAN_SFX = ('weapon/zombie_moan_1.wav', 'weapon/zombie_moan_2.wav',
                     'weapon/zombie_moan_3.wav', 'weapon/zombie_moan_4.wav')
+_ROBOT_LASER_SFX = 'weapon/robot_laser.wav'
 _RELOAD_SFX: dict = {
     'Agent':    'reload/agent_reload.wav',
     'Pioneer':  'reload/pioneer_reload.wav',
@@ -672,6 +673,8 @@ def read_input(player_id: int, keys_held: set,
             audio.play(random.choice(_VINCE_SHOTGUN_SFX), audio.VOLUME_SELF)
         elif _state.char_name == 'Zombie':
             audio.play(random.choice(_ZOMBIE_MOAN_SFX), audio.VOLUME_SELF)
+        elif _state.char_name == 'Robot':
+            audio.play(_ROBOT_LASER_SFX, audio.VOLUME_SELF)
         if _state.magazine_size < 9999:
             _state.ammo -= 1
             if _state.ammo <= 0:

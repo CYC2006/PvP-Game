@@ -13,6 +13,7 @@ from game.render_utils import (LOGICAL_W, LOGICAL_H, SCREEN_W, SCREEN_H, ws as _
 from game.chars.agent    import flash_fx
 from game.chars.agent    import burst_bullet_fx
 from game.chars.agent    import dash_fx as agent_dash_fx
+from game.chars.agent    import mercury_fx as agent_mercury_fx
 from game.chars.vince    import grenade_fx, airstrike_fx
 from game.chars.vince    import taunt_fx as vince_taunt_fx
 from game.chars.pioneer  import stun_bullet_fx
@@ -535,6 +536,8 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     flash_fx.detect_flash_hit_sfx(state, my_id)
     marksman_barrage_fx.detect_barrage_sfx(state, my_id, player_chars or {})
     mini_grenade_fx.detect_bomb_sfx(state, my_id, player_chars or {})
+    burst_bullet_fx.detect_powershot_sfx(state, my_id, player_chars or {})
+    agent_mercury_fx.detect_mercury_sfx(state, my_id, player_chars or {})
 
     _draw_map(screen, cx, cy)
     if game_mode == "deathmatch":
