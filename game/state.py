@@ -30,7 +30,7 @@ BULLET_RADIUS    = 5
 DEFAULT_MAX_HP   = 100      # 預設血量（未設定角色時使用）
 BULLET_MAX_RANGE = 900
 
-ZONE_START_TICK  = 10800   # 3 min at 60 Hz — when shrink begins
+ZONE_START_TICK  = 7200    # 2 min at 60 Hz — when shrink begins
 ZONE_SHRINK_RATE = 6       # ticks per pixel of half-size reduction
 
 
@@ -126,6 +126,8 @@ class Player:
     marksman_barrage_tick: int = -1  # tick when barrage F was cast (-1 = inactive)
     # ── Hunter Space：迷你手雷投擲（欄位僅供雙方端音效同步用）────────────
     hunter_bomb_tick: int      = -1  # tick when mini grenades were dropped (-1 = inactive)
+    # ── Agent RMB：Powershot（欄位僅供雙方端音效同步用）───────────────────
+    agent_powershot_tick: int  = -1  # tick when powershot RMB was cast (-1 = inactive)
     # ── 被嘲諷吸引狀態（任意角色可持有）──────────────────────────────
     pull_source_id: int       = -1   # player id pulling this player (-1 = none)
     pull_speed: float         = 0.0  # px/tick
