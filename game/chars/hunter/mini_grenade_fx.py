@@ -25,6 +25,8 @@ def detect_disappeared(state, now: float, my_id: int = None, player_chars: dict 
             casting = player.hunter_bomb_tick >= 0
             if casting and not _was_casting.get(pid, False):
                 _awaiting_first_hit.add(pid)
+                volume = audio.VOLUME_SELF if pid == my_id else audio.VOLUME_OTHER
+                audio.play('movement/hunter_swoosh.wav', volume)
             _was_casting[pid] = casting
 
     current = {bid for bid, b in state.bullets.items()

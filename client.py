@@ -332,6 +332,18 @@ def char_select_loop(sock, server_addr, player_id, room_code, screen,
 
         charselect.update(dt)
         charselect.draw_char_select(screen, font_lg, font_sm, my_ready, False)
+
+        # 偵測倒數自動 confirm（draw 內部設定 _confirmed）
+        if not my_ready and charselect.is_confirmed():
+            my_ready = True
+            try:
+                sock.sendto(pack_char_select(charselect.selected_idx(),
+                                             charselect.selected_rune()),
+                            server_addr)
+            except Exception:
+                pass
+            resend_timer = 0.0
+
         pygame.display.flip()
         clock.tick(FPS)
 

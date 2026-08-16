@@ -37,6 +37,7 @@ _VINCE_SHOTGUN_SFX = ('weapon/vince_shotgun_1.wav', 'weapon/vince_shotgun_2.wav'
 _ZOMBIE_MOAN_SFX = ('weapon/zombie_moan_1.wav', 'weapon/zombie_moan_2.wav',
                     'weapon/zombie_moan_3.wav', 'weapon/zombie_moan_4.wav')
 _ROBOT_LASER_SFX = 'weapon/robot_laser.wav'
+_POISONER_HISS_SFX = 'weapon/poisoner_hiss.wav'
 _RELOAD_SFX: dict = {
     'Agent':    'reload/agent_reload.wav',
     'Pioneer':  'reload/pioneer_reload.wav',
@@ -79,6 +80,7 @@ class InputState:
     reloading:           bool  = False
     reload_start_ms:     int   = 0
     pending_sfx:         list  = field(default_factory=list)   # [(due_ms, relpath)]，供錯開發射的音效排程用
+    poisoner_hiss_on:    bool  = False   # Poisoner 連續射擊嘶嘶聲是否正在循環播放
     # ── 按鍵緣偵測 ───────────────────────────────────────────────────────────
     space_prev:          bool  = False
     e_prev:              bool  = False
@@ -222,7 +224,6 @@ def _space_hunter(st: InputState, dx: float, dy: float,
     st.dash_speed             = 18.0 - _DASH_DECEL
     st.skill_last_ms['space'] = now
     speed_mult = 18.0 / max(st.player_speed, 0.001)
-    audio.play('movement/hunter_swoosh.wav', audio.VOLUME_SELF)
     return True, ndx, ndy, speed_mult
 
 
@@ -326,6 +327,8 @@ _SPACE_HANDLERS: dict = {
 def init_char(char_name: str) -> None:
     """遊戲開始後呼叫，依選擇角色完整重置並設定所有 client 端狀態。"""
     global _state, SHOOT_COOLDOWN_MS, MAGAZINE_SIZE, RELOAD_TIME_MS
+
+    audio.stop_loop('poisoner_hiss')   # 避免上一局結束時循環音效沒被停止、延續到新的一局
 
     from game.char_data import get_stat, CHAR_STATS
 
@@ -688,6 +691,23 @@ def read_input(player_id: int, keys_held: set,
                     reload_sfx = _RELOAD_SFX.get(_state.char_name)
                     if reload_sfx:
                         audio.play(reload_sfx, audio.VOLUME_SELF)
+
+    # ── Poisoner 連續射擊嘶嘶聲：循環播放，跟著左鍵按住/放開（不受射速冷卻影響）──
+    if _state.char_name == 'Poisoner':
+        firing_held = (not suppress_lmb
+                and not _mercury_ult_active
+                and not _zombie_spit_active
+                and not _state.reloading
+                and not r_skill_active
+                and not _state.burst_shots_left
+                and not is_stunned
+                and pygame.mouse.get_pressed()[0])
+        if firing_held and not _state.poisoner_hiss_on:
+            audio.start_loop('poisoner_hiss', _POISONER_HISS_SFX, audio.VOLUME_SELF)
+            _state.poisoner_hiss_on = True
+        elif not firing_held and _state.poisoner_hiss_on:
+            audio.stop_loop('poisoner_hiss')
+            _state.poisoner_hiss_on = False
 
     # ── 技能冷卻資訊（給 HUD）────────────────────────────────────────────
     skill_cooldowns: dict = {}
