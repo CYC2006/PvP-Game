@@ -14,6 +14,7 @@ from game.input      import (read_input, set_giant_age, set_dash_context,
                              init_char, init_rune,
                              apply_gem_cd_reduction)
 from game.renderer   import draw, handle_settings_click, reset_game_state, set_map_portals, trigger_portal_flash, settings_blocks_click, LOGICAL_W, LOGICAL_H
+from game            import audio
 from game.state      import GameState, configure_map
 from game.obstacle   import load_map
 import game.charselect as charselect
@@ -260,15 +261,22 @@ def char_select_loop(sock, server_addr, player_id, room_code, screen,
     charselect.reset()
     my_ready        = False
     last_time       = pygame.time.get_ticks()
+    loop_start_ms   = last_time
+    music_started   = False
     resend_timer    = 0.0    # PKT_CHAR_SELECT retry every 1.5s while confirmed
     heartbeat_timer = 0.0    # PKT_JOIN heartbeat every 1s (keep-alive for server)
     RESEND_INTERVAL    = 1.5
     HEARTBEAT_INTERVAL = 1.0
+    MUSIC_DELAY_MS     = 2000
 
     while True:
         now = pygame.time.get_ticks()
         dt  = (now - last_time) / 1000.0
         last_time = now
+
+        if not music_started and now - loop_start_ms >= MUSIC_DELAY_MS:
+            audio.play_music('select_character.wav', 0.8, loop=False)
+            music_started = True
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -433,6 +441,7 @@ def run() -> None:
         player_chars, my_char_name, my_rune_id, map_id, game_mode, side_flip = char_select_loop(
             sock, server_addr, player_id, room_code, screen, font_lg, font_sm, clock,
             map_id=selected_map_id, game_mode=lobby_game_mode_idx)
+        audio.stop_music()
         if player_chars is None:
             sock.close()
             pygame.display.set_caption("PvP Game")

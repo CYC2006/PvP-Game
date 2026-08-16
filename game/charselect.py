@@ -221,7 +221,8 @@ def draw_char_select(screen: pygame.Surface,
     screen.fill(COL_BG)
 
     # ── 倒數計時（取代標題）──────────────────────────────────────
-    elapsed_s = (pygame.time.get_ticks() - _countdown_start_ms) // 1000
+    # 數字每 1.11 秒才減一（非精準 1 秒），刻意對齊 select_character.wav 音檔本身的滴答節奏
+    elapsed_s = (pygame.time.get_ticks() - _countdown_start_ms) // 1110
     remaining = max(0, _COUNTDOWN_TOTAL - elapsed_s)
     if remaining <= 0 and not _confirmed:
         _confirmed = True

@@ -1,7 +1,8 @@
 import os
 import pygame
 
-_SFX_DIR = os.path.join("assets", "sfx")
+_SFX_DIR   = os.path.join("assets", "sfx")
+_MUSIC_DIR = os.path.join("assets", "music")
 _cache: dict = {}   # relpath → Sound
 
 VOLUME_SELF  = 1.0   # 自己造成的音效
@@ -47,3 +48,18 @@ def stop_loop(key: str) -> None:
     channel = _loop_channels.pop(key, None)
     if channel is not None:
         channel.stop()
+
+
+def play_music(relpath: str, volume: float = 1.0, loop: bool = True) -> None:
+    """背景音樂走 pygame.mixer.music（單一串流），跟 Sound-based 的音效分開處理。
+    loop=False 時只播一次，播完就停，不會自動重頭再來。"""
+    try:
+        pygame.mixer.music.load(os.path.join(_MUSIC_DIR, relpath))
+    except (FileNotFoundError, pygame.error):
+        return
+    pygame.mixer.music.set_volume(volume)
+    pygame.mixer.music.play(loops=-1 if loop else 0)
+
+
+def stop_music() -> None:
+    pygame.mixer.music.stop()
