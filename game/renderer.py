@@ -535,7 +535,6 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     r_dash_fx.detect_rush_sfx(state, my_id, player_chars or {})
     flash_fx.detect_flash_hit_sfx(state, my_id)
     marksman_barrage_fx.detect_barrage_sfx(state, my_id, player_chars or {})
-    mini_grenade_fx.detect_bomb_sfx(state, my_id, player_chars or {})
     burst_bullet_fx.detect_powershot_sfx(state, my_id, player_chars or {})
     agent_mercury_fx.detect_mercury_sfx(state, my_id, player_chars or {})
 
@@ -914,7 +913,7 @@ def _draw_bullets(screen, state, cx, cy, player_chars: dict, my_id: int = None):
     burst_bullet_fx.cleanup(current_bids)
     flash_fx.detect_disappeared(state, now)
     grenade_fx.detect_disappeared(state, now, my_id)
-    mini_grenade_fx.detect_disappeared(state, now)
+    mini_grenade_fx.detect_disappeared(state, now, my_id, player_chars)
     stun_bullet_fx.detect_disappeared(state, now)
     explosion_bullet_fx.detect_disappeared(state, now)
 
