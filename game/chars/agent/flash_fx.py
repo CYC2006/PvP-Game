@@ -4,12 +4,24 @@ import time
 
 import pygame
 
+from game import audio
 from game.render_utils import SCREEN_W, SCREEN_H, ws
 
 _bullet_pos: dict = {}   # bid → (x, y)
 _explosions: list = []   # [(wx, wy, spawn_t)]
 _spin_angle: dict = {}   # bid → 累積 radians
 _sprites:    dict = {}   # owner_id → Surface
+_last_flash_ticks: dict = {}   # pid → 上一幀觀察到的 flash_ticks
+
+
+def detect_flash_hit_sfx(state, my_id: int) -> None:
+    """閃光彈確實命中、螢幕開始轉白時播放；只有中招那方聽得到，施放者沒有音效。"""
+    if my_id not in state.players:
+        return
+    current = getattr(state.players[my_id], 'flash_ticks', 0)
+    if current > _last_flash_ticks.get(my_id, 0):
+        audio.play('others/agent_stun_grenade.wav', audio.VOLUME_SELF)
+    _last_flash_ticks[my_id] = current
 
 
 def detect_disappeared(state, now: float) -> None:

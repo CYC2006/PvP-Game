@@ -122,6 +122,10 @@ class Player:
     vince_dash_dy: float      = 0.0  # normalized dash direction y
     # ── Vince Space 技能狀態（嘲諷）─────────────────────────────────
     vince_taunt_tick: int     = -1   # tick when taunt started (-1 = inactive)
+    # ── Marksman R：滾動空襲（欄位僅供雙方端音效同步用）──────────────────
+    marksman_barrage_tick: int = -1  # tick when barrage F was cast (-1 = inactive)
+    # ── Hunter Space：迷你手雷投擲（欄位僅供雙方端音效同步用）────────────
+    hunter_bomb_tick: int      = -1  # tick when mini grenades were dropped (-1 = inactive)
     # ── 被嘲諷吸引狀態（任意角色可持有）──────────────────────────────
     pull_source_id: int       = -1   # player id pulling this player (-1 = none)
     pull_speed: float         = 0.0  # px/tick
@@ -1029,6 +1033,10 @@ class GameState:
     def _spawn_mini_grenades(self, owner_id: int) -> None:
         from game.chars.hunter.mini_grenade_state import spawn_mini_grenades
         spawn_mini_grenades(self, owner_id)
+
+    def step_hunter_bomb_cast(self) -> None:
+        from game.chars.hunter.mini_grenade_state import step_hunter_bomb_cast
+        step_hunter_bomb_cast(self)
 
     def _trigger_mini_grenade_explosion(self, x: float, y: float, owner_id: int) -> None:
         from game.chars.hunter.mini_grenade_state import trigger_mini_grenade_explosion

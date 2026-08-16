@@ -532,6 +532,9 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     zombie_spit_fx.detect_spit_sfx(state, my_id, player_chars or {})
     pioneer_jump_fx.detect_jump_sfx(state, my_id, player_chars or {})
     r_dash_fx.detect_rush_sfx(state, my_id, player_chars or {})
+    flash_fx.detect_flash_hit_sfx(state, my_id)
+    marksman_barrage_fx.detect_barrage_sfx(state, my_id, player_chars or {})
+    mini_grenade_fx.detect_bomb_sfx(state, my_id, player_chars or {})
 
     _draw_map(screen, cx, cy)
     if game_mode == "deathmatch":

@@ -221,6 +221,7 @@ def _space_hunter(st: InputState, dx: float, dy: float,
     st.dash_speed             = 18.0 - _DASH_DECEL
     st.skill_last_ms['space'] = now
     speed_mult = 18.0 / max(st.player_speed, 0.001)
+    audio.play('movement/hunter_swoosh.wav', audio.VOLUME_SELF)
     return True, ndx, ndy, speed_mult
 
 

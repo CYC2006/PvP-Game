@@ -7,12 +7,26 @@
 
 import time
 import pygame
+from game import audio
 from game.render_utils import ws, SCREEN_W, COL_BULLET
 from game.chars.marksman.barrage_state import BARRAGE_FUSE
 
 EXPL_MAX_R    = 110
 EXPL_DURATION = 0.5   # 秒
 _PLUS_SIZE    = 8     # + 標誌的半臂長（px）
+
+_was_casting: dict = {}   # pid → bool，上一幀 marksman_barrage_tick 是否 >= 0
+
+
+def detect_barrage_sfx(state, my_id: int, player_chars: dict) -> None:
+    for pid, player in state.players.items():
+        if player_chars.get(pid) != 'Marksman':
+            continue
+        casting = player.marksman_barrage_tick >= 0
+        if casting and not _was_casting.get(pid, False):
+            volume = audio.VOLUME_SELF if pid == my_id else audio.VOLUME_OTHER
+            audio.play('others/marksman_bombing.wav', volume)
+        _was_casting[pid] = casting
 _PLUS_WIDTH   = 2     # + 線寬（px）
 
 _known:      dict = {}   # sid → (wx, wy, owner_id, explode_t_or_None)

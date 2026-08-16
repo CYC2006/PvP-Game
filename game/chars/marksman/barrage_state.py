@@ -19,7 +19,7 @@ BARRAGE_PER_WAVE = 3      # 每波同時落下的空襲數
 BARRAGE_EXPL_R   = 80     # 爆炸傷害半徑（px）
 BARRAGE_DMG_MIN  = 10     # 邊緣最低傷害
 BARRAGE_DMG_MAX  = 35     # 中心最高傷害（公式算出）
-
+BARRAGE_CAST_TICKS = 20   # 施放狀態同步欄位保留時長，僅供音效同步用途
 
 def activate_barrage(state, owner_id: int, aim_x: float, aim_y: float) -> None:
     """按下 R 後立即建立 18 枚待發空襲，存入 _pending_barrage。"""
@@ -29,6 +29,7 @@ def activate_barrage(state, owner_id: int, aim_x: float, aim_y: float) -> None:
     length = math.hypot(aim_x, aim_y)
     if length == 0:
         return
+    player.marksman_barrage_tick = state.tick
     ux, uy = aim_x / length, aim_y / length
     rx, ry = -uy, ux   # 右方向向量（垂直於前進方向）
 
@@ -84,3 +85,8 @@ def step_barrage(state) -> None:
 
     for sid in to_remove:
         state.barrage_strikes.pop(sid, None)
+
+    for player in state.players.values():
+        if (player.marksman_barrage_tick >= 0
+                and state.tick - player.marksman_barrage_tick >= BARRAGE_CAST_TICKS):
+            player.marksman_barrage_tick = -1

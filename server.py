@@ -478,6 +478,7 @@ def run(map_id: int = 0):
                         s.step_mines()
                         s.step_turrets(room.obstacles, room.obstacle_hp)
                         s.step_barrage()
+                        s.step_hunter_bomb_cast()
                         s.step_poison_pools()
                         s.step_poisoner_space()
                         s.step_poisoner_e()

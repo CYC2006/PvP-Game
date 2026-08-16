@@ -10,5 +10,5 @@ def detect(state, my_id: int, player_chars: dict) -> None:
         dashing = player.agent_dash_tick >= 0
         if dashing and not _was_dashing.get(pid, False):
             volume = audio.VOLUME_SELF if pid == my_id else audio.VOLUME_OTHER
-            audio.play('movement/agent_space_swoosh.wav', volume)
+            audio.play('movement/agent_swoosh.wav', volume)
         _was_dashing[pid] = dashing

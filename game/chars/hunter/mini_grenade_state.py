@@ -10,12 +10,13 @@ _DROP_RADIUS = 40.0
 _LINGER_MIN  = 15
 _LINGER_MAX  = 25
 _COUNT       = 6
-
+CAST_TICKS   = 30   # 施放狀態同步欄位保留時長，僅供音效同步用途
 
 def spawn_mini_grenades(state, owner_id: int) -> None:
     player = state.players.get(owner_id)
     if not player:
         return
+    player.hunter_bomb_tick = state.tick
     sector = math.tau / _COUNT
     for i in range(_COUNT):
         a = sector * i + random.uniform(0, sector)
@@ -33,6 +34,13 @@ def spawn_mini_grenades(state, owner_id: int) -> None:
             linger_ticks=random.randint(_LINGER_MIN, _LINGER_MAX),
             bullet_type=BType.MINI_GRENADE,
         )
+
+
+def step_hunter_bomb_cast(state) -> None:
+    for player in state.players.values():
+        if (player.hunter_bomb_tick >= 0
+                and state.tick - player.hunter_bomb_tick >= CAST_TICKS):
+            player.hunter_bomb_tick = -1
 
 
 def trigger_mini_grenade_explosion(state, x: float, y: float, owner_id: int) -> None:
