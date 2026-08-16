@@ -37,7 +37,7 @@ _VINCE_SHOTGUN_SFX = ('weapon/vince_shotgun_1.wav', 'weapon/vince_shotgun_2.wav'
 _ZOMBIE_MOAN_SFX = ('weapon/zombie_moan_1.wav', 'weapon/zombie_moan_2.wav',
                     'weapon/zombie_moan_3.wav', 'weapon/zombie_moan_4.wav')
 _ROBOT_LASER_SFX = 'weapon/robot_laser.wav'
-_POISONER_HISS_SFX = 'weapon/poisoner_hiss.wav'
+_POISONER_HISS_SFX = 'weapon/poisoner_poison.wav'
 _RELOAD_SFX: dict = {
     'Agent':    'reload/agent_reload.wav',
     'Pioneer':  'reload/pioneer_reload.wav',
