@@ -128,39 +128,38 @@ def _build_minimap(map_def: dict, w: int, h: int) -> pygame.Surface:
         pygame.draw.rect(surf, (100, 68, 35), (ox - 1, oy - 1, ow + 2, oh + 2))
         pygame.draw.rect(surf, col,           (ox, oy, ow, oh))
 
-    # Draw portals (Portal map)
+    # Draw portals
+    PW_MINI = max(8, int(20 * sx))
     for portal in map_def.get("portals", []):
-        px     = portal["x"]
-        py_min = portal["y_min"]
-        py_max = portal["y_max"]
-
-        screen_x   = int(px * sx)
-        screen_y1  = int(py_min * sy)
-        screen_y2  = int(py_max * sy)
-        portal_h   = screen_y2 - screen_y1
-        portal_w   = max(8, int(20 * sx))
-
-        # Left portal: draw on the left edge; right portal: on the right edge
-        if px == 0:
-            rect_x = 0
-        else:
-            rect_x = w - portal_w
-
-        # Layered glow: outer (dim) → mid → inner (bright)
-        for layer, (col, inset) in enumerate([
-            ((80,  30, 120), 0),
-            ((140,  60, 200), 2),
-            ((190, 120, 255), 4),
-        ]):
-            r = pygame.Rect(rect_x + inset, screen_y1 + inset,
-                            portal_w - inset * 2, portal_h - inset * 2)
-            if r.width > 0 and r.height > 0:
-                pygame.draw.rect(surf, col, r)
-
-        # Bright centre line
-        cx_line = rect_x + portal_w // 2
-        pygame.draw.line(surf, (230, 180, 255),
-                         (cx_line, screen_y1 + 4), (cx_line, screen_y2 - 4), 1)
+        if "x" in portal:
+            # Left / right portal (vertical slab, purple)
+            px     = portal["x"]
+            sy1    = int(portal["y_min"] * sy)
+            sy2    = int(portal["y_max"] * sy)
+            ph     = sy2 - sy1
+            rect_x = 0 if px == 0 else w - PW_MINI
+            for col, inset in [((80, 30, 120), 0), ((140, 60, 200), 2), ((190, 120, 255), 4)]:
+                r = pygame.Rect(rect_x + inset, sy1 + inset,
+                                PW_MINI - inset * 2, ph - inset * 2)
+                if r.width > 0 and r.height > 0:
+                    pygame.draw.rect(surf, col, r)
+            cx_line = rect_x + PW_MINI // 2
+            pygame.draw.line(surf, (230, 180, 255), (cx_line, sy1 + 4), (cx_line, sy2 - 4), 1)
+        elif "y" in portal:
+            # Top / bottom portal (horizontal slab, pink)
+            PH_MINI = max(8, int(20 * sy))
+            py_val  = portal["y"]
+            sx1     = int(portal["x_min"] * sx)
+            sx2     = int(portal["x_max"] * sx)
+            pw      = sx2 - sx1
+            rect_y  = 0 if py_val == 0 else h - PH_MINI
+            for col, inset in [((120, 30, 80), 0), ((200, 60, 140), 2), ((255, 120, 190), 4)]:
+                r = pygame.Rect(sx1 + inset, rect_y + inset,
+                                pw - inset * 2, PH_MINI - inset * 2)
+                if r.width > 0 and r.height > 0:
+                    pygame.draw.rect(surf, col, r)
+            cy_line = rect_y + PH_MINI // 2
+            pygame.draw.line(surf, (255, 200, 230), (sx1 + 4, cy_line), (sx2 - 4, cy_line), 1)
 
     return surf
 

@@ -646,40 +646,58 @@ def _build_map_surface() -> "pygame.Surface":
     pygame.draw.rect(surf, COL_MAP_BORDER, surf.get_rect(), 2)
 
     # Draw portals if this map has them
+    PW = 28   # portal visual thickness into the map
     for portal in _map_portals:
-        px     = portal["x"]
-        py_min = portal["y_min"]
-        py_max = portal["y_max"]
-        ph     = py_max - py_min
-        pw     = 28   # portal visual width into the map
-
-        # Determine rect: left portal anchors at x=0, right portal at map edge
-        rect_x = 0 if px == 0 else MW - pw
-
-        # Outer glow layers (darkest → brightest), each inset from the open (inner) side.
-        # Left portal: anchored at x=0, shrinks rightward.
-        # Right portal: anchored at x=MW, shrinks leftward.
-        LAYERS = [
-            ((60,  18,  90), 0),
-            ((100,  30, 150), 3),
-            ((150,  60, 220), 7),
-            ((190, 100, 255), 12),
-        ]
-        for col, inset in LAYERS:
-            if px == 0:
-                r = pygame.Rect(0, py_min + inset, pw - inset, ph - inset * 2)
-            else:
-                r = pygame.Rect(MW - pw + inset, py_min + inset, pw - inset, ph - inset * 2)
-            if r.width > 0 and r.height > 0:
-                pygame.draw.rect(surf, col, r)
-
-        # Lavender shimmer stripe down the centre of the portal slab
-        cx_line = rect_x + pw // 2
-        pygame.draw.line(surf, (230, 190, 255),
-                         (cx_line, py_min + 6), (cx_line, py_max - 6), 2)
-        # Small bright centre dot
-        pygame.draw.circle(surf, (255, 230, 255),
-                           (cx_line, (py_min + py_max) // 2), 4)
+        if "x" in portal:
+            # ── Left / right portal (vertical slab) ─────────────────────
+            px     = portal["x"]
+            py_min = portal["y_min"]
+            py_max = portal["y_max"]
+            ph     = py_max - py_min
+            rect_x = 0 if px == 0 else MW - PW
+            LAYERS = [
+                ((60,  18,  90), 0),
+                ((100,  30, 150), 3),
+                ((150,  60, 220), 7),
+                ((190, 100, 255), 12),
+            ]
+            for col, inset in LAYERS:
+                if px == 0:
+                    r = pygame.Rect(0, py_min + inset, PW - inset, ph - inset * 2)
+                else:
+                    r = pygame.Rect(MW - PW + inset, py_min + inset, PW - inset, ph - inset * 2)
+                if r.width > 0 and r.height > 0:
+                    pygame.draw.rect(surf, col, r)
+            cx_line = rect_x + PW // 2
+            pygame.draw.line(surf, (230, 190, 255),
+                             (cx_line, py_min + 6), (cx_line, py_max - 6), 2)
+            pygame.draw.circle(surf, (255, 230, 255),
+                               (cx_line, (py_min + py_max) // 2), 4)
+        elif "y" in portal:
+            # ── Top / bottom portal (horizontal slab, pink tones) ────────
+            py     = portal["y"]
+            px_min = portal["x_min"]
+            px_max = portal["x_max"]
+            pw     = px_max - px_min
+            rect_y = 0 if py == 0 else MH - PW
+            LAYERS = [
+                ((90,  18,  60), 0),
+                ((150,  30, 100), 3),
+                ((220,  60, 150), 7),
+                ((255, 100, 190), 12),
+            ]
+            for col, inset in LAYERS:
+                if py == 0:
+                    r = pygame.Rect(px_min + inset, 0, pw - inset * 2, PW - inset)
+                else:
+                    r = pygame.Rect(px_min + inset, MH - PW + inset, pw - inset * 2, PW - inset)
+                if r.width > 0 and r.height > 0:
+                    pygame.draw.rect(surf, col, r)
+            cy_line = rect_y + PW // 2
+            pygame.draw.line(surf, (255, 200, 230),
+                             (px_min + 6, cy_line), (px_max - 6, cy_line), 2)
+            pygame.draw.circle(surf, (255, 230, 245),
+                               ((px_min + px_max) // 2, cy_line), 4)
 
     return surf
 
