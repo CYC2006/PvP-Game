@@ -3,12 +3,26 @@ import time
 
 import pygame
 
+from game import audio
 from game.render_utils import SCREEN_W, SCREEN_H, ws
 from game.state import BULLET_RADIUS
 
 SHURIKEN_GROW_RATE = 0.3   # 與 shuriken_state 保持一致
 
 _first_tick: dict = {}   # bid → 第一次出現時的 state.tick
+
+_was_casting: dict = {}   # pid → bool，上一幀 assassin_blade_tick 是否 >= 0
+
+
+def detect_blade_sfx(state, my_id: int, player_chars: dict) -> None:
+    for pid, player in state.players.items():
+        if player_chars.get(pid) != 'Assassin':
+            continue
+        casting = player.assassin_blade_tick >= 0
+        if casting and not _was_casting.get(pid, False):
+            volume = audio.VOLUME_SELF if pid == my_id else audio.VOLUME_OTHER
+            audio.play('others/assassin_blade_strike.wav', volume)
+        _was_casting[pid] = casting
 
 # ── 殘影追蹤 ─────────────────────────────────────────────────────────────────
 _TRAIL_MAX = 8      # 最多保留幾個殘影點

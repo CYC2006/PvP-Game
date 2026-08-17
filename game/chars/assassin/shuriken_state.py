@@ -4,6 +4,7 @@ from game.state import Bullet, BType, PLAYER_RADIUS, BULLET_MAX_RANGE
 SHURIKEN_GROW_RATE = 0.3    # px/tick，碰撞半徑每 tick 增加量
 SHURIKEN_BASE_DMG  = 15     # 初始傷害
 SHURIKEN_DMG_SCALE = 1.5    # 每 px 碰撞半徑增加的傷害
+BLADE_CAST_TICKS   = 15     # 施放狀態同步欄位保留時長，僅供音效同步用途
 
 
 def spawn_shuriken(state, owner_id: int, aim_x: float, aim_y: float) -> None:
@@ -13,6 +14,7 @@ def spawn_shuriken(state, owner_id: int, aim_x: float, aim_y: float) -> None:
     length = math.hypot(aim_x, aim_y)
     if length == 0:
         return
+    player.assassin_blade_tick = state.tick
     ux, uy = aim_x / length, aim_y / length
     rx, ry = -uy, ux   # 右側垂直方向（與 _spawn_bullet 相同）
     _BARREL_FWD   = PLAYER_RADIUS + 10   # 26 px
@@ -30,3 +32,10 @@ def spawn_shuriken(state, owner_id: int, aim_x: float, aim_y: float) -> None:
         spawn_tick=state.tick,
         bullet_type=BType.SHURIKEN,
     )
+
+
+def step_blade_cast(state) -> None:
+    for player in state.players.values():
+        if (player.assassin_blade_tick >= 0
+                and state.tick - player.assassin_blade_tick >= BLADE_CAST_TICKS):
+            player.assassin_blade_tick = -1

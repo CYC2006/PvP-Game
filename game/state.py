@@ -128,6 +128,8 @@ class Player:
     hunter_bomb_tick: int      = -1  # tick when mini grenades were dropped (-1 = inactive)
     # ── Agent RMB：Powershot（欄位僅供雙方端音效同步用）───────────────────
     agent_powershot_tick: int  = -1  # tick when powershot RMB was cast (-1 = inactive)
+    # ── Assassin RMB：手裡劍強擲（欄位僅供雙方端音效同步用）───────────────
+    assassin_blade_tick: int   = -1  # tick when RMB shuriken was cast (-1 = inactive)
     # ── 被嘲諷吸引狀態（任意角色可持有）──────────────────────────────
     pull_source_id: int       = -1   # player id pulling this player (-1 = none)
     pull_speed: float         = 0.0  # px/tick
@@ -1017,6 +1019,10 @@ class GameState:
     def _spawn_shuriken(self, owner_id: int, aim_x: float, aim_y: float) -> None:
         from game.chars.assassin.shuriken_state import spawn_shuriken
         spawn_shuriken(self, owner_id, aim_x, aim_y)
+
+    def step_blade_cast(self) -> None:
+        from game.chars.assassin.shuriken_state import step_blade_cast
+        step_blade_cast(self)
 
     def _activate_speed_boost(self, owner_id: int) -> None:
         from game.chars.assassin.speed_state import activate_speed_boost

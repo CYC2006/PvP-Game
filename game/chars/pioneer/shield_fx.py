@@ -6,6 +6,7 @@
 
 import time
 import pygame
+from game import audio
 from game.render_utils import ws, SCREEN_W, SCREEN_H
 
 SHIELD_RADIUS      = 60      # px（與 shield_state 同步）
@@ -15,6 +16,22 @@ SHOCKWAVE_DURATION = 0.5     # 秒
 _known:      dict = {}
 # [(wx, wy, start_t)]  ← 衝擊波列表
 _shockwaves: list = []
+
+_last_hp: dict = {}   # pid → 上一幀觀察到的護盾 hp（無護盾視為 0）
+
+
+def detect_shield_sfx(state, my_id: int, player_chars: dict) -> None:
+    """施放 E 時護盾會整個重建、hp 跳回滿血，用「hp 比上一幀高」當作剛施放的訊號
+    （spawn_tick 沒有同步，hp/max_hp 才有完整精度同步）。"""
+    for pid in state.players:
+        if player_chars.get(pid) != 'Pioneer':
+            continue
+        shield = state.shields.get(pid)
+        current_hp = shield.hp if shield else 0
+        if current_hp > _last_hp.get(pid, 0):
+            volume = audio.VOLUME_SELF if pid == my_id else audio.VOLUME_OTHER
+            audio.play('others/pioneer_shield.wav', volume)
+        _last_hp[pid] = current_hp
 
 
 def update(state) -> None:

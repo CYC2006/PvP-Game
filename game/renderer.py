@@ -20,11 +20,12 @@ from game.chars.pioneer  import stun_bullet_fx
 from game.chars.vince.giant_state import get_scale as _giant_get_scale, GROW_TICKS, ACTIVE_TICKS, TOTAL_TICKS
 from game.chars.hunter   import mini_grenade_fx
 from game.chars.hunter   import air_cannon_fx
+from game.chars.hunter   import cloak_fx as hunter_cloak_fx
 from game.chars.zombie   import blade_fx
 from game.chars.zombie   import jump_fx as zombie_jump_fx
 from game.chars.zombie   import spit_fx as zombie_spit_fx
 from game.chars.zombie   import rage_fx as zombie_rage_fx
-from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx
+from game.chars.assassin import smoke_fx, shuriken_fx, r_dash_fx, speed_fx as assassin_speed_fx
 from game.chars.poisoner   import bubble_fx
 from game.chars.poisoner   import poison_pool_fx
 from game.chars.poisoner   import e_skill_fx as poisoner_e_fx
@@ -537,6 +538,11 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     marksman_barrage_fx.detect_barrage_sfx(state, my_id, player_chars or {})
     burst_bullet_fx.detect_powershot_sfx(state, my_id, player_chars or {})
     agent_mercury_fx.detect_mercury_sfx(state, my_id, player_chars or {})
+    zombie_rage_fx.detect_bloodlust_sfx(state, my_id, player_chars or {})
+    assassin_speed_fx.detect_speed_sfx(state, my_id, player_chars or {})
+    shuriken_fx.detect_blade_sfx(state, my_id, player_chars or {})
+    hunter_cloak_fx.detect_cloak_sfx(state, my_id, player_chars or {})
+    pioneer_shield_fx.detect_shield_sfx(state, my_id, player_chars or {})
 
     _draw_map(screen, cx, cy)
     if game_mode == "deathmatch":

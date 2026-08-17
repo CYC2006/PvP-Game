@@ -1,17 +1,17 @@
 """Sniper R — Phantom Cloak（幻影隱身）
 
 持續 3 秒（180 tick）。
-每個週期 30 tick = 24 tick 隱身 + 6 tick 現形。
-共 6 個週期，形成「出現→消失→出現→消失」迷蹤效果。
+每個週期 45 tick = 33 tick 隱身 + 12 tick 現形。
+共 4 個週期，形成「出現→消失→出現→消失」迷蹤效果。
 
 phase_of(remaining) -> 'hidden' | 'revealed'
   remaining = cloak_until - current_tick（剩餘 tick 數）
 """
 
 CLOAK_TICKS  = 180   # 3 秒
-CLOAK_CYCLE  = 30    # 一個週期長度
-CLOAK_HIDDEN = 24    # 每週期中隱身的 tick 數
-CLOAK_SHOW   = 6     # 每週期中現形的 tick 數
+CLOAK_CYCLE  = 45    # 一個週期長度
+CLOAK_HIDDEN = 33    # 每週期中隱身的 tick 數
+CLOAK_SHOW   = 12    # 每週期中現形的 tick 數
 
 
 def activate_cloak(state, owner_id: int) -> None:
