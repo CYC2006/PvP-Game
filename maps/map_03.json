@@ -1,0 +1,484 @@
+{
+  "obstacles": [
+    {
+      "id": 1,
+      "kind": "box_normal",
+      "x": 168,
+      "y": 168,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 2,
+      "kind": "box_normal",
+      "x": 232,
+      "y": 168,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 3,
+      "kind": "box_normal",
+      "x": 168,
+      "y": 232,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 4,
+      "kind": "box_normal",
+      "x": 232,
+      "y": 232,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 5,
+      "kind": "box_normal",
+      "x": 348,
+      "y": 168,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 6,
+      "kind": "box_normal",
+      "x": 412,
+      "y": 168,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 7,
+      "kind": "box_normal",
+      "x": 348,
+      "y": 232,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 8,
+      "kind": "box_special",
+      "x": 412,
+      "y": 232,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 9,
+      "kind": "box_normal",
+      "x": 508,
+      "y": 168,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 10,
+      "kind": "box_special",
+      "x": 572,
+      "y": 168,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 11,
+      "kind": "box_normal",
+      "x": 508,
+      "y": 232,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 12,
+      "kind": "box_normal",
+      "x": 572,
+      "y": 232,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 13,
+      "kind": "box_normal",
+      "x": 848,
+      "y": 168,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 14,
+      "kind": "box_normal",
+      "x": 912,
+      "y": 168,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 15,
+      "kind": "box_special",
+      "x": 848,
+      "y": 232,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 16,
+      "kind": "box_special",
+      "x": 912,
+      "y": 232,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 17,
+      "kind": "box_special",
+      "x": 348,
+      "y": 348,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 18,
+      "kind": "box_normal",
+      "x": 412,
+      "y": 348,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 19,
+      "kind": "box_normal",
+      "x": 348,
+      "y": 412,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 20,
+      "kind": "box_normal",
+      "x": 412,
+      "y": 412,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 21,
+      "kind": "box_normal",
+      "x": 508,
+      "y": 348,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 22,
+      "kind": "box_normal",
+      "x": 572,
+      "y": 348,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 23,
+      "kind": "box_normal",
+      "x": 508,
+      "y": 412,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 24,
+      "kind": "box_normal",
+      "x": 572,
+      "y": 412,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 25,
+      "kind": "box_normal",
+      "x": 668,
+      "y": 348,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 26,
+      "kind": "box_special",
+      "x": 732,
+      "y": 348,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 27,
+      "kind": "box_special",
+      "x": 668,
+      "y": 412,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 28,
+      "kind": "box_normal",
+      "x": 732,
+      "y": 412,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 29,
+      "kind": "box_special",
+      "x": 668,
+      "y": 508,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 30,
+      "kind": "box_special",
+      "x": 732,
+      "y": 508,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 31,
+      "kind": "box_special",
+      "x": 668,
+      "y": 572,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 32,
+      "kind": "box_special",
+      "x": 732,
+      "y": 572,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 33,
+      "kind": "box_normal",
+      "x": 168,
+      "y": 668,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 34,
+      "kind": "box_normal",
+      "x": 232,
+      "y": 668,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 35,
+      "kind": "box_normal",
+      "x": 168,
+      "y": 732,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 36,
+      "kind": "box_special",
+      "x": 232,
+      "y": 732,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 37,
+      "kind": "box_normal",
+      "x": 348,
+      "y": 668,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 38,
+      "kind": "box_normal",
+      "x": 412,
+      "y": 668,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 39,
+      "kind": "box_normal",
+      "x": 348,
+      "y": 732,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 40,
+      "kind": "box_normal",
+      "x": 412,
+      "y": 732,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 41,
+      "kind": "box_special",
+      "x": 508,
+      "y": 668,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 42,
+      "kind": "box_normal",
+      "x": 572,
+      "y": 668,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 43,
+      "kind": "box_normal",
+      "x": 508,
+      "y": 732,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 44,
+      "kind": "box_normal",
+      "x": 572,
+      "y": 732,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 45,
+      "kind": "box_normal",
+      "x": 848,
+      "y": 668,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 46,
+      "kind": "box_special",
+      "x": 912,
+      "y": 668,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 47,
+      "kind": "box_normal",
+      "x": 848,
+      "y": 732,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 48,
+      "kind": "box_special",
+      "x": 912,
+      "y": 732,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 49,
+      "kind": "box_normal",
+      "x": 168,
+      "y": 848,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 50,
+      "kind": "box_normal",
+      "x": 232,
+      "y": 848,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 51,
+      "kind": "box_normal",
+      "x": 168,
+      "y": 912,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 52,
+      "kind": "box_normal",
+      "x": 232,
+      "y": 912,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 53,
+      "kind": "box_normal",
+      "x": 508,
+      "y": 848,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 54,
+      "kind": "box_normal",
+      "x": 572,
+      "y": 848,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 55,
+      "kind": "box_special",
+      "x": 508,
+      "y": 912,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 56,
+      "kind": "box_normal",
+      "x": 572,
+      "y": 912,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 57,
+      "kind": "box_special",
+      "x": 668,
+      "y": 848,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 58,
+      "kind": "box_normal",
+      "x": 732,
+      "y": 848,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 59,
+      "kind": "box_normal",
+      "x": 668,
+      "y": 912,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 60,
+      "kind": "box_special",
+      "x": 732,
+      "y": 912,
+      "angle_deg": 0,
+      "scale": 1.0
+    }
+  ]
+}
