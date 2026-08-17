@@ -62,8 +62,8 @@ _DET_H = _DET_B - _DET_Y             # 630
 _PREV_W = _RW - 0
 _PREV_H = int(_PREV_W * 9 / 16)
 
-# Map card: tall enough for name + 3 tag rows + padding
-_CARD_H   = 126
+# Map card: name row + a single row of obstacle-colour dots
+_CARD_H   = 82
 _CARD_GAP = 10
 
 MAP_RS: list[pygame.Rect] = [
@@ -218,29 +218,28 @@ def draw(screen: pygame.Surface,
             pygame.draw.rect(screen, (68, 148, 235),
                              (r.x, r.y + 8, 3, r.h - 16), border_radius=2)
 
-        # Map name
+        # Row 1 — map name
         nc = (185, 218, 255) if sel else (90, 110, 145)
         ns = font_lg.render(m["name"], True, nc)
         screen.blit(ns, (r.x + 14, r.y + 12))
 
-        # Portal map: show small portal indicator badge
+        # Portal map: show small portal indicator badge, same row as name
         if m.get("portals"):
             badge_col = (130, 60, 200) if sel else (80, 40, 130)
-            pygame.draw.rect(screen, badge_col,
-                             (r.x + r.w - 36, r.y + 10, 28, 14), border_radius=4)
+            badge_r = pygame.Rect(r.x + r.w - 14 - 28,
+                                  r.y + 12 + (ns.get_height() - 14) // 2, 28, 14)
+            pygame.draw.rect(screen, badge_col, badge_r, border_radius=4)
             bt = font_sm.render("TP", True, (220, 170, 255))
-            screen.blit(bt, (r.x + r.w - 36 + (28 - bt.get_width()) // 2,
-                             r.y + 10 + (14 - bt.get_height()) // 2))
+            screen.blit(bt, (badge_r.centerx - bt.get_width() // 2,
+                             badge_r.centery - bt.get_height() // 2))
 
-        # Obstacle colour dots — stacked vertically from bottom of name
-        dot_y = r.y + 12 + ns.get_height() + 8
+        # Row 2 — obstacle colour dots, horizontal, no text labels
+        dot_r = 7
+        dot_y = r.y + 12 + ns.get_height() + 6 + dot_r
         dot_x = r.x + 14
         for lbl, _destr, dcol in m["tags"]:
-            pygame.draw.circle(screen, dcol, (dot_x + 5, dot_y + 7), 5)
-            ls = font_sm.render(lbl, True,
-                                (115, 142, 178) if sel else (75, 92, 118))
-            screen.blit(ls, (dot_x + 14, dot_y))
-            dot_y += font_sm.get_height() + 4
+            pygame.draw.circle(screen, dcol, (dot_x + dot_r, dot_y), dot_r)
+            dot_x += dot_r * 2 + 10
 
     # ── Right: minimap preview ────────────────────────────────────────────
     # Fit the map inside the envelope while preserving its true aspect ratio.
