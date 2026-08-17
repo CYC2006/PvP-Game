@@ -1,4 +1,5 @@
 import json
+import math
 import random
 import socket
 import time
@@ -449,20 +450,24 @@ def run(map_id: int = 0):
                                 fn = _SKILL_E.get(p.char_name)
                                 if fn:
                                     fn(room.state, pid, ax, ay)
+                                    p.e_uses = min(255, p.e_uses + 1)
                             _bursting = p.burst_next_tick >= 0
                             if cmd.use_skill_rmb:
                                 fn = _SKILL_RMB.get(p.char_name)
                                 if fn:
                                     fn(room.state, pid, ax, ay)
+                                    p.rmb_uses = min(255, p.rmb_uses + 1)
                             if not _bursting:
                                 if cmd.use_skill_space:
                                     fn = _SKILL_SPACE.get(p.char_name)
                                     if fn:
                                         fn(room.state, pid, ax, ay)
+                                        p.space_uses = min(255, p.space_uses + 1)
                                 if cmd.use_skill_r:
                                     fn = _SKILL_R.get(p.char_name)
                                     if fn:
                                         fn(room.state, pid, ax, ay)
+                                        p.f_uses = min(255, p.f_uses + 1)
                         if cmd.use_rune:
                             room.state._activate_rune(pid)
                     room.state.apply_command(
@@ -590,14 +595,25 @@ def run(map_id: int = 0):
                         if s.game_mode == "deathmatch" and s.lives:
                             loser = next((pid for pid, lv in s.lives.items() if lv <= 0), None)
                             if loser is not None:
-                                go_payload = pack_game_over()
+                                final_payload = pack_state(s)
+                                go_payload    = pack_game_over()
                                 for a in room.clients.values():
                                     try:
+                                        sock.sendto(final_payload, a)
                                         sock.sendto(go_payload, a)
                                     except Exception:
                                         pass
                                 _reset_room(room)
                                 continue
+
+                        # Distance traveled tracking (server-side only)
+                        for _p in s.players.values():
+                            if _p._tracking_x >= 0:
+                                _p.distance_traveled = min(655350, _p.distance_traveled +
+                                                           int(math.hypot(_p.x - _p._tracking_x,
+                                                                          _p.y - _p._tracking_y)))
+                            _p._tracking_x = _p.x
+                            _p._tracking_y = _p.y
 
                         payload = pack_state(s)
                         for a in room.clients.values():

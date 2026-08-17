@@ -13,7 +13,7 @@ from game.input      import (read_input, set_giant_age, set_dash_context,
                              cancel_mercury_barrage, cancel_zombie_spit,
                              init_char, init_rune,
                              apply_gem_cd_reduction)
-from game.renderer   import draw, handle_settings_click, reset_game_state, set_map_portals, trigger_portal_flash, settings_blocks_click, LOGICAL_W, LOGICAL_H
+from game.renderer   import draw, draw_results, handle_settings_click, reset_game_state, set_map_portals, trigger_portal_flash, settings_blocks_click, LOGICAL_W, LOGICAL_H
 from game            import audio
 from game.state      import GameState, configure_map
 from game.obstacle   import load_map
@@ -382,6 +382,28 @@ def _show_game_over_msg(screen: pygame.Surface,
         pygame.display.flip()
 
 
+def _show_results(screen: pygame.Surface, state, my_pid: int,
+                  player_chars: dict, font_sm: pygame.font.Font,
+                  clock: pygame.time.Clock,
+                  elapsed_ms: int, did_win: bool,
+                  map_name: str = "") -> str:
+    """Show deathmatch results screen. Returns 'lobby' or 'quit'."""
+    lobby_btn = None
+    while True:
+        clock.tick(FPS)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return "quit"
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return "lobby"
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if lobby_btn and lobby_btn.collidepoint(pygame.mouse.get_pos()):
+                    return "lobby"
+        lobby_btn = draw_results(screen, state, my_pid, player_chars,
+                                 font_sm, elapsed_ms, did_win, map_name=map_name)
+        pygame.display.flip()
+
+
 # ── 主流程 ────────────────────────────────────────────────────────────────────
 
 def run() -> None:
@@ -600,7 +622,23 @@ def run() -> None:
         if not app_running:
             break
 
-        if opponent_quit:
+        opp_pid   = 3 - player_id
+        my_lives  = state.lives.get(player_id, -1)
+        opp_lives = state.lives.get(opp_pid, -1)
+        natural_dm_end = (game_mode == "deathmatch" and
+                          (my_lives == 0 or opp_lives == 0))
+
+        if natural_dm_end:
+            did_win = (opp_lives == 0 and my_lives > 0)
+            result  = _show_results(screen, state, player_id, player_chars,
+                                    font_sm, clock,
+                                    elapsed_ms=pygame.time.get_ticks() - _game_start_ms,
+                                    did_win=did_win,
+                                    map_name=map_entry.get("name", ""))
+            if result == "quit":
+                app_running = False
+                break
+        elif opponent_quit:
             _show_game_over_msg(screen, font_lg, font_sm, clock,
                                 "Opponent has left the game")
 

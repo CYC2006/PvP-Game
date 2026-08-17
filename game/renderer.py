@@ -1626,3 +1626,272 @@ def _draw_poison_vignette(screen: pygame.Surface, stacks: int) -> None:
             _poison_overlay_cache.pop(next(iter(_poison_overlay_cache)))
 
     screen.blit(_poison_overlay_cache[bucket], (0, 0))
+
+
+# ── Results screen ────────────────────────────────────────────────────────────
+
+_RESULTS_FONT_CACHE: list = []   # 90pt Bold — VICTORY / DEFEAT
+_RESULTS_SUB_FONT_CACHE: list = []  # 20pt Regular — subtitle
+_RESULTS_NAME_FONT_CACHE: list = [] # 22pt Bold — character name
+_RESULTS_VAL_FONT_CACHE: list = []  # 17pt Bold — stat values
+
+_PORTRAIT_CACHE: dict = {}
+_SPRITE_MAP = {
+    "Agent":    ("agent",    "gun"),
+    "Vince":    ("vince",    "gun"),
+    "Marksman": ("marksman", "machine"),
+    "Hunter":   ("hunter",   "silencer"),
+    "Robot":    ("robot",    "silencer"),
+    "Pioneer":  ("pioneer",  "machine"),
+    "Assassin": ("assassin", "hold"),
+    "Poisoner": ("poisoner", "gun"),
+    "Zombie":   ("zombie",   "hold"),
+}
+
+
+def _get_results_font() -> pygame.font.Font:
+    if not _RESULTS_FONT_CACHE:
+        _RESULTS_FONT_CACHE.append(
+            pygame.font.Font(os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf"), 90))
+    return _RESULTS_FONT_CACHE[0]
+
+
+def _get_results_sub_font() -> pygame.font.Font:
+    if not _RESULTS_SUB_FONT_CACHE:
+        _RESULTS_SUB_FONT_CACHE.append(
+            pygame.font.Font(os.path.join("assets", "fonts", "MapleMono-NF-Regular.ttf"), 20))
+    return _RESULTS_SUB_FONT_CACHE[0]
+
+
+def _get_results_name_font() -> pygame.font.Font:
+    if not _RESULTS_NAME_FONT_CACHE:
+        _RESULTS_NAME_FONT_CACHE.append(
+            pygame.font.Font(os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf"), 22))
+    return _RESULTS_NAME_FONT_CACHE[0]
+
+
+def _get_results_val_font() -> pygame.font.Font:
+    if not _RESULTS_VAL_FONT_CACHE:
+        _RESULTS_VAL_FONT_CACHE.append(
+            pygame.font.Font(os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf"), 17))
+    return _RESULTS_VAL_FONT_CACHE[0]
+
+
+def _get_char_portrait(char_name: str, size: int) -> pygame.Surface:
+    key = (char_name, size)
+    if key in _PORTRAIT_CACHE:
+        return _PORTRAIT_CACHE[key]
+    folder, sprite = _SPRITE_MAP.get(char_name, (char_name.lower(), "gun"))
+    path = os.path.join("assets", "player", folder, f"{folder}_{sprite}.png")
+    try:
+        img = pygame.image.load(path).convert_alpha()
+        iw, ih = img.get_size()
+        scale = size / max(iw, ih)
+        img = pygame.transform.smoothscale(img, (int(iw * scale), int(ih * scale)))
+    except Exception:
+        img = pygame.Surface((size, size), pygame.SRCALPHA)
+        pygame.draw.rect(img, (80, 80, 100, 160), (0, 0, size, size), border_radius=6)
+    _PORTRAIT_CACHE[key] = img
+    return img
+
+
+def draw_results(screen: pygame.Surface, state, my_pid: int,
+                 player_chars: dict, font_sm: pygame.font.Font,
+                 elapsed_ms: int, did_win: bool,
+                 map_name: str = "") -> pygame.Rect:
+    """Draw the deathmatch end-game results screen. Returns LOBBY button Rect."""
+    W, H = LOGICAL_W, LOGICAL_H
+    CX   = W // 2
+    opp_pid = 3 - my_pid
+
+    COL_BG      = (12,  14,  20)
+    COL_PANEL   = (18,  21,  31)
+    COL_INNER   = (14,  16,  24)
+    COL_BORDER  = (30,  33,  53)
+    COL_BORDER2 = (42,  47,  74)
+    COL_MUTED   = (118, 126, 160)
+    COL_TEXT    = (220, 226, 245)
+    COL_GOLD    = (245, 196,  74)
+    COL_DEFEAT  = ( 99, 104, 128)
+    COL_SKILL   = ( 23,  27,  43)
+    COL_OUTLINE = (  5,   6,   8)
+
+    screen.fill(COL_BG)
+
+    # ── VICTORY / DEFEAT header ───────────────────────────────────────────────
+    v_font = _get_results_font()
+    v_text = "VICTORY" if did_win else "DEFEAT"
+    v_col  = COL_GOLD if did_win else COL_DEFEAT
+    vx     = CX - v_font.size(v_text)[0] // 2
+    vy     = 16
+    for odx, ody in ((-4, 0), (4, 0), (0, -4), (0, 4), (-3, -3), (3, 3), (-3, 3), (3, -3)):
+        screen.blit(v_font.render(v_text, True, COL_OUTLINE), (vx + odx, vy + ody))
+    screen.blit(v_font.render(v_text, True, v_col), (vx, vy))
+
+    total_secs = elapsed_ms // 1000
+    mm = total_secs // 60
+    ss = total_secs % 60
+    sub_font  = _get_results_sub_font()
+    sub_label = f"Deathmatch  ·  {map_name}" if map_name else "Deathmatch"
+    sub_surf  = sub_font.render(sub_label, True, COL_MUTED)
+    sub_y     = vy + v_font.get_height() + 4
+    screen.blit(sub_surf, (CX - sub_surf.get_width() // 2, sub_y))
+
+    # ── Panel — dynamic Y so VICTORY + subtitle never overlap ─────────────────
+    PX = 72
+    PW = W - 144
+    PY = sub_y + sub_surf.get_height() + 10
+    PH = H - PY - 24
+    pygame.draw.rect(screen, COL_PANEL,  (PX, PY, PW, PH), border_radius=12)
+    pygame.draw.rect(screen, COL_BORDER, (PX, PY, PW, PH), 1, border_radius=12)
+
+    # ── HUD bar (mini replica of in-game timer bar) ───────────────────────────
+    HUB_H = 62
+    pygame.draw.rect(screen, COL_INNER,
+                     (PX + 1, PY + 1, PW - 2, HUB_H - 1), border_radius=11)
+    pygame.draw.line(screen, COL_BORDER, (PX + 1, PY + HUB_H), (PX + PW - 1, PY + HUB_H))
+
+    if not _dm_timer_font:
+        _dm_timer_font.append(
+            pygame.font.Font(os.path.join("assets", "fonts", "MapleMono-NF-Bold.ttf"), 48))
+    t_font = _dm_timer_font[0]
+
+    timer_s = t_font.render(f"{mm:02d}:{ss:02d}", True, COL_TEXT)
+
+    left_pid  = my_pid
+    right_pid = opp_pid
+    left_col  = _COL_BLUE_TEAM if left_pid  == 1 else _COL_RED_TEAM
+    right_col = _COL_BLUE_TEAM if right_pid == 1 else _COL_RED_TEAM
+    k1_s = t_font.render(str(state.kill_counts.get(left_pid,  0)), True, left_col)
+    k2_s = t_font.render(str(state.kill_counts.get(right_pid, 0)), True, right_col)
+
+    DW, DH, D_GAP, TGAP = 27, 36, 9, 24
+    diamonds_w = 3 * DW + 2 * D_GAP
+    kill_w     = max(k1_s.get_width(), k2_s.get_width(), 32)
+    total_w    = diamonds_w + TGAP + kill_w + TGAP + timer_s.get_width() + TGAP + kill_w + TGAP + diamonds_w
+    hud_x      = CX - total_w // 2
+    timer_cy   = PY + HUB_H // 2
+
+    # Left = my side; right = opponent. Empty diamonds always start from center outward.
+    lives_left  = state.lives.get(left_pid,  0)
+    lives_right = state.lives.get(right_pid, 0)
+    for j in range(3):                              # j=2 is closest to center → empties first
+        _draw_diamond(screen, hud_x + j * (DW + D_GAP) + DW // 2, timer_cy,
+                      DW, DH, left_col, j < lives_left)
+    kx1 = hud_x + diamonds_w + TGAP
+    screen.blit(k1_s, (kx1 + kill_w // 2 - k1_s.get_width() // 2,
+                        timer_cy - k1_s.get_height() // 2))
+    tx = kx1 + kill_w + TGAP
+    screen.blit(timer_s, (tx, timer_cy - timer_s.get_height() // 2))
+    kx2 = tx + timer_s.get_width() + TGAP
+    screen.blit(k2_s, (kx2 + kill_w // 2 - k2_s.get_width() // 2,
+                        timer_cy - k2_s.get_height() // 2))
+    rx_start = kx2 + kill_w + TGAP
+    for j in range(3):                              # j=0 is closest to center → empties first
+        _draw_diamond(screen, rx_start + j * (DW + D_GAP) + DW // 2, timer_cy,
+                      DW, DH, right_col, j >= 3 - lives_right)
+
+    # ── Body — two columns ────────────────────────────────────────────────────
+    BODY_Y = PY + HUB_H
+    COL_W  = PW // 2
+    pygame.draw.line(screen, COL_BORDER,
+                     (PX + COL_W, BODY_Y + 10), (PX + COL_W, PY + PH - 62))
+
+    for col_idx, pid in enumerate([my_pid, opp_pid]):
+        col_x  = PX + col_idx * COL_W
+        cpad   = 24
+        cx_col = col_x + cpad
+        cw     = COL_W - cpad * 2
+        my_col = _COL_BLUE_TEAM if pid == 1 else _COL_RED_TEAM
+
+        player    = state.players.get(pid)
+        char_name = player_chars.get(pid, "???")
+
+        y = BODY_Y + 18
+
+        # Portrait (actual sprite) + character name centered vertically beside it
+        PORTRAIT = 90
+        ph       = y
+        port_r   = pygame.Rect(cx_col, ph, PORTRAIT, PORTRAIT)
+        pygame.draw.rect(screen, COL_INNER, port_r, border_radius=8)
+        pygame.draw.rect(screen, my_col, port_r, 2, border_radius=8)
+
+        portrait_img = _get_char_portrait(char_name, PORTRAIT - 8)
+        pi_x = cx_col + (PORTRAIT - portrait_img.get_width())  // 2
+        pi_y = ph     + (PORTRAIT - portrait_img.get_height()) // 2
+        screen.blit(portrait_img, (pi_x, pi_y))
+
+        name_font = _get_results_name_font()
+        name_s    = name_font.render(char_name, True, COL_TEXT)
+        nx        = cx_col + PORTRAIT + 16
+        name_y    = ph + (PORTRAIT - name_s.get_height()) // 2
+        screen.blit(name_s, (nx, name_y))
+        y += PORTRAIT + 16
+
+        # Skill badges
+        skill_keys = ["LMB", "RMB", "SPACE", "E", "F"]
+        if player:
+            counts = [player.lmb_uses, player.rmb_uses, player.space_uses,
+                      player.e_uses, player.f_uses]
+        else:
+            counts = [0, 0, 0, 0, 0]
+
+        BADGE_H = 38
+        GAP     = 7
+        badge_w = (cw - GAP * 4) // 5
+        val_font = _get_results_val_font()
+
+        for i, (key, cnt) in enumerate(zip(skill_keys, counts)):
+            bx = cx_col + i * (badge_w + GAP)
+            br = pygame.Rect(bx, y, badge_w, BADGE_H)
+            pygame.draw.rect(screen, COL_SKILL,   br, border_radius=6)
+            pygame.draw.rect(screen, COL_BORDER2, br, 1, border_radius=6)
+            k_s = font_sm.render(key, True, COL_MUTED)
+            screen.blit(k_s, (bx + badge_w // 2 - k_s.get_width() // 2,
+                               y + BADGE_H // 2 - k_s.get_height() // 2))
+            c_s = val_font.render(str(cnt), True, COL_TEXT)
+            screen.blit(c_s, (bx + badge_w // 2 - c_s.get_width() // 2,
+                               y + BADGE_H + 5))
+
+        y += BADGE_H + val_font.get_height() + 14
+
+        # Stats rows
+        if player:
+            dist_disp = player.distance_traveled // 10
+            rows = [
+                ("Damage Dealt",        f"{player.damage_dealt:,}"),
+                ("Obstacles Destroyed", str(player.obstacles_destroyed)),
+                ("Healing Received",    f"{player.healing_received:,}"),
+                ("Distance Traveled (m)", f"{dist_disp:,}"),
+            ]
+        else:
+            rows = [("Damage Dealt", "—"), ("Obstacles Destroyed", "—"),
+                    ("Healing Received", "—"), ("Distance Traveled (m)", "—")]
+
+        ROW_H = 46
+        for lbl_str, val_str in rows:
+            pygame.draw.line(screen, COL_BORDER,
+                             (cx_col - 4, y), (cx_col + cw + 4, y))
+            lbl_s2 = font_sm.render(lbl_str,  True, COL_MUTED)
+            val_s2 = val_font.render(val_str, True, COL_TEXT)
+            row_cy = y + ROW_H // 2
+            screen.blit(lbl_s2, (cx_col + 4, row_cy - lbl_s2.get_height() // 2))
+            screen.blit(val_s2, (cx_col + cw - val_s2.get_width() - 4,
+                                  row_cy - val_s2.get_height() // 2))
+            y += ROW_H
+
+    # ── Footer — LOBBY button ─────────────────────────────────────────────────
+    FOOT_Y  = PY + PH - 58
+    pygame.draw.line(screen, COL_BORDER, (PX + 1, FOOT_Y), (PX + PW - 1, FOOT_Y))
+
+    BTN_W, BTN_H = 200, 42
+    mx_cur, my_cur = pygame.mouse.get_pos()
+    btn_r = pygame.Rect(CX - BTN_W // 2, FOOT_Y + (58 - BTN_H) // 2, BTN_W, BTN_H)
+    hov   = btn_r.collidepoint(mx_cur, my_cur)
+    pygame.draw.rect(screen, (28, 33, 52) if hov else (18, 22, 36), btn_r, border_radius=7)
+    pygame.draw.rect(screen, COL_BORDER2 if hov else COL_BORDER, btn_r, 1, border_radius=7)
+    lbl_s = font_sm.render("LOBBY", True, COL_TEXT if hov else COL_MUTED)
+    screen.blit(lbl_s, (btn_r.centerx - lbl_s.get_width() // 2,
+                         btn_r.centery - lbl_s.get_height() // 2))
+
+    return btn_r
