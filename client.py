@@ -546,7 +546,8 @@ def run() -> None:
                 state    = unpack_state(latest)
                 _next_lp = state.players.get(player_id)
                 if (_prev_lp and _next_lp and
-                        abs(_next_lp.x - _prev_lp.x) > 300):
+                        (abs(_next_lp.x - _prev_lp.x) > 300 or
+                         abs(_next_lp.y - _prev_lp.y) > 300)):
                     trigger_portal_flash()
                 new_gem_count = state.gold_counts.get(player_id, 0)
                 for _ in range(new_gem_count - _prev_gem_count):

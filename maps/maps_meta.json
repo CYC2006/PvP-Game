@@ -41,13 +41,13 @@
       {"label": "Golden Crates", "destructible": true,  "color": [220, 175,  30]}
     ],
     "minimap_bg": [22, 20, 26],
-    "width": 1080,
-    "height": 1080,
+    "width": 1680,
+    "height": 1680,
     "portals": [
-      {"x": 0,    "y_min": 420, "y_max": 660},
-      {"x": 1080, "y_min": 420, "y_max": 660},
-      {"y": 0,    "x_min": 420, "x_max": 660},
-      {"y": 1080, "x_min": 420, "x_max": 660}
+      {"x": 0,    "y_min": 720, "y_max": 960},
+      {"x": 1680, "y_min": 720, "y_max": 960},
+      {"y": 0,    "x_min": 720, "x_max": 960},
+      {"y": 1680, "x_min": 720, "x_max": 960}
     ]
   }
 ]

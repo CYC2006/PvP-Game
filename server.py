@@ -4,7 +4,7 @@ import socket
 import time
 import sys
 
-from game.state    import GameState, configure_map, PORTAL_Y_MIN, PORTAL_Y_MAX, PORTAL_COOLDOWN_TICKS, PLAYER_RADIUS
+from game.state    import GameState, configure_map, PORTAL_COOLDOWN_TICKS, PLAYER_RADIUS
 from game.obstacle import load_map
 from network.protocol import (
     PKT_JOIN, PKT_CMD, PKT_CHAR_SELECT, PKT_QUIT, PKT_PING, PKT_PONG,
@@ -151,23 +151,48 @@ def run(map_id: int = 0):
                 pass
 
     def _step_portals(state: GameState, room: RoomState, map_portals: list) -> None:
-        """Teleport players that walk into a portal edge."""
-        map_w = room.map_w
+        """Teleport players that walk into a portal edge, driven by map portal JSON data."""
+        map_w  = room.map_w
+        map_h  = room.map_h
+        REACH  = PLAYER_RADIUS * 2
+
+        # Split portals into horizontal (left/right, keyed by "x") and
+        # vertical (top/bottom, keyed by "y")
+        h_portals = [p for p in map_portals if "x" in p]
+        v_portals = [p for p in map_portals if "y" in p]
+
+        h_y_min = h_portals[0]["y_min"] if h_portals else None
+        h_y_max = h_portals[0]["y_max"] if h_portals else None
+        v_x_min = v_portals[0]["x_min"] if v_portals else None
+        v_x_max = v_portals[0]["x_max"] if v_portals else None
+
         for pid, player in state.players.items():
             cd = room.portal_cooldowns.get(pid, 0)
             if cd > 0:
                 room.portal_cooldowns[pid] = cd - 1
                 continue
-            if not (PORTAL_Y_MIN <= player.y <= PORTAL_Y_MAX):
-                continue
-            if player.x <= PLAYER_RADIUS * 2:
-                # Entered left portal → emerge at right
-                player.x = map_w - PLAYER_RADIUS * 2 - 4
-                room.portal_cooldowns[pid] = PORTAL_COOLDOWN_TICKS
-            elif player.x >= map_w - PLAYER_RADIUS * 2:
-                # Entered right portal → emerge at left
-                player.x = PLAYER_RADIUS * 2 + 4
-                room.portal_cooldowns[pid] = PORTAL_COOLDOWN_TICKS
+
+            teleported = False
+
+            # Left / right portals
+            if h_y_min is not None and h_y_min <= player.y <= h_y_max:
+                if player.x <= REACH:
+                    player.x = map_w - REACH - 4
+                    room.portal_cooldowns[pid] = PORTAL_COOLDOWN_TICKS
+                    teleported = True
+                elif player.x >= map_w - REACH:
+                    player.x = REACH + 4
+                    room.portal_cooldowns[pid] = PORTAL_COOLDOWN_TICKS
+                    teleported = True
+
+            # Top / bottom portals (skip if already teleported this tick)
+            if not teleported and v_x_min is not None and v_x_min <= player.x <= v_x_max:
+                if player.y <= REACH:
+                    player.y = map_h - REACH - 4
+                    room.portal_cooldowns[pid] = PORTAL_COOLDOWN_TICKS
+                elif player.y >= map_h - REACH:
+                    player.y = REACH + 4
+                    room.portal_cooldowns[pid] = PORTAL_COOLDOWN_TICKS
 
     def _reset_room(room: RoomState) -> None:
         for addr in list(room.addr_to_id.keys()):
