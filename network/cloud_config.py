@@ -5,6 +5,6 @@
 # 跨網路（Oracle VM）：     CLOUD_SERVER_IP = "129.225.195.211"
 #   → 先執行 bash deploy.sh 部署 server，兩台電腦點 ONLINE 即可撮合。
 
-#CLOUD_SERVER_IP   = "129.225.195.211"  # Oracle VM — auto-detection handles localhost fallback
-CLOUD_SERVER_IP   = "127.0.0.1"
+CLOUD_SERVER_IP   = "129.225.195.211"  # Oracle VM — auto-detection handles localhost fallback
+#CLOUD_SERVER_IP   = "127.0.0.1"
 CLOUD_SERVER_PORT = 5000
