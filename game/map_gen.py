@@ -60,14 +60,15 @@ def _try_place(rng, kind: str, scale: float,
     return None
 
 
-def _make(oid: int, kind: str, x: float, y: float, scale: float = 1.0) -> Obstacle:
+def _make(oid: int, kind: str, x: float, y: float,
+          scale: float = 1.0, angle_rad: float = 0.0) -> Obstacle:
     cfg = OBSTACLE_CONFIG[kind]
     return Obstacle(
         id=oid, x=x, y=y, kind=kind,
         width=float(cfg["width"]  * scale),
         height=float(cfg["height"] * scale),
         hp=cfg["hp"],
-        angle=0.0,
+        angle=angle_rad,
         shape=cfg.get("shape", "obb"),
         destructible=cfg.get("destructible", True),
         radius_ratio=cfg.get("radius_ratio", HITBOX_RATIO),
@@ -137,12 +138,15 @@ def _gen_grassland(seed: int, map_w: int = 1920, map_h: int = 1080) -> dict:
             obs[oid] = o; solids.append(o); oid += 1
 
     # Boxes — avoid all solid obstacles + trees + spawn zones
+    # Each box has a random scale (0.72-1.48) and angle (±45°), matching original map style
     all_avoid = solids + trees
     for _ in range(n_boxes):
-        kind = "box_special" if rng.random() < 0.10 else "box_normal"
-        pos = _try_place(rng, kind, 1.0, map_w, map_h, edge, all_avoid, zones)
+        kind  = "box_special" if rng.random() < 0.10 else "box_normal"
+        scale = rng.uniform(0.72, 1.48)
+        pos   = _try_place(rng, kind, scale, map_w, map_h, edge, all_avoid, zones)
         if pos:
-            o = _make(oid, kind, pos[0], pos[1])
+            angle = math.radians(rng.uniform(-45, 45))
+            o = _make(oid, kind, pos[0], pos[1], scale, angle)
             obs[oid] = o; solids.append(o); all_avoid.append(o); oid += 1
 
     return obs

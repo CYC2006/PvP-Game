@@ -27,7 +27,11 @@
     "minimap_bg": [14, 26, 14],
     "width": 2560,
     "height": 720,
-    "dynamic_obstacles": true
+    "dynamic_obstacles": true,
+    "portals": [
+      {"x": 0,    "y_min": 240, "y_max": 480},
+      {"x": 2560, "y_min": 240, "y_max": 480}
+    ]
   },
   {
     "id": "storage",
