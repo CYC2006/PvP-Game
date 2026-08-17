@@ -16,6 +16,7 @@ from game.chars.agent    import dash_fx as agent_dash_fx
 from game.chars.agent    import mercury_fx as agent_mercury_fx
 from game.chars.vince    import grenade_fx, airstrike_fx
 from game.chars.vince    import taunt_fx as vince_taunt_fx
+from game.chars.vince    import giant_fx as vince_giant_fx
 from game.chars.pioneer  import stun_bullet_fx
 from game.chars.vince.giant_state import get_scale as _giant_get_scale, GROW_TICKS, ACTIVE_TICKS, TOTAL_TICKS
 from game.chars.hunter   import mini_grenade_fx
@@ -35,6 +36,7 @@ from game.chars.marksman     import turret_fx as marksman_turret_fx
 from game.chars.marksman     import barrage_fx as marksman_barrage_fx
 from game.chars.pioneer  import shield_fx as pioneer_shield_fx
 from game.chars.pioneer  import jump_fx as pioneer_jump_fx
+from game.chars.pioneer  import clone_fx as pioneer_clone_fx
 from game.chars.robot    import push_fx as robot_push_fx
 from game.chars.robot    import mark_fx as robot_mark_fx
 from game.chars.robot    import e_fx as robot_e_fx
@@ -543,6 +545,10 @@ def draw(screen: pygame.Surface, state: GameState, my_id: int,
     shuriken_fx.detect_blade_sfx(state, my_id, player_chars or {})
     hunter_cloak_fx.detect_cloak_sfx(state, my_id, player_chars or {})
     pioneer_shield_fx.detect_shield_sfx(state, my_id, player_chars or {})
+    vince_giant_fx.detect_giant_sfx(state, my_id, player_chars or {})
+    pioneer_clone_fx.detect_clone_sfx(state, my_id, player_chars or {})
+    zombie_jump_fx.detect_jump_sfx(state, my_id, player_chars or {})
+    air_cannon_fx.detect_cannon_sfx(state, my_id)
 
     _draw_map(screen, cx, cy)
     if game_mode == "deathmatch":

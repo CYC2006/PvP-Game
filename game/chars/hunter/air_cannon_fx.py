@@ -4,12 +4,25 @@
 每幀直接從 state.air_cannons 讀取當前位置，無需額外狀態追蹤。
 """
 import pygame
+from game import audio
 from game.render_utils import ws, SCREEN_W, SCREEN_H
 
 _CANNON_RADIUS = 25    # 視覺半徑 px（與碰撞半徑對應）
 _FILL_ALPHA    = 120   # 填色透明度（0–255）
 _RING_ALPHA    = 200   # 外環透明度
 _RING_WIDTH    = 3     # 外環線寬 px
+
+_known_ids: set = set()   # 上一幀已知的 air_cannon id，偵測新出現的拋射物
+
+
+def detect_cannon_sfx(state, my_id: int) -> None:
+    current_ids = set(state.air_cannons)
+    for cid in current_ids - _known_ids:
+        cannon = state.air_cannons[cid]
+        volume = audio.VOLUME_SELF if cannon.owner_id == my_id else audio.VOLUME_OTHER
+        audio.play('others/hunter_air_cannon.wav', volume)
+    _known_ids.clear()
+    _known_ids.update(current_ids)
 
 
 def draw(screen: pygame.Surface, state, cx: float, cy: float) -> None:

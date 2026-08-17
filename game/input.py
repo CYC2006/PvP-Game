@@ -25,7 +25,7 @@ _PIONEER_RIFLE_SFX = ('weapon/pioneer_rifle_1.wav', 'weapon/pioneer_rifle_2.wav'
                       'weapon/pioneer_rifle_3.wav', 'weapon/pioneer_rifle_4.wav')
 _MARKSMAN_MACHINE_SFX = ('weapon/marksman_machine_1.wav', 'weapon/marksman_machine_2.wav',
                          'weapon/marksman_machine_3.wav', 'weapon/marksman_machine_4.wav')
-_HUNTER_SNIPER_SFX = 'weapon/hunter_sniper.wav'
+_HUNTER_SNIPER_SFX = ('weapon/hunter_sniper_1.wav', 'weapon/hunter_sniper_2.wav')
 _HUNTER_RELOAD_BASIC_SFX   = 'reload/hunter_reload_basic.wav'
 _HUNTER_RELOAD_1AMMO_SFX   = 'reload/hunter_reload_1ammo.wav'
 _HUNTER_RELOAD_BASE_MS     = 1000   # 固定基礎時間
@@ -667,7 +667,7 @@ def read_input(player_id: int, keys_held: set,
         elif _state.char_name == 'Marksman':
             audio.play(random.choice(_MARKSMAN_MACHINE_SFX), audio.VOLUME_SELF)
         elif _state.char_name == 'Hunter':
-            audio.play(_HUNTER_SNIPER_SFX, audio.VOLUME_SELF)
+            audio.play(random.choice(_HUNTER_SNIPER_SFX), audio.VOLUME_SELF)
         elif _state.char_name == 'Assassin':
             for pellet_i in range(_ASSASSIN_PELLET_COUNT):
                 due_ms = now + pellet_i * _ASSASSIN_PELLET_INTERVAL_MS

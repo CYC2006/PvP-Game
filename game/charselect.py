@@ -8,6 +8,7 @@ When confirmed: navigation (arrows, scroll, keys) is locked.
 import os
 import time
 import pygame
+from game import audio
 from game.char_data import CHAR_STATS, CHAR_ORDER, get_stat
 
 LOGICAL_W = 1280
@@ -167,11 +168,13 @@ def handle_event(event: pygame.event.Event) -> bool:
 
     elif event.type == pygame.KEYDOWN:
         if event.key in (pygame.K_LEFT, pygame.K_a):
-            if not _confirmed:
-                _target_idx = max(0, _target_idx - 1)
+            if not _confirmed and _target_idx > 0:
+                _target_idx -= 1
+                audio.play('pages/switch_button.wav')
         elif event.key in (pygame.K_RIGHT, pygame.K_d):
-            if not _confirmed:
-                _target_idx = min(N - 1, _target_idx + 1)
+            if not _confirmed and _target_idx < N - 1:
+                _target_idx += 1
+                audio.play('pages/switch_button.wav')
         elif event.key == pygame.K_RETURN:
             _confirmed = not _confirmed
             return _confirmed
@@ -181,8 +184,10 @@ def handle_event(event: pygame.event.Event) -> bool:
         if not _confirmed:
             if _left_arr_rect.collidepoint(mx, my) and _target_idx > 0:
                 _target_idx -= 1
+                audio.play('pages/switch_button.wav')
             elif _right_arr_rect.collidepoint(mx, my) and _target_idx < N - 1:
                 _target_idx += 1
+                audio.play('pages/switch_button.wav')
         if _confirm_btn_rect.collidepoint(mx, my):
             _confirmed = not _confirmed
             return _confirmed

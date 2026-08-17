@@ -5,6 +5,7 @@
 """
 import time
 import pygame
+from game import audio
 from game.render_utils import ws, SCREEN_W
 
 SHOCKWAVE_START_R  = 60
@@ -15,6 +16,19 @@ SHOCKWAVE_DURATION = 0.3   # 秒
 _prev_active:       dict = {}
 # [(world_x, world_y, start_time)]
 _landing_shockwaves: list = []
+
+_was_jumping: dict = {}   # pid → bool，上一幀 zombie_jump_tick 是否 >= 0
+
+
+def detect_jump_sfx(state, my_id: int, player_chars: dict) -> None:
+    for pid, player in state.players.items():
+        if player_chars.get(pid) != 'Zombie':
+            continue
+        jumping = player.zombie_jump_tick >= 0
+        if jumping and not _was_jumping.get(pid, False):
+            volume = audio.VOLUME_SELF if pid == my_id else audio.VOLUME_OTHER
+            audio.play('movement/zombie_jump.wav', volume)
+        _was_jumping[pid] = jumping
 
 
 def update(state) -> None:
