@@ -129,12 +129,13 @@ def _gen_grassland(seed: int, map_w: int = 1920, map_h: int = 1080) -> dict:
             o = _make(oid, "tree_1", pos[0], pos[1], scale)
             obs[oid] = o; trees.append(o); oid += 1
 
-    # Rocks — avoid other rocks + spawn zones; CAN be under trees
+    # Rocks — avoid other rocks + spawn zones; CAN be under trees; random rotation
     for _ in range(n_rocks):
-        kind = rng.choice(["rock_1", "rock_2"])
-        pos = _try_place(rng, kind, 1.0, map_w, map_h, edge, solids, zones)
+        kind  = rng.choice(["rock_1", "rock_2"])
+        pos   = _try_place(rng, kind, 1.0, map_w, map_h, edge, solids, zones)
         if pos:
-            o = _make(oid, kind, pos[0], pos[1])
+            angle = rng.uniform(0, 2 * math.pi)
+            o = _make(oid, kind, pos[0], pos[1], angle_rad=angle)
             obs[oid] = o; solids.append(o); oid += 1
 
     # Boxes — avoid all solid obstacles + trees + spawn zones
@@ -172,12 +173,13 @@ def _gen_treepath(seed: int, map_w: int = 2560, map_h: int = 720) -> dict:
             o = _make(oid, "tree_1", pos[0], pos[1], scale)
             obs[oid] = o; trees.append(o); oid += 1
 
-    # Rocks — avoid other rocks + spawn zones; CAN be placed under trees
+    # Rocks — avoid other rocks + spawn zones; CAN be placed under trees; random rotation
     for _ in range(n_rocks):
-        kind = rng.choice(["rock_1", "rock_2"])
-        pos = _try_place(rng, kind, 1.0, map_w, map_h, edge, rocks, zones)
+        kind  = rng.choice(["rock_1", "rock_2"])
+        pos   = _try_place(rng, kind, 1.0, map_w, map_h, edge, rocks, zones)
         if pos:
-            o = _make(oid, kind, pos[0], pos[1])
+            angle = rng.uniform(0, 2 * math.pi)
+            o = _make(oid, kind, pos[0], pos[1], angle_rad=angle)
             obs[oid] = o; rocks.append(o); oid += 1
 
     return obs

@@ -193,6 +193,18 @@ class Player:
     fire_interval_ticks: int  = 0      # min ticks between shots（由 apply_char_stats 設定）
     # ── Deathmatch zone ───────────────────────────────────────────────────
     zone_ticks: int           = 0      # consecutive ticks spent in danger zone
+    # ── Scoreboard stats (accumulated per game, not reset on respawn) ──────────
+    damage_dealt:        int   = 0
+    obstacles_destroyed: int   = 0
+    healing_received:    int   = 0
+    distance_traveled:   int   = 0
+    lmb_uses:            int   = 0
+    rmb_uses:            int   = 0
+    space_uses:          int   = 0
+    e_uses:              int   = 0
+    f_uses:              int   = 0
+    _tracking_x:         float = -1.0
+    _tracking_y:         float = -1.0
 
     def move(self, dx: float, dy: float, speed_mult: float = 1.0) -> None:
         length = (dx ** 2 + dy ** 2) ** 0.5
@@ -448,8 +460,9 @@ def get_zone_bounds(tick: int, map_w: int, map_h: int):
         return None
     cx = map_w // 2
     cy = map_h // 2
-    elapsed = tick - ZONE_START_TICK
-    half = max(50, 960 - elapsed // ZONE_SHRINK_RATE)
+    elapsed       = tick - ZONE_START_TICK
+    initial_half  = max(map_w, map_h) // 2
+    half          = max(50, initial_half - elapsed // ZONE_SHRINK_RATE)
     return (cx - half, cy - half, cx + half, cy + half)
 
 
@@ -653,6 +666,7 @@ class GameState:
                 # Pioneer R：分身同步射擊（只在普攻觸發，不在技能路徑）
                 if player.clone_until > self.tick:
                     self._spawn_clone_bullets(player_id, aim_x, aim_y)
+            player.lmb_uses = min(65535, player.lmb_uses + 1)
 
     def _spawn_bullet(self, owner_id: int, aim_x: float, aim_y: float,
                       bullet_scale_override: float = 0.0,
@@ -876,6 +890,8 @@ class GameState:
                     if obstacle_hp[oid] <= 0:
                         self.destroyed_obstacles.add(oid)
                         self._handle_obstacle_drop(obs)
+                        if shooter:
+                            shooter.obstacles_destroyed = min(255, shooter.obstacles_destroyed + 1)
                 expired.append(bid)
                 break
 
@@ -1209,6 +1225,14 @@ class GameState:
         if player.zombie_rage_tick >= 0:
             damage = damage // 2
 
+        # Track damage dealt by the opposing player (zone damage bypasses apply_damage)
+        if damage > 0:
+            attacker_id = next((pid for pid in self.players if pid != player_id), None)
+            if attacker_id is not None:
+                atk = self.players.get(attacker_id)
+                if atk is not None:
+                    atk.damage_dealt = min(65535, atk.damage_dealt + damage)
+
         shield = self.shields.get(player_id)
         if shield is not None and shield.broken_tick < 0:
             if damage >= shield.hp:
@@ -1314,7 +1338,9 @@ class GameState:
             p.rune_recovery_ticks = 360
         elif p.rune_id == 1:   # 強化恢復：瞬間 20%
             heal = int(p.base_max_hp * 0.20)
-            p.hp  = min(p.max_hp, p.hp + heal)
+            old_hp = p.hp
+            p.hp   = min(p.max_hp, p.hp + heal)
+            p.healing_received = min(65535, p.healing_received + (p.hp - old_hp))
 
     def step_rune_recovery(self) -> None:
         """每 tick 呼叫：驅動一般恢復的逐秒治療倒計時。"""
@@ -1323,8 +1349,10 @@ class GameState:
                 continue
             # 在 360, 300, 240, 180, 120, 60 tick 各回復 5%（共 6 次）
             if p.rune_recovery_ticks % 60 == 0:
-                heal = int(p.base_max_hp * 0.05)
-                p.hp = min(p.max_hp, p.hp + heal)
+                heal   = int(p.base_max_hp * 0.05)
+                old_hp = p.hp
+                p.hp   = min(p.max_hp, p.hp + heal)
+                p.healing_received = min(65535, p.healing_received + (p.hp - old_hp))
             p.rune_recovery_ticks -= 1
 
     def step_zone(self, tick: int, map_w: int, map_h: int) -> None:
@@ -1384,8 +1412,10 @@ class GameState:
             for pid, player in self.players.items():
                 if math.hypot(player.x - ingot.x, player.y - ingot.y) < PLAYER_RADIUS + GOLD_RADIUS:
                     if ingot.kind == "health":
-                        heal = int(player.max_hp * 0.10)
+                        heal   = int(player.max_hp * 0.10)
+                        old_hp = player.hp
                         player.hp = min(player.max_hp, player.hp + heal)
+                        player.healing_received = min(65535, player.healing_received + (player.hp - old_hp))
                     else:  # "gem"
                         self.gold_counts[pid] = self.gold_counts.get(pid, 0) + 1
                     collected.append(gid)
