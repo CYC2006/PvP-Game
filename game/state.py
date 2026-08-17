@@ -1396,9 +1396,14 @@ class GameState:
     def resolve_player_collisions(self, obstacles: dict = None) -> None:
         if not obstacles:
             return
+        from game.chars.vince.giant_state import GROW_TICKS, ACTIVE_TICKS
         for player in self.players.values():
             if player.jump_tick >= 0 or player.zombie_jump_tick >= 0:
                 continue  # 跳躍中：穿越障礙物
+            if player.giant_tick >= 0:
+                _ga = self.tick - player.giant_tick
+                if GROW_TICKS <= _ga < GROW_TICKS + ACTIVE_TICKS:
+                    continue  # 巨人化主動階段：無視障礙物與木頭屏障，可直接穿越
             for oid, obs in obstacles.items():
                 if oid in self.destroyed_obstacles:
                     continue

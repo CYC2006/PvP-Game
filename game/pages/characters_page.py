@@ -63,7 +63,8 @@ _SKILLS: dict = {
          "everyone caught in the blast."),
         ("GIANT FORM",    "F",     20,
          "Transforms you into a massive giant for a limited time, growing "
-         "far larger and tougher while hitting much harder."),
+         "far larger and tougher while hitting much harder. While fully "
+         "grown, you can walk straight through obstacles."),
     ],
     'Marksman': [
         ("IMPACT ROUND",  "RMB",   4,
