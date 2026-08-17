@@ -548,22 +548,25 @@ def pack_char_select(char_id: int, rune_id: int = 0) -> bytes:
 
 
 def pack_game_start(chars: dict = None, map_id: int = 0,
-                    game_mode: int = 0, side_flip: bool = False) -> bytes:
+                    game_mode: int = 0, side_flip: bool = False,
+                    obstacle_seed: int = 0) -> bytes:
     """
-    格式: PKT_GAME_START [pid char_id]... map_id game_mode side_flip
+    格式: PKT_GAME_START [pid char_id]... map_id game_mode side_flip seed_hi seed_lo
     game_mode: 0=deathmatch, 1=endless
+    obstacle_seed: 0 = load from file; >0 = generate dynamically with this seed
     """
     data = [PKT_GAME_START]
     if chars:
         for pid, char_id in sorted(chars.items()):
             data += [int(pid) & 0xFF, int(char_id) & 0xFF]
     data += [int(map_id) & 0xFF, int(game_mode) & 0xFF, 1 if side_flip else 0]
+    data += [(obstacle_seed >> 8) & 0xFF, obstacle_seed & 0xFF]
     return bytes(data)
 
 
 def unpack_game_start(data: bytes) -> tuple:
-    """回傳 ({pid: char_id}, map_id, game_mode, side_flip)。
-    格式固定為 2 對 [pid char_id]，後接 map_id, game_mode, side_flip。
+    """回傳 ({pid: char_id}, map_id, game_mode, side_flip, obstacle_seed)。
+    格式固定為 2 對 [pid char_id]，後接 map_id, game_mode, side_flip, seed_hi, seed_lo。
     """
     chars = {}
     i = 1
@@ -571,10 +574,12 @@ def unpack_game_start(data: bytes) -> tuple:
         if i + 1 < len(data):
             chars[data[i]] = data[i + 1]
             i += 2
-    map_id    = data[i]     if i     < len(data) else 0
-    game_mode = data[i + 1] if i + 1 < len(data) else 0
-    side_flip = bool(data[i + 2]) if i + 2 < len(data) else False
-    return chars, map_id, game_mode, side_flip
+    map_id        = data[i]     if i     < len(data) else 0
+    game_mode     = data[i + 1] if i + 1 < len(data) else 0
+    side_flip     = bool(data[i + 2]) if i + 2 < len(data) else False
+    obstacle_seed = (((data[i + 3] << 8) | data[i + 4])
+                     if i + 4 < len(data) else 0)
+    return chars, map_id, game_mode, side_flip, obstacle_seed
 
 
 def pack_quit(player_id: int) -> bytes:

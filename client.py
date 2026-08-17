@@ -284,13 +284,13 @@ def char_select_loop(sock, server_addr, player_id, room_code, screen,
                     sock.sendto(pack_quit(player_id), server_addr)
                 except Exception:
                     pass
-                return None, None, 0, 0
+                return None, None, 0, 0, "endless", False, 0
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 try:
                     sock.sendto(pack_quit(player_id), server_addr)
                 except Exception:
                     pass
-                return None, None, 0, 0
+                return None, None, 0, 0, "endless", False, 0
             just_confirmed = charselect.handle_event(event)
             if just_confirmed:
                 idx     = charselect.selected_idx()
@@ -327,14 +327,14 @@ def char_select_loop(sock, server_addr, player_id, room_code, screen,
                 data, _ = sock.recvfrom(BUF_SIZE)
                 pkt = packet_type(data)
                 if pkt == PKT_GAME_START:
-                    raw_chars, map_id, game_mode_wire, side_flip = unpack_game_start(data)
+                    raw_chars, map_id, game_mode_wire, side_flip, obs_seed = unpack_game_start(data)
                     player_chars = {pid: _CHAR_LIST[cid]["name"]
                                     for pid, cid in raw_chars.items()
                                     if 0 <= cid < len(_CHAR_LIST)}
                     gmode = "deathmatch" if game_mode_wire == 0 else "endless"
-                    return player_chars, charselect.selected_char()["name"], charselect.selected_rune(), map_id, gmode, side_flip
+                    return player_chars, charselect.selected_char()["name"], charselect.selected_rune(), map_id, gmode, side_flip, obs_seed
                 elif pkt == PKT_GAME_OVER:
-                    return None, None, 0, 0, "endless", False
+                    return None, None, 0, 0, "endless", False, 0
             except (BlockingIOError, ConnectionResetError, OSError):
                 break
 
@@ -438,7 +438,7 @@ def run() -> None:
         pygame.display.set_caption(f"PvP Game — Player {player_id}")
 
         # ── Char select ──────────────────────────────────────────────
-        player_chars, my_char_name, my_rune_id, map_id, game_mode, side_flip = char_select_loop(
+        player_chars, my_char_name, my_rune_id, map_id, game_mode, side_flip, obstacle_seed = char_select_loop(
             sock, server_addr, player_id, room_code, screen, font_lg, font_sm, clock,
             map_id=selected_map_id, game_mode=lobby_game_mode_idx)
         audio.stop_music()
@@ -451,7 +451,13 @@ def run() -> None:
         meta      = _get_maps_meta()
         map_entry = meta[map_id] if map_id < len(meta) else meta[0]
         configure_map(map_entry.get("width", 1920), map_entry.get("height", 1080))
-        obstacles = load_map(map_entry["file"])
+        if obstacle_seed:
+            from game.map_gen import generate as _gen_map
+            obstacles = _gen_map(map_entry["id"], obstacle_seed,
+                                 map_entry.get("width", 1920),
+                                 map_entry.get("height", 1080))
+        else:
+            obstacles = load_map(map_entry["file"])
 
         init_char(my_char_name)
         init_rune(my_rune_id)

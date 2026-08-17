@@ -3,33 +3,31 @@
     "id": "grassland",
     "file": "maps/map_01.json",
     "name": "GRASSLAND",
-    "desc": "An open field scattered with wooden crates, rocky outcrops, and clusters of tall trees. Cover is sparse but varied — positioning and map awareness are essential to winning.",
+    "desc": "An open field with randomly scattered wooden crates, rocky outcrops, and tall trees. Every match generates a fresh layout — no two games play the same.",
     "tags": [
       {"label": "Wooden Crates", "destructible": true,  "color": [165, 115,  60]},
+      {"label": "Golden Crates", "destructible": true,  "color": [220, 175,  30]},
       {"label": "Rocks",         "destructible": false, "color": [115, 125, 138]},
       {"label": "Trees",         "destructible": false, "color": [ 55, 148,  70]}
     ],
     "minimap_bg": [18, 32, 18],
     "width": 1920,
-    "height": 1080
+    "height": 1080,
+    "dynamic_obstacles": true
   },
   {
-    "id": "portal",
+    "id": "treepath",
     "file": "maps/map_02.json",
-    "name": "PORTAL",
-    "desc": "A wide corridor where mystical portals on each side connect opposite ends of the arena. Enter left to emerge right — master portal timing to gain the upper hand.",
+    "name": "TREE PATH",
+    "desc": "A wide forest corridor packed with dense rock clusters and towering trees. No boxes — only raw terrain. Rocks scatter freely beneath the canopy, making every match a different maze.",
     "tags": [
-      {"label": "Wooden Crates", "destructible": true,  "color": [165, 115,  60]},
-      {"label": "Rocks",         "destructible": false, "color": [115, 125, 138]},
-      {"label": "Trees",         "destructible": false, "color": [ 55, 148,  70]}
+      {"label": "Rocks",  "destructible": false, "color": [115, 125, 138]},
+      {"label": "Trees",  "destructible": false, "color": [ 55, 148,  70]}
     ],
-    "minimap_bg": [16, 12, 28],
-    "width": 1920,
+    "minimap_bg": [14, 26, 14],
+    "width": 2560,
     "height": 720,
-    "portals": [
-      {"x": 0,    "y_min": 240, "y_max": 480},
-      {"x": 1920, "y_min": 240, "y_max": 480}
-    ]
+    "dynamic_obstacles": true
   },
   {
     "id": "storage",
@@ -43,6 +41,7 @@
     "minimap_bg": [22, 20, 26],
     "width": 1680,
     "height": 1680,
+    "dynamic_obstacles": true,
     "portals": [
       {"x": 0,    "y_min": 720, "y_max": 960},
       {"x": 1680, "y_min": 720, "y_max": 960},

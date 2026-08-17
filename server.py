@@ -4,8 +4,9 @@ import socket
 import time
 import sys
 
-from game.state    import GameState, configure_map, PORTAL_COOLDOWN_TICKS, PLAYER_RADIUS
+from game.state       import GameState, configure_map, PORTAL_COOLDOWN_TICKS, PLAYER_RADIUS
 from game.obstacle import load_map
+from game.map_gen  import generate as _gen_map
 from network.protocol import (
     PKT_JOIN, PKT_CMD, PKT_CHAR_SELECT, PKT_QUIT, PKT_PING, PKT_PONG,
     pack_joined, pack_all_joined, pack_state, pack_game_start, pack_game_over,
@@ -88,7 +89,7 @@ class RoomState:
         'last_seen', 'obstacle_hp', 'game_started', 'paused', 'paused_since',
         'next_tick', 'waiting', 'portal_cooldowns',
         'map_id', 'obstacles', 'obstacle_hp_template', 'portals', 'map_w', 'map_h',
-        'game_mode', 'side_flip',
+        'game_mode', 'side_flip', 'obstacle_seed', 'dynamic_obstacles',
     )
 
     def __init__(self, map_id: int, map_data: dict):
@@ -113,6 +114,8 @@ class RoomState:
         self.portal_cooldowns  = {}
         self.game_mode         = 0   # 0=deathmatch, 1=endless
         self.side_flip         = False
+        self.obstacle_seed     = 0
+        self.dynamic_obstacles = map_data.get("dynamic_obstacles", False)
 
 
 def run(map_id: int = 0):
@@ -130,6 +133,7 @@ def run(map_id: int = 0):
             "portals":              entry.get("portals", []),
             "width":                w,
             "height":               h,
+            "dynamic_obstacles":    entry.get("dynamic_obstacles", False),
         }
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -309,7 +313,8 @@ def run(map_id: int = 0):
                         sock.sendto(pack_all_joined(), addr)
                     elif room.game_started and room.player_chars:
                         sock.sendto(pack_game_start(room.player_chars, room.map_id,
-                                                    room.game_mode, room.side_flip), addr)
+                                                    room.game_mode, room.side_flip,
+                                                    room.obstacle_seed), addr)
                 else:
                     if room is None:
                         # First player to join a room is treated as host — their map_id/mode wins
@@ -333,7 +338,9 @@ def run(map_id: int = 0):
                     continue
                 if room.game_started:
                     if room.player_chars:
-                        sock.sendto(pack_game_start(room.player_chars, room.map_id), addr)
+                        sock.sendto(pack_game_start(room.player_chars, room.map_id,
+                                                    room.game_mode, room.side_flip,
+                                                    room.obstacle_seed), addr)
                 else:
                     pid     = room.addr_to_id[addr]
                     char_id = data[1]
@@ -350,6 +357,32 @@ def run(map_id: int = 0):
                         room.state.game_mode   = _mode_str
                         room.state.side_flip   = room.side_flip
                         room.state.game_start_tick = room.state.tick
+
+                        # Re-init player positions now that final map dims and
+                        # side_flip are known (fixes race where joiner created
+                        # room with wrong map dimensions)
+                        configure_map(room.map_w, room.map_h)
+                        _lx = room.map_w // 4
+                        _rx = room.map_w * 3 // 4
+                        for _pid, _p in room.state.players.items():
+                            _sx = (_rx if _pid == 1 else _lx) if room.side_flip \
+                                  else (_lx if _pid == 1 else _rx)
+                            _p.x = _p.spawn_x = float(_sx)
+                            _p.y = float(room.map_h // 2)
+
+                        # Dynamic obstacle generation
+                        room.obstacle_seed = 0
+                        if room.dynamic_obstacles:
+                            _meta_entry  = meta[room.map_id] if room.map_id < len(meta) else meta[0]
+                            _map_name    = _meta_entry["id"]
+                            room.obstacle_seed = random.randint(1, 65535)
+                            _new_obs = _gen_map(_map_name, room.obstacle_seed,
+                                                room.map_w, room.map_h)
+                            room.obstacles            = _new_obs
+                            room.obstacle_hp_template = {oid: o.hp for oid, o in _new_obs.items()}
+                            room.obstacle_hp          = dict(room.obstacle_hp_template)
+                            print(f"[Server] {_map_name} dynamic seed={room.obstacle_seed}: {len(_new_obs)} obs")
+
                         from game.char_data import CHAR_ORDER, reload
                         reload()
                         for p_id, c_id in room.player_chars.items():
@@ -360,7 +393,8 @@ def run(map_id: int = 0):
                                 room.state.lives[p_id] = 3
                             print(f"[Server] Player {p_id} → {char_name}, rune {r_id}")
                         payload = pack_game_start(room.player_chars, room.map_id,
-                                                  room.game_mode, room.side_flip)
+                                                  room.game_mode, room.side_flip,
+                                                  room.obstacle_seed)
                         for a in room.clients.values():
                             try:
                                 sock.sendto(payload, a)

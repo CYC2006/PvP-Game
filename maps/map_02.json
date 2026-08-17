@@ -1,350 +1,558 @@
 {
-  "width": 1920,
+  "width": 2560,
   "height": 720,
   "obstacles": [
     {
-      "id": 0,
-      "kind": "tree_1",
-      "x": 150,
-      "y": 108,
-      "angle_deg": 0,
-      "scale": 1.0
-    },
-    {
       "id": 1,
       "kind": "tree_1",
-      "x": 250,
-      "y": 605,
+      "x": 1270.16,
+      "y": 344.07,
       "angle_deg": 0,
-      "scale": 0.85
+      "scale": 1.1859
     },
     {
       "id": 2,
       "kind": "tree_1",
-      "x": 1026,
-      "y": 258,
+      "x": 254.1,
+      "y": 472.52,
       "angle_deg": 0,
-      "scale": 1.19
+      "scale": 1.1037
     },
     {
       "id": 3,
-      "kind": "box_normal",
-      "x": 344,
-      "y": 261,
-      "angle_deg": -23,
-      "scale": 0.72
+      "kind": "tree_1",
+      "x": 1856.28,
+      "y": 182.16,
+      "angle_deg": 0,
+      "scale": 1.0118
     },
     {
       "id": 4,
-      "kind": "box_normal",
-      "x": 214,
-      "y": 420,
-      "angle_deg": -17,
-      "scale": 0.66
+      "kind": "tree_1",
+      "x": 2257.77,
+      "y": 502.87,
+      "angle_deg": 0,
+      "scale": 1.0171
     },
     {
       "id": 5,
-      "kind": "box_normal",
-      "x": 866,
-      "y": 607,
-      "angle_deg": -32,
-      "scale": 0.67
+      "kind": "tree_1",
+      "x": 809.59,
+      "y": 169.69,
+      "angle_deg": 0,
+      "scale": 0.8428
     },
     {
       "id": 6,
-      "kind": "box_normal",
-      "x": 1485,
-      "y": 68,
-      "angle_deg": 7,
-      "scale": 0.83
+      "kind": "tree_1",
+      "x": 919.23,
+      "y": 430.07,
+      "angle_deg": 0,
+      "scale": 1.1818
     },
     {
       "id": 7,
-      "kind": "box_normal",
-      "x": 535,
-      "y": 566,
-      "angle_deg": -14,
-      "scale": 0.8
+      "kind": "tree_1",
+      "x": 2271.54,
+      "y": 197.32,
+      "angle_deg": 0,
+      "scale": 1.1287
     },
     {
       "id": 8,
-      "kind": "box_normal",
-      "x": 1506,
-      "y": 181,
-      "angle_deg": 2,
-      "scale": 0.77
+      "kind": "tree_1",
+      "x": 1563.08,
+      "y": 218.01,
+      "angle_deg": 0,
+      "scale": 1.1591
     },
     {
       "id": 9,
-      "kind": "box_normal",
-      "x": 776,
-      "y": 524,
-      "angle_deg": 17,
-      "scale": 0.75
+      "kind": "tree_1",
+      "x": 1986.13,
+      "y": 531.34,
+      "angle_deg": 0,
+      "scale": 0.9554
     },
     {
       "id": 10,
-      "kind": "box_normal",
-      "x": 1210,
-      "y": 462,
-      "angle_deg": -1,
-      "scale": 0.83
+      "kind": "tree_1",
+      "x": 1593.23,
+      "y": 511.31,
+      "angle_deg": 0,
+      "scale": 1.0695
     },
     {
       "id": 11,
-      "kind": "box_normal",
-      "x": 1265,
-      "y": 283,
-      "angle_deg": 23,
-      "scale": 0.66
+      "kind": "rock_2",
+      "x": 2381.17,
+      "y": 121.35,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 12,
-      "kind": "box_normal",
-      "x": 383,
-      "y": 555,
-      "angle_deg": 14,
-      "scale": 0.83
+      "kind": "rock_1",
+      "x": 847.49,
+      "y": 540.51,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 13,
-      "kind": "box_normal",
-      "x": 763,
-      "y": 100,
-      "angle_deg": 7,
-      "scale": 0.74
+      "kind": "rock_2",
+      "x": 680.2,
+      "y": 152.49,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 14,
-      "kind": "box_normal",
-      "x": 663,
-      "y": 170,
-      "angle_deg": 12,
-      "scale": 0.67
+      "kind": "rock_1",
+      "x": 1400.84,
+      "y": 136.88,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 15,
-      "kind": "box_normal",
-      "x": 1365,
-      "y": 610,
-      "angle_deg": 44,
-      "scale": 0.78
+      "kind": "rock_1",
+      "x": 150.77,
+      "y": 105.16,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 16,
-      "kind": "box_normal",
-      "x": 376,
-      "y": 660,
-      "angle_deg": 23,
-      "scale": 0.74
+      "kind": "rock_2",
+      "x": 1264.1,
+      "y": 548.58,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 17,
-      "kind": "box_normal",
-      "x": 841,
-      "y": 311,
-      "angle_deg": -39,
-      "scale": 0.67
+      "kind": "rock_1",
+      "x": 338.21,
+      "y": 504.43,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 18,
-      "kind": "box_normal",
-      "x": 1025,
-      "y": 100,
-      "angle_deg": -9,
-      "scale": 0.79
+      "kind": "rock_2",
+      "x": 281.97,
+      "y": 593.6,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 19,
-      "kind": "box_normal",
-      "x": 910,
-      "y": 513,
-      "angle_deg": -14,
-      "scale": 0.72
+      "kind": "rock_1",
+      "x": 523.78,
+      "y": 177.77,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 20,
-      "kind": "box_normal",
-      "x": 1212,
-      "y": 647,
-      "angle_deg": -7,
-      "scale": 0.83
+      "kind": "rock_1",
+      "x": 2038.86,
+      "y": 266.29,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 21,
-      "kind": "box_normal",
-      "x": 1354,
-      "y": 469,
-      "angle_deg": -24,
-      "scale": 0.72
+      "kind": "rock_1",
+      "x": 1774.0,
+      "y": 534.04,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 22,
-      "kind": "box_normal",
-      "x": 991,
-      "y": 439,
-      "angle_deg": -10,
-      "scale": 0.81
+      "kind": "rock_2",
+      "x": 398.07,
+      "y": 207.51,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 23,
       "kind": "rock_1",
-      "x": 1632,
-      "y": 507,
-      "angle_deg": 15,
-      "scale": 1.19
+      "x": 1940.19,
+      "y": 526.94,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 24,
       "kind": "rock_1",
-      "x": 1632,
-      "y": 369,
+      "x": 520.45,
+      "y": 324.97,
       "angle_deg": 0,
-      "scale": 0.68
+      "scale": 1.0
     },
     {
       "id": 25,
       "kind": "rock_1",
-      "x": 1672,
-      "y": 262,
-      "angle_deg": 1,
-      "scale": 0.76
+      "x": 683.62,
+      "y": 504.44,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 26,
-      "kind": "rock_1",
-      "x": 776,
-      "y": 627,
-      "angle_deg": -27,
-      "scale": 0.65
+      "kind": "rock_2",
+      "x": 2007.48,
+      "y": 385.62,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 27,
-      "kind": "rock_1",
-      "x": 1667,
-      "y": 173,
-      "angle_deg": -37,
-      "scale": 0.94
+      "kind": "rock_2",
+      "x": 1033.88,
+      "y": 276.11,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 28,
-      "kind": "rock_1",
-      "x": 629,
-      "y": 263,
-      "angle_deg": 39,
-      "scale": 0.92
+      "kind": "rock_2",
+      "x": 2301.03,
+      "y": 607.68,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 29,
       "kind": "rock_1",
-      "x": 1101,
-      "y": 352,
-      "angle_deg": -25,
-      "scale": 0.84
+      "x": 247.08,
+      "y": 284.57,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 30,
       "kind": "rock_1",
-      "x": 276,
-      "y": 87,
-      "angle_deg": -12,
-      "scale": 1.12
+      "x": 1500.77,
+      "y": 172.02,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 31,
-      "kind": "rock_1",
-      "x": 676,
-      "y": 515,
-      "angle_deg": -29,
-      "scale": 1.09
+      "kind": "rock_2",
+      "x": 117.65,
+      "y": 374.92,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 32,
-      "kind": "rock_1",
-      "x": 1824,
-      "y": 93,
+      "kind": "rock_2",
+      "x": 2295.05,
+      "y": 432.34,
       "angle_deg": 0,
-      "scale": 0.85
+      "scale": 1.0
     },
     {
       "id": 33,
       "kind": "rock_1",
-      "x": 638,
-      "y": 631,
-      "angle_deg": -10,
-      "scale": 0.63
+      "x": 1230.03,
+      "y": 217.03,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 34,
-      "kind": "rock_1",
-      "x": 850,
-      "y": 404,
-      "angle_deg": 17,
-      "scale": 0.75
+      "kind": "rock_2",
+      "x": 895.21,
+      "y": 417.87,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 35,
-      "kind": "box_special",
-      "x": 962,
-      "y": 607,
-      "angle_deg": 41,
-      "scale": 0.71
+      "kind": "rock_2",
+      "x": 2394.75,
+      "y": 214.12,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 36,
-      "kind": "box_special",
-      "x": 385,
-      "y": 67,
-      "angle_deg": 21,
-      "scale": 0.78
+      "kind": "rock_1",
+      "x": 804.97,
+      "y": 255.77,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 37,
-      "kind": "box_special",
-      "x": 919,
-      "y": 81,
-      "angle_deg": -32,
-      "scale": 0.85
+      "kind": "rock_2",
+      "x": 489.82,
+      "y": 464.66,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 38,
-      "kind": "box_special",
-      "x": 1631,
-      "y": 599,
-      "angle_deg": 33,
-      "scale": 0.69
+      "kind": "rock_2",
+      "x": 1503.2,
+      "y": 545.26,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 39,
-      "kind": "box_special",
-      "x": 1575,
-      "y": 240,
-      "angle_deg": -3,
-      "scale": 0.82
+      "kind": "rock_2",
+      "x": 1888.29,
+      "y": 127.11,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 40,
       "kind": "rock_2",
-      "x": 566,
-      "y": 111,
-      "angle_deg": 4,
-      "scale": 0.78
+      "x": 1792.48,
+      "y": 280.95,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 41,
-      "kind": "rock_2",
-      "x": 1087,
-      "y": 520,
-      "angle_deg": -13,
-      "scale": 0.77
+      "kind": "rock_1",
+      "x": 1384.37,
+      "y": 617.04,
+      "angle_deg": 0,
+      "scale": 1.0
     },
     {
       "id": 42,
+      "kind": "rock_1",
+      "x": 1656.93,
+      "y": 464.21,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 43,
       "kind": "rock_2",
-      "x": 948,
-      "y": 174,
-      "angle_deg": -23,
-      "scale": 0.68
+      "x": 2108.36,
+      "y": 588.8,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 44,
+      "kind": "rock_2",
+      "x": 1037.49,
+      "y": 573.24,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 45,
+      "kind": "rock_2",
+      "x": 1517.6,
+      "y": 312.28,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 46,
+      "kind": "rock_1",
+      "x": 1658.8,
+      "y": 244.39,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 47,
+      "kind": "rock_2",
+      "x": 1379.92,
+      "y": 242.08,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 48,
+      "kind": "rock_2",
+      "x": 1091.12,
+      "y": 163.34,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 49,
+      "kind": "rock_1",
+      "x": 770.35,
+      "y": 156.23,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 50,
+      "kind": "rock_1",
+      "x": 422.36,
+      "y": 360.19,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 51,
+      "kind": "rock_2",
+      "x": 1131.72,
+      "y": 452.18,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 52,
+      "kind": "rock_2",
+      "x": 755.19,
+      "y": 411.05,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 53,
+      "kind": "rock_1",
+      "x": 2429.36,
+      "y": 340.02,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 54,
+      "kind": "rock_2",
+      "x": 2430.7,
+      "y": 465.5,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 55,
+      "kind": "rock_2",
+      "x": 948.24,
+      "y": 101.83,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 56,
+      "kind": "rock_2",
+      "x": 149.03,
+      "y": 475.07,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 57,
+      "kind": "rock_1",
+      "x": 1595.61,
+      "y": 587.3,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 58,
+      "kind": "rock_2",
+      "x": 2097.19,
+      "y": 499.1,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 59,
+      "kind": "rock_1",
+      "x": 924.7,
+      "y": 237.58,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 60,
+      "kind": "rock_2",
+      "x": 2162.5,
+      "y": 383.01,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 61,
+      "kind": "rock_1",
+      "x": 659.87,
+      "y": 273.65,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 62,
+      "kind": "rock_1",
+      "x": 2145.45,
+      "y": 271.41,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 63,
+      "kind": "rock_1",
+      "x": 2302.17,
+      "y": 229.18,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 64,
+      "kind": "rock_2",
+      "x": 490.89,
+      "y": 605.99,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 65,
+      "kind": "rock_2",
+      "x": 1140.01,
+      "y": 261.08,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 66,
+      "kind": "rock_2",
+      "x": 2256.28,
+      "y": 107.89,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 67,
+      "kind": "rock_1",
+      "x": 1367.27,
+      "y": 372.95,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 68,
+      "kind": "rock_1",
+      "x": 1019.7,
+      "y": 428.15,
+      "angle_deg": 0,
+      "scale": 1.0
+    },
+    {
+      "id": 69,
+      "kind": "rock_2",
+      "x": 693.73,
+      "y": 607.73,
+      "angle_deg": 0,
+      "scale": 1.0
     }
   ]
 }
