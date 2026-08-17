@@ -103,7 +103,7 @@ _anim_offset:        float = 0.0
 _confirmed:          bool  = False
 _selected_rune:      int   = 0   # 選中的魔紋 ID（0/1/2）
 _countdown_start_ms: int   = 0
-_COUNTDOWN_TOTAL:    int   = 30  # seconds
+_COUNTDOWN_TOTAL:    int   = 29  # seconds
 
 # ── 點擊區域（每幀在 draw 裡更新）────────────────────────────────────────
 _left_arr_rect:    pygame.Rect = pygame.Rect(0, 0, 0, 0)
