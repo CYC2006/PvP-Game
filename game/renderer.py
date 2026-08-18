@@ -255,6 +255,7 @@ def reset_game_state() -> None:
     _skill_pie_surf      = None
     _portal_flash_frames = 0
     _zone_embers.clear()
+    r_dash_fx.reset()
 
 
 # 各障礙物種類的粒子顏色（同色系深淺變化）

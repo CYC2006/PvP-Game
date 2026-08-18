@@ -32,6 +32,18 @@ _trail_end_ms:     int  = 0
 _trail_was_active: bool = False
 
 
+def reset() -> None:
+    """每局遊戲開始前呼叫，清除跨局殘留的殘影 / 刮痕狀態（避免 spawn_tick 舊局殘留）。"""
+    global _last_afterimage_tick, _last_r_afterimage_tick, _trail_end_ms, _trail_was_active
+    _was_rushing.clear()
+    _afterimages.clear()
+    _last_afterimage_tick   = 0
+    _last_r_afterimage_tick = 0
+    _trail_triangles.clear()
+    _trail_end_ms     = 0
+    _trail_was_active = False
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 殘影
 # ─────────────────────────────────────────────────────────────────────────────
@@ -63,7 +75,9 @@ def draw_afterimages(screen, cx: float, cy: float, state_tick: int) -> None:
         img, wx, wy, spawn_tick = item[0], item[1], item[2], item[3]
         max_age = item[4] if len(item) > 4 else 24
         age = state_tick - spawn_tick
-        if age >= max_age:
+        # age < 0 只會發生在殘影跨局殘留（新局 tick 低於舊局 spawn_tick）
+        # 直接視為過期丟棄，避免 alpha 溢出 [0, 255]
+        if age < 0 or age >= max_age:
             continue
         alive.append(item)
         alpha = int(170 * (1.0 - age / max_age))
