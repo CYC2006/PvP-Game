@@ -78,6 +78,10 @@ def _draw_spaced_digits(screen: pygame.Surface, font: pygame.font.Font,
 
 _local_server_started = False
 
+# Tracks the most recently matched session so an unexpected crash can still
+# notify the server (see _notify_server_quit / __main__ finally block below).
+_active_session = {"player_id": None, "server_addr": None}
+
 def _start_server_thread(map_id: int = 0) -> None:
     """Start server.py as a daemon thread for local / same-machine testing."""
     def _run_safe():
@@ -252,6 +256,23 @@ def _cancel_matchmaking(sock, server_addr, player_id):
             sock.sendto(pack_quit(player_id), server_addr)
         except Exception:
             pass
+
+
+def _notify_server_quit() -> None:
+    """Best-effort PKT_QUIT for unexpected exits (crash / Ctrl+C) where the normal
+    in-loop quit handlers never get a chance to run, so the opponent isn't left
+    silently frozen for the server's disconnect-timeout window. Uses a fresh
+    socket since the session's own socket may already be closed or unusable."""
+    player_id   = _active_session["player_id"]
+    server_addr = _active_session["server_addr"]
+    if player_id is None or server_addr is None:
+        return
+    try:
+        notify_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        notify_sock.sendto(pack_quit(player_id), server_addr)
+        notify_sock.close()
+    except Exception:
+        pass
 
 
 # ── 選角畫面 ──────────────────────────────────────────────────────────────────
@@ -456,6 +477,8 @@ def run() -> None:
         if player_id is None:
             sock.close()
             continue
+        _active_session["player_id"]   = player_id
+        _active_session["server_addr"] = server_addr
 
         pygame.display.set_caption(f"PvP Game — Player {player_id}")
 
@@ -651,3 +674,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n[Client] Disconnected.")
         sys.exit(0)
+    finally:
+        _notify_server_quit()
